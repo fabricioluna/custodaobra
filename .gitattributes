@@ -1,0 +1,9 @@
+# Fins de linha LF no repositório e na cópia de trabalho, inclusive no Windows.
+# Evita diferenças falsas entre o Prettier local e o CI.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.webp binary
