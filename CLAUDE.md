@@ -84,7 +84,7 @@ Regras:
 Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `updated_at` (`timestamptz`) em todas as tabelas, trigger para `updated_at`. Nomes de tabelas e colunas em inglês, `snake_case`. Valores em dinheiro sempre `bigint` em **centavos**.
 
 ### Identidade e contas
-- `profiles`: `id` (= `auth.users.id`), `full_name`, `whatsapp_phone` (formato E.164, único, nulo até vincular), `whatsapp_linked_at`, `default_org_id`
+- `profiles`: `id` (= `auth.users.id`), `full_name`, `whatsapp_phone` (formato E.164, único, nulo até vincular), `whatsapp_linked_at`, `default_org_id`, `onboarded_at` (preenchido quando a pessoa conclui o primeiro acesso, em que escolhe o nome da conta)
 - `organizations`: `id`, `name`, `slug` (único), `kind` (`personal` | `business`), `timezone` (padrão `America/Recife`), `created_by`
 - `organization_members`: `org_id`, `user_id`, `role` (`owner` | `admin` | `member`). PK composta.
 - `invitations`: `id`, `org_id`, `project_id` (nulo se o convite é para a organização toda), `email` ou `phone`, `role`, `token_hash`, `expires_at`, `accepted_at`, `invited_by`
@@ -109,7 +109,7 @@ Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `up
 - `whatsapp_messages` (log): `id`, `wa_message_id` (único, garante idempotência), `direction` (`in` | `out`), `from_phone`, `user_id`, `org_id`, `type`, `payload` (jsonb), `expense_id`, `processed_at`, `error`
 
 ### Comercial
-- `plans` (global): `code`, `name`, `max_projects`, `max_members`, `whatsapp_enabled`, `max_whatsapp_entries_month`, `max_ai_calls_month`, `price_cents_month`, `active`
+- `plans` (global): `code`, `name`, `max_projects`, `max_members`, `whatsapp_enabled`, `max_whatsapp_entries_month`, `max_ai_calls_month`, `price_cents_month`, `trial_days` (dias de teste de uma conta nova), `is_default` (plano em que toda conta nova começa; só um), `active`
 - `subscriptions`: `id`, `org_id` (único), `plan_code`, `status` (`trialing` | `active` | `past_due` | `cancelled`), `trial_ends_at`, `current_period_end`, `provider`, `provider_customer_id`, `provider_subscription_id`
 - `usage_counters`: `org_id`, `month` (`date`, primeiro dia do mês), `whatsapp_entries`, `ai_calls`, `ai_input_tokens`, `ai_output_tokens`. PK `(org_id, month)`.
 - `audit_log`: `id`, `org_id`, `user_id`, `entity`, `entity_id`, `action`, `diff` (jsonb), `created_at`
@@ -253,7 +253,7 @@ src/
     database.ts             gerado pelo Supabase CLI, nunca editar à mão
 supabase/
   migrations/
-  seed.sql                  planos, stage_templates, categorias padrão, dados de demonstração
+  seed.sql                  só dados de demonstração (planos, stage_templates e categorias padrão vêm por migration)
 tests/
   unit/
   e2e/
@@ -272,6 +272,7 @@ tests/
 - Nada de `any`. Tipos do banco gerados com `supabase gen types`.
 - Toda mudança de banco é uma migration em `supabase/migrations/`. Nunca alterar o banco pelo painel do Supabase.
 - Toda migration que cria tabela já cria as políticas RLS da tabela.
+- Dados de referência que precisam existir em todos os ambientes (planos, `stage_templates`, categorias padrão) entram por migration, não pelo `seed.sql`: o `seed.sql` só roda no Supabase local, e os ambientes `dev` e `prod` ficam na nuvem.
 - Componentes acessíveis: rótulos em todos os campos, foco visível, área de toque mínima de 44 px.
 - Botão flutuante "Lançar gasto" sempre visível na área da obra, abrindo um formulário curto: valor (teclado numérico), descrição, etapa (opcional), e o resto em "mais detalhes".
 - Estados vazios explicam o próximo passo ("Nenhum gasto ainda. Toque em Lançar gasto ou mande uma mensagem no WhatsApp").
@@ -420,5 +421,7 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 - **Nome:** Custo da Obra (verificar e registrar o domínio custodaobra.com.br; criar logo próprio e depositar como marca mista no INPI, classes 42 e 9)
 - **Banco e autenticação:** Supabase (decidido)
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
-- **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos
+- **Planos:** provisórios, preço zero, 14 dias de teste. `pessoal` (padrão do cadastro): 1 obra, 3 membros, 300 lançamentos por WhatsApp e 600 chamadas de IA por mês. `profissional`: 10 obras, 10 membros, 3000 e 6000.
+- **Organização pessoal:** nasce com o nome da pessoa (Google) ou o começo do e-mail; no primeiro acesso a pessoa confirma ou troca (pelo próprio nome ou o da empresa).
+- **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos; cores da marca (os tokens daqui diferem da logo em JPEG, que é mais saturada: azul perto de `#002344`, dourado perto de `#FFB900`)
 - **Contas necessárias:** Supabase (dev e prod), Vercel, chave da API da Anthropic (cobrada à parte da assinatura do Claude), conta de desenvolvedor Meta com app do WhatsApp Business
