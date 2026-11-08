@@ -17,14 +17,19 @@ A logo é uma casa em contorno amarelo-dourado com três barras de gráfico dent
 
   | Token | Cor | Uso |
   |---|---|---|
-  | `brand-navy` | `#1C2A44` | fundo de destaque, cabeçalho, tela de login, ícone do app |
-  | `brand-gold` | `#ECB72D` | ação principal (botão "Lançar gasto"), destaques, gráficos |
-  | `brand-white` | `#FFFFFF` | texto sobre o azul-marinho |
+  | `brand-navy` (azul planta) | `#002344` | estrutura: cabeçalho, navegação, tela de login, ícone do app, texto principal |
+  | `brand-gold` (dourado lápis) | `#FFB800` | só para dinheiro: botão "Lançar gasto", item ativo sobre o azul, "realizado" nos gráficos |
+  | `brand-white` | `#FFFFFF` | texto sobre o azul |
+  | `concrete` | `#F2F4F7` | fundo do app no tema claro |
+  | `graphite` | `#4E5D72` | texto secundário |
+
+  Cores tiradas da logo (o JPEG está em Adobe RGB; os valores acima já estão convertidos para sRGB).
 
 - O dourado não tem contraste suficiente para texto pequeno sobre fundo branco. Sobre fundo claro, use o dourado só em botões (com texto azul-marinho dentro) e elementos gráficos; texto corrido fica em azul-marinho ou cinza escuro.
 - Alertas do previsto x realizado usam cores próprias (verde, amarelo, vermelho), separadas da paleta da marca, para o dourado nunca ser confundido com "atenção".
 - Tema claro como padrão, com versão escura usando o azul-marinho como fundo.
-- Fonte da interface: sem serifa, legível e com números tabulares para valores em dinheiro (sugestão: Inter ou Plus Jakarta Sans via `next/font`).
+- Fonte da interface: **Archivo** (via `next/font`, com eixo de largura). Corpo na largura normal; títulos com o utilitário `heading` (largura expandida, peso 800, como letra de placa de obra). Números tabulares em valores em dinheiro (utilitário `money`).
+- Princípios visuais: tudo alinhado à esquerda; o azul enquadra a tela (cabeçalho e navegação); o dourado é reservado ao dinheiro; a tecla dourada "Lançar gasto" é o elemento mais forte da tela e o resto fica quieto. A grade de planta baixa (`blueprint-grid`) aparece só em superfícies azuis de abertura (início e login). Ícones regenerados com `npm run icons`.
 
 App web (PWA) para quem está construindo ou reformando uma casa controlar os gastos da obra. O diferencial é lançar despesas pelo WhatsApp (texto, foto de cupom, áudio) e acompanhar o **previsto x realizado por etapa** enquanto a obra acontece, a tempo de corrigir o rumo.
 
@@ -98,7 +103,7 @@ Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `up
 
 ### Gastos
 - `suppliers` (fornecedores): `id`, `org_id`, `name`, `document` (CPF ou CNPJ, opcional), `phone`, `kind` (`loja` | `profissional` | `empresa` | `outro`)
-- `expenses` (lançamentos): `id`, `org_id`, `project_id`, `stage_id` (nulo = sem etapa), `category_id`, `supplier_id` (nulo), `description`, `amount_cents`, `spent_on` (`date`), `payment_method` (`pix` | `dinheiro` | `cartao_credito` | `cartao_debito` | `boleto` | `transferencia` | `outro`), `has_invoice` (bool), `invoice_number`, `nfe_access_key`, `status` (`pending` | `confirmed` | `cancelled`), `source` (`app` | `whatsapp_text` | `whatsapp_audio` | `whatsapp_image` | `import`), `raw_input` (texto original ou transcrição), `ai_confidence` (0 a 1, nulo se manual), `payable_id` (nulo), `created_by`, `deleted_at`
+- `expenses` (lançamentos): `id`, `org_id`, `project_id`, `stage_id` (nulo = sem etapa), `category_id`, `supplier_id` (nulo), `description`, `amount_cents`, `quantity` (numérico, nulo), `unit` (ex.: `saco`, `m³`, `milheiro`, nulo), `unit_price_cents` (nulo), `spent_on` (`date`), `payment_method` (`pix` | `dinheiro` | `cartao_credito` | `cartao_debito` | `boleto` | `transferencia` | `outro`), `has_invoice` (bool), `invoice_number`, `nfe_access_key`, `status` (`pending` | `confirmed` | `cancelled`), `source` (`app` | `whatsapp_text` | `whatsapp_audio` | `whatsapp_image` | `import`), `raw_input` (texto original ou transcrição), `ai_confidence` (0 a 1, nulo se manual), `payable_id` (nulo), `created_by`, `deleted_at`
 - `expense_items` (itens de um cupom, fase 4): `id`, `org_id`, `expense_id`, `description`, `quantity`, `unit`, `unit_price_cents`, `total_cents`
 - `attachments` (comprovantes): `id`, `org_id`, `expense_id`, `storage_path`, `mime_type`, `size_bytes`, `uploaded_by`
 - `payables` (contas a pagar): `id`, `org_id`, `project_id`, `stage_id`, `category_id`, `supplier_id`, `description`, `amount_cents`, `due_date`, `status` (`open` | `paid` | `cancelled`), `installment_group_id`, `installment_number`, `installment_total`, `paid_expense_id`
@@ -145,7 +150,9 @@ Views precisam respeitar RLS (`security_invoker = true`).
   | Limpeza e entrega | 3 |
 
   Esses percentuais são uma referência aproximada e editável, nunca apresentados como dado técnico exato.
-- **Categorias padrão**: Material, Mão de obra, Serviço terceirizado, Aluguel de equipamentos, Frete, Taxas e documentação, Outros.
+- **Categorias padrão**: Material, Mão de obra, Serviço terceirizado, Aluguel de equipamentos, Frete, Taxas e documentação, Terreno, Outros.
+- **Terreno** (compra do lote, ITBI, escritura do terreno): aparece no total investido, mas fica **fora** do custo da construção, do custo por m² e da comparação previsto x realizado das etapas, para não distorcer esses números. O painel mostra os dois valores separados: "Construção" e "Terreno".
+- **Quantidade × valor unitário** (opcional, em "mais detalhes" do lançamento): a pessoa informa, por exemplo, 20 sacos × R$ 39,00 e o app calcula o total. O valor gravado continua sendo `amount_cents`; quantidade, unidade e valor unitário são só detalhe do lançamento.
 - Lançamento sem etapa aparece numa lista "Para classificar" no painel.
 - Lançamentos `pending` **não** entram em nenhum total. Pendentes com mais de 24 h são cancelados por um cron diário.
 - Exclusão de lançamento é sempre lógica (`deleted_at`). Toda criação, edição e exclusão gera registro em `audit_log`.
@@ -358,10 +365,10 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 
 ### Fase 1: MVP web
 - CRUD de obras com etapas padrão criadas automaticamente
-- Lançamento de gasto pelo app com foto do comprovante
+- Lançamento de gasto pelo app com foto do comprovante, e quantidade × valor unitário opcional em "mais detalhes"
 - Fornecedores (criados automaticamente ao digitar um nome novo)
 - Lista de lançamentos com filtros (período, etapa, categoria, fornecedor, com ou sem nota) e busca
-- Painel da obra: total gasto, gasto por etapa, por categoria e por mês, lista "Para classificar"
+- Painel da obra: total gasto (construção e terreno separados), gasto por etapa, por categoria e por mês, lista "Para classificar"
 - Exportar lançamentos em XLSX e CSV
 - PWA instalável
 
@@ -423,5 +430,5 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
 - **Planos:** provisórios, preço zero, 14 dias de teste. `pessoal` (padrão do cadastro): 1 obra, 3 membros, 300 lançamentos por WhatsApp e 600 chamadas de IA por mês. `profissional`: 10 obras, 10 membros, 3000 e 6000.
 - **Organização pessoal:** nasce com o nome da pessoa (Google) ou o começo do e-mail; no primeiro acesso a pessoa confirma ou troca (pelo próprio nome ou o da empresa).
-- **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos; cores da marca (os tokens daqui diferem da logo em JPEG, que é mais saturada: azul perto de `#002344`, dourado perto de `#FFB900`)
+- **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos
 - **Contas necessárias:** Supabase (dev e prod), Vercel, chave da API da Anthropic (cobrada à parte da assinatura do Claude), conta de desenvolvedor Meta com app do WhatsApp Business
