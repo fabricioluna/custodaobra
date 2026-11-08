@@ -17,7 +17,7 @@ export function BrandMark({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 text-lg font-extrabold tracking-tight text-brand-white",
+        "inline-flex items-center gap-2.5 text-lg heading text-brand-white",
         className,
       )}
     >
@@ -28,7 +28,7 @@ export function BrandMark({
         height={iconSize}
         unoptimized
         priority
-        className="rounded-md"
+        className="rounded-[22%]"
       />
       {APP_NAME}
     </span>

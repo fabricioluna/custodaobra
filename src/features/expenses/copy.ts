@@ -1,7 +1,7 @@
 export const expensesCopy = {
   list: {
-    title: "Lançamentos",
-    description: "Todos os gastos das suas obras.",
+    title: "Gastos",
+    description: "Tudo o que já foi gasto nas suas obras.",
     emptyTitle: "Nenhum gasto ainda",
     emptyDescription:
       "Toque em Lançar gasto ou mande uma mensagem no WhatsApp.",

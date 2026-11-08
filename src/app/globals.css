@@ -11,11 +11,16 @@
  * claro, use-o só em botões (com texto azul-marinho) e em elementos gráficos.
  */
 @theme {
-  --color-brand-navy: #1c2a44;
-  --color-brand-navy-soft: #2a3d5f;
-  --color-brand-gold: #ecb72d;
-  --color-brand-gold-soft: #fdf4dc;
+  /* Azul planta: estrutura (cabeçalho, navegação, texto principal). */
+  --color-brand-navy: #002344;
+  --color-brand-navy-soft: #0e3a66;
+  /* Dourado lápis: só para dinheiro (Lançar gasto, item ativo, "realizado"). */
+  --color-brand-gold: #ffb800;
+  --color-brand-gold-soft: #fff4cc;
   --color-brand-white: #ffffff;
+  /* Concreto e grafite: fundo e texto secundário do tema claro. */
+  --color-concrete: #f2f4f7;
+  --color-graphite: #4e5d72;
 
   /*
    * Cores do previsto x realizado. Separadas da marca de propósito: o dourado
@@ -75,9 +80,9 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Tema claro (padrão). Texto em azul-marinho; dourado só como ação. */
+/* Tema claro (padrão). Texto em azul planta; dourado só como ação. */
 :root {
-  --background: #f6f7f9;
+  --background: var(--color-concrete);
   --foreground: var(--color-brand-navy);
   --card: #ffffff;
   --card-foreground: var(--color-brand-navy);
@@ -85,24 +90,24 @@
   --popover-foreground: var(--color-brand-navy);
   --primary: var(--color-brand-navy);
   --primary-foreground: var(--color-brand-white);
-  --secondary: #eceef2;
+  --secondary: #e4e8ee;
   --secondary-foreground: var(--color-brand-navy);
-  --muted: #eceef2;
-  --muted-foreground: #4b5568;
+  --muted: #e4e8ee;
+  --muted-foreground: var(--color-graphite);
   --accent: var(--color-brand-gold-soft);
   --accent-foreground: var(--color-brand-navy);
   --destructive: var(--color-status-danger);
-  --border: #dde1e8;
-  --input: #c9cfd9;
+  --border: #d8dee6;
+  --input: #b9c3d0;
   --ring: var(--color-brand-navy);
-  /* Ação principal ("Lançar gasto"): dourado com texto azul-marinho. */
+  /* Ação principal ("Lançar gasto"): dourado com texto azul planta. */
   --action: var(--color-brand-gold);
   --action-foreground: var(--color-brand-navy);
   --chart-1: var(--color-brand-gold);
   --chart-2: var(--color-brand-navy);
-  --chart-3: #5a77a8;
-  --chart-4: #9fb1cf;
-  --chart-5: #c7a24a;
+  --chart-3: #3f6fa6;
+  --chart-4: #9db4cf;
+  --chart-5: #b98500;
   --radius: 0.75rem;
   /* Cabeçalho e barra lateral ficam em azul-marinho nos dois temas. */
   --sidebar: var(--color-brand-navy);
@@ -115,7 +120,7 @@
   --sidebar-ring: var(--color-brand-gold);
 }
 
-/* Tema escuro: azul-marinho como fundo. */
+/* Tema escuro: azul planta como fundo. */
 .dark {
   --background: var(--color-brand-navy);
   --foreground: var(--color-brand-white);
@@ -125,11 +130,11 @@
   --popover-foreground: var(--color-brand-white);
   --primary: var(--color-brand-gold);
   --primary-foreground: var(--color-brand-navy);
-  --secondary: #33476b;
+  --secondary: #164878;
   --secondary-foreground: var(--color-brand-white);
-  --muted: #33476b;
-  --muted-foreground: #c3cbd9;
-  --accent: #33476b;
+  --muted: #164878;
+  --muted-foreground: #b4c4d8;
+  --accent: #164878;
   --accent-foreground: var(--color-brand-white);
   --destructive: #f87171;
   --border: rgb(255 255 255 / 0.12);
@@ -138,11 +143,11 @@
   --action: var(--color-brand-gold);
   --action-foreground: var(--color-brand-navy);
   --chart-1: var(--color-brand-gold);
-  --chart-2: #9fb1cf;
-  --chart-3: #5a77a8;
-  --chart-4: #e8edf5;
-  --chart-5: #c7a24a;
-  --sidebar: #16223a;
+  --chart-2: #9db4cf;
+  --chart-3: #3f6fa6;
+  --chart-4: #e4ebf3;
+  --chart-5: #b98500;
+  --sidebar: #001a33;
   --sidebar-foreground: var(--color-brand-white);
   --sidebar-primary: var(--color-brand-gold);
   --sidebar-primary-foreground: var(--color-brand-navy);
@@ -156,6 +161,29 @@
 @utility money {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* Títulos: Archivo larga e pesada, como letra de placa de obra. */
+@utility heading {
+  font-weight: 800;
+  font-stretch: 118%;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* Grade de planta baixa. Só em superfícies azuis de abertura (início, login). */
+@utility blueprint-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size:
+    96px 96px,
+    96px 96px,
+    24px 24px,
+    24px 24px;
 }
 
 @layer base {

@@ -26,7 +26,7 @@ describe("AppNav", () => {
 
     expect(links.map((l) => l.textContent)).toEqual([
       "Obras",
-      "Lançamentos",
+      "Gastos",
       "Lançar gasto",
       "Contas",
       "Mais",

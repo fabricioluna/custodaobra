@@ -14,13 +14,15 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed bg-card px-6 py-12 text-center">
-      <span className="mb-4 flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
-        <Icon className="size-7" aria-hidden />
+    <section className="flex max-w-prose flex-col items-start gap-4 py-2">
+      <span className="flex size-12 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+        <Icon className="size-6" strokeWidth={2} aria-hidden />
       </span>
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mt-1 max-w-sm text-muted-foreground">{description}</p>
-      {action ? <div className="mt-6">{action}</div> : null}
-    </div>
+      <div>
+        <h2 className="text-xl heading">{title}</h2>
+        <p className="mt-1.5 text-base text-muted-foreground">{description}</p>
+      </div>
+      {action}
+    </section>
   );
 }

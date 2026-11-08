@@ -19,11 +19,11 @@ describe("orgPath", () => {
 });
 
 describe("getOrgNavItems", () => {
-  it("lista Obras, Lançamentos, Contas e Mais, nessa ordem", () => {
+  it("lista Obras, Gastos, Contas e Mais, nessa ordem", () => {
     const items = getOrgNavItems("minha-casa");
     expect(items.map((i) => i.label)).toEqual([
       "Obras",
-      "Lançamentos",
+      "Gastos",
       "Contas",
       "Mais",
     ]);

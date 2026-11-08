@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
-import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { BrandMark } from "./brand-mark";
@@ -51,9 +50,9 @@ function BottomNav({ items, activeKey, launchHref }: NavViewProps) {
   return (
     <nav
       aria-label={layoutCopy.nav.label}
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground md:hidden"
     >
-      <ul className="grid h-16 grid-cols-5">
+      <ul className="grid h-16 grid-cols-[1fr_1fr_5.5rem_1fr_1fr]">
         {[first, second].map((item) => (
           <BottomNavItem
             key={item.key}
@@ -62,20 +61,7 @@ function BottomNav({ items, activeKey, launchHref }: NavViewProps) {
           />
         ))}
         <li className="flex justify-center">
-          <Link
-            href={launchHref}
-            className={cn(
-              "-mt-5 flex flex-col items-center gap-1 rounded-2xl",
-              focusRing,
-            )}
-          >
-            <span className="flex size-14 items-center justify-center rounded-full bg-action text-action-foreground shadow-lg ring-4 ring-sidebar">
-              <Plus className="size-7" strokeWidth={2.5} aria-hidden />
-            </span>
-            <span className="text-[11px] leading-none font-semibold">
-              {layoutCopy.nav.launchExpense}
-            </span>
-          </Link>
+          <LaunchKey href={launchHref} />
         </li>
         {rest.map((item) => (
           <BottomNavItem
@@ -89,6 +75,29 @@ function BottomNav({ items, activeKey, launchHref }: NavViewProps) {
   );
 }
 
+/**
+ * A tecla dourada de lançar gasto: a ação mais importante do app, a maior
+ * área de toque da tela, sempre no centro e ao alcance do polegar.
+ */
+function LaunchKey({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group -mt-5 flex flex-col items-center gap-1.5 rounded-2xl",
+        focusRing,
+      )}
+    >
+      <span className="flex size-15 items-center justify-center rounded-[1.1rem] bg-action text-action-foreground shadow-[0_4px_0_0_rgb(0_0_0/0.28)] transition-transform group-active:translate-y-1 group-active:shadow-none motion-reduce:transition-none">
+        <Plus className="size-8" strokeWidth={2.75} aria-hidden />
+      </span>
+      <span className="text-xs leading-none font-bold whitespace-nowrap">
+        {layoutCopy.nav.launchExpense}
+      </span>
+    </Link>
+  );
+}
+
 function BottomNavItem({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
   return (
@@ -97,14 +106,18 @@ function BottomNavItem({ item, active }: { item: NavItem; active: boolean }) {
         href={item.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex h-full flex-col items-center justify-center gap-1 text-[11px] leading-none font-medium",
+          "relative flex h-full flex-col items-center justify-center gap-1 text-xs leading-none",
           active
-            ? "font-semibold text-sidebar-primary"
-            : "text-sidebar-foreground/75 hover:text-sidebar-foreground",
+            ? "font-bold text-sidebar-primary before:absolute before:inset-x-4 before:top-0 before:h-[3px] before:rounded-b-full before:bg-sidebar-primary"
+            : "font-medium text-sidebar-foreground/75 hover:text-sidebar-foreground",
           focusRing,
         )}
       >
-        <Icon className="size-6" aria-hidden />
+        <Icon
+          className="size-6"
+          strokeWidth={active ? 2.25 : 1.75}
+          aria-hidden
+        />
         {item.label}
       </Link>
     </li>
@@ -113,19 +126,18 @@ function BottomNavItem({ item, active }: { item: NavItem; active: boolean }) {
 
 function SideNav({ items, activeKey, launchHref }: NavViewProps) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col gap-6 bg-sidebar px-4 py-5 text-sidebar-foreground md:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col gap-8 bg-sidebar px-4 py-6 text-sidebar-foreground md:flex">
       <div className="px-2">
         <BrandMark />
       </div>
       <Link
         href={launchHref}
         className={cn(
-          buttonVariants({ variant: "action", size: "lg" }),
-          "w-full",
+          "flex h-13 items-center justify-center gap-2 rounded-xl bg-action text-base font-bold text-action-foreground shadow-[0_3px_0_0_rgb(0_0_0/0.28)] transition-transform active:translate-y-0.5 active:shadow-none motion-reduce:transition-none",
           focusRing,
         )}
       >
-        <Plus aria-hidden />
+        <Plus className="size-5" strokeWidth={2.75} aria-hidden />
         {layoutCopy.nav.launchExpense}
       </Link>
       <nav aria-label={layoutCopy.nav.label}>
@@ -139,14 +151,18 @@ function SideNav({ items, activeKey, launchHref }: NavViewProps) {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-11 items-center gap-3 rounded-lg px-3 text-base",
+                    "relative flex h-11 items-center gap-3 rounded-lg px-3 text-base",
                     active
-                      ? "bg-sidebar-accent font-semibold text-sidebar-primary"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                      ? "bg-sidebar-accent font-bold text-sidebar-primary before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r-full before:bg-sidebar-primary"
+                      : "font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                     focusRing,
                   )}
                 >
-                  <Icon className="size-5" aria-hidden />
+                  <Icon
+                    className="size-5"
+                    strokeWidth={active ? 2.25 : 1.75}
+                    aria-hidden
+                  />
                   {item.label}
                 </Link>
               </li>
@@ -164,7 +180,7 @@ export function AppNavFallback() {
     <>
       <div
         aria-hidden
-        className="fixed inset-y-0 left-0 z-40 hidden w-64 bg-sidebar px-6 py-5 md:block"
+        className="fixed inset-y-0 left-0 z-40 hidden w-64 bg-sidebar px-6 py-6 md:block"
       >
         <BrandMark />
       </div>

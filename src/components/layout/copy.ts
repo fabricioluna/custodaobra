@@ -3,7 +3,7 @@ export const layoutCopy = {
   nav: {
     label: "Navegação principal",
     projects: "Obras",
-    expenses: "Lançamentos",
+    expenses: "Gastos",
     payables: "Contas",
     more: "Mais",
     launchExpense: "Lançar gasto",

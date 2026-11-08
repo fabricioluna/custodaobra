@@ -23,8 +23,8 @@ describe("cores da marca", () => {
 
   it("segue as cores definidas no CLAUDE.md", () => {
     expect(BRAND_COLORS).toEqual({
-      navy: "#1c2a44",
-      gold: "#ecb72d",
+      navy: "#002344",
+      gold: "#ffb800",
       white: "#ffffff",
     });
   });
