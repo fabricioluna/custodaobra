@@ -294,7 +294,7 @@ tests/
 - Rate limit no webhook, no login e nos convites.
 - Testes de RLS obrigatórios: um usuário de uma organização nunca lê nem altera dados de outra. Esses testes rodam no CI.
 - Páginas de Termos de Uso e Política de Privacidade antes do lançamento comercial, informando que as mensagens do WhatsApp são processadas por IA.
-- O usuário pode exportar todos os seus dados (CSV/XLSX) e excluir a conta. Exclusão remove dados pessoais e anexos.
+- O usuário pode exportar todos os seus dados (CSV/XLSX) e excluir a conta. Exclusão remove dados pessoais e anexos. Atenção: apagar o usuário em `auth.users` **não** apaga a organização pessoal (`created_by` vira nulo); o fluxo de exclusão precisa apagar as organizações das quais a pessoa é a única dona.
 - Log de mensagens do WhatsApp guardado por 90 dias; depois disso o `payload` é apagado e fica só o vínculo com o lançamento.
 
 ---
@@ -336,9 +336,12 @@ npm run lint
 npm run typecheck      # tsc --noEmit
 npm run test           # vitest
 npm run test:e2e       # playwright
-npx supabase db push   # aplicar migrations no projeto ligado
-npx supabase gen types typescript --linked > src/types/database.ts
+npm run db:push       # aplica as migrations no projeto ligado (supabase db push --remote)
+npm run db:types      # regenera src/types/database.ts a partir do projeto ligado
+npm run icons         # regenera favicon e ícones do PWA
 ```
+
+Supabase CLI 3: sem `--remote`, `db push` e `gen types` miram o Supabase local (Docker). Por isso os scripts acima já passam `--remote`. O projeto ligado hoje é o `custodaobra-dev` (`vkaobopcusfuwlwaacam`); `npx supabase login` e `npx supabase link --project-ref <ref>` são feitos uma vez por máquina.
 
 Supabase: usar um projeto na nuvem separado para desenvolvimento (`dev`) e outro para produção, em vez do Supabase local, para não depender de Docker no Windows.
 
