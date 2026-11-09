@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { buildExpensesCsv, csvFileName } from "@/features/expenses/csv";
 import { listExpenses } from "@/features/expenses/queries";
 import { parseExpenseFilters } from "@/features/expenses/schemas";
+import { buildExpensesXlsx } from "@/features/expenses/xlsx";
 import { getOrgBySlug } from "@/features/organizations/queries";
 import { getProject } from "@/features/projects/queries";
 import { todayIn } from "@/lib/dates";
@@ -14,7 +15,8 @@ const PAGE_SIZE = 1000;
 const EXPORT_LIMIT = 20_000;
 
 /**
- * Planilha CSV dos gastos da obra, com os mesmos filtros da lista.
+ * Planilha dos gastos da obra (XLSX, ou CSV com `?formato=csv`), com os
+ * mesmos filtros da lista.
  * O RLS garante que só sai o que a pessoa pode ver.
  */
 export async function GET(
@@ -31,22 +33,38 @@ export async function GET(
   const project = await getProject(org.id, projectId);
   if (!project) return new Response("Não encontrado", { status: 404 });
 
-  const filters = parseExpenseFilters(
-    Object.fromEntries(request.nextUrl.searchParams),
+  const { formato, ...query } = Object.fromEntries(
+    request.nextUrl.searchParams,
   );
+  const filters = parseExpenseFilters(query);
   const expenses = [];
   for (let offset = 0; offset < EXPORT_LIMIT; offset += PAGE_SIZE) {
     const page = await listExpenses(project.id, filters, PAGE_SIZE, offset);
     expenses.push(...page);
     if (page.length < PAGE_SIZE) break;
   }
-  const fileName = csvFileName(project.name, todayIn(org.timezone));
+  const today = todayIn(org.timezone);
+  const headers = { "Cache-Control": "private, no-store" };
 
-  return new Response(buildExpensesCsv(expenses), {
+  if (formato === "csv") {
+    const fileName = csvFileName(project.name, today, "csv");
+    return new Response(buildExpensesCsv(expenses), {
+      headers: {
+        ...headers,
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+      },
+    });
+  }
+
+  const fileName = csvFileName(project.name, today, "xlsx");
+  const xlsx = await buildExpensesXlsx(expenses, project.name);
+  return new Response(new Uint8Array(xlsx), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
+      ...headers,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${fileName}"`,
-      "Cache-Control": "private, no-store",
     },
   });
 }

@@ -15,7 +15,7 @@ export default async function ProjectLayout({
   params,
 }: LayoutProps<"/o/[orgSlug]/obras/[projectId]">) {
   const { orgSlug, projectId } = await params;
-  const { org, project } = await requireProject(orgSlug, projectId);
+  const { org, project, access } = await requireProject(orgSlug, projectId);
   const base = orgPath(org.slug, "obras", project.id);
   const { tabs } = projectsCopy;
 
@@ -31,8 +31,16 @@ export default async function ProjectLayout({
         </Link>
         <h1 className="text-2xl heading md:text-4xl">{project.name}</h1>
         {project.archived_at ? (
-          <p className="mt-2 text-sm font-semibold text-status-warn">
+          <p className="mt-2 flex flex-wrap items-center gap-x-3 text-sm font-semibold text-status-warn">
             {projectsCopy.edit.archivedNotice}
+            {access.isOrgAdmin ? (
+              <Link
+                href={`${base}/configuracoes`}
+                className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4"
+              >
+                {projectsCopy.edit.archivedAction}
+              </Link>
+            ) : null}
           </p>
         ) : null}
       </div>

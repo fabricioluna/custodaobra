@@ -75,16 +75,24 @@ export default async function ProjectExpensesPage({
               {copy.truncated(EXPENSE_LIST_LIMIT)}
             </p>
           ) : null}
-          <a
-            href={`${base}/exportar${filtersToSearchParams(filters)}`}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "lg" }),
-              "mt-5 rounded-xl",
-            )}
-          >
-            <Download aria-hidden />
-            {copy.export}
-          </a>
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <a
+              href={`${base}/exportar${filtersToSearchParams(filters)}`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "rounded-xl",
+              )}
+            >
+              <Download aria-hidden />
+              {copy.export}
+            </a>
+            <a
+              href={`${base}/exportar${filtersToSearchParams(filters, { formato: "csv" })}`}
+              className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-4"
+            >
+              {copy.exportCsv}
+            </a>
+          </div>
         </>
       )}
     </>

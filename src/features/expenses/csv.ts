@@ -17,7 +17,7 @@ export type CsvExpense = {
   supplier: { name: string } | null;
 };
 
-const HEADER = [
+export const EXPORT_HEADER = [
   "Data",
   "Descrição",
   "Valor (R$)",
@@ -77,11 +77,15 @@ export function buildExpensesCsv(expenses: CsvExpense[]): string {
       .map(cell)
       .join(";"),
   );
-  return `﻿${[HEADER.join(";"), ...rows].join("\r\n")}\r\n`;
+  return `﻿${[EXPORT_HEADER.join(";"), ...rows].join("\r\n")}\r\n`;
 }
 
-/** Nome do arquivo: gastos-casa-do-jardim-2026-11-08.csv */
-export function csvFileName(projectName: string, today: string): string {
+/** Nome do arquivo: gastos-casa-do-jardim-2026-11-08.csv (ou .xlsx) */
+export function csvFileName(
+  projectName: string,
+  today: string,
+  extension: "csv" | "xlsx" = "csv",
+): string {
   const slug =
     projectName
       .toLowerCase()
@@ -90,5 +94,5 @@ export function csvFileName(projectName: string, today: string): string {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 40) || "obra";
-  return `gastos-${slug}-${today}.csv`;
+  return `gastos-${slug}-${today}.${extension}`;
 }

@@ -8,10 +8,13 @@ import { requireUserId } from "@/lib/auth/session";
 import { isUuid } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
 
-/** Obras ativas da organização com o resumo de gastos, mais recentes primeiro. */
+/**
+ * Obras da organização com o resumo de gastos, mais recentes primeiro.
+ * Por padrão só as ativas; `archived: "only"` traz só as arquivadas.
+ */
 export async function listProjects(
   orgId: string,
-  { includeArchived = false } = {},
+  { archived = "exclude" }: { archived?: "exclude" | "include" | "only" } = {},
 ) {
   const supabase = await createClient();
   let query = supabase
@@ -22,7 +25,8 @@ export async function listProjects(
     .eq("org_id", orgId)
     .order("archived_at", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false });
-  if (!includeArchived) query = query.is("archived_at", null);
+  if (archived === "exclude") query = query.is("archived_at", null);
+  if (archived === "only") query = query.not("archived_at", "is", null);
   const { data: projects } = await query;
   if (!projects?.length) return [];
 
@@ -42,6 +46,19 @@ export async function listProjects(
     expenseCount: byId.get(project.id)?.expense_count ?? 0,
   }));
 }
+
+/** Quantas obras arquivadas a organização tem (para o link na lista). */
+export async function countArchivedProjects(orgId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("projects")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .not("archived_at", "is", null);
+  return count ?? 0;
+}
+
+export type ProjectListItem = Awaited<ReturnType<typeof listProjects>>[number];
 
 export const getProject = cache(async (orgId: string, projectId: string) => {
   const supabase = await createClient();

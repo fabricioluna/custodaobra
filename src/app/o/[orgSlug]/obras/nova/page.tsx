@@ -24,7 +24,7 @@ export default async function NewProjectPage({
 
   const supabase = await createClient();
   const [projects, allowed] = await Promise.all([
-    listProjects(org.id, { includeArchived: true }),
+    listProjects(org.id, { archived: "include" }),
     canCreateProject(supabase, org.id),
   ]);
   const isFirst = projects.length === 0;

@@ -97,7 +97,13 @@ test.describe("obra e gastos", () => {
     );
 
     // Planilha.
-    const csv = await page.request.get(`${projectUrl}/lancamentos/exportar`);
+    const xlsx = await page.request.get(`${projectUrl}/lancamentos/exportar`);
+    expect(xlsx.status()).toBe(200);
+    expect(xlsx.headers()["content-type"]).toContain("spreadsheetml");
+    expect(xlsx.headers()["content-disposition"]).toMatch(/\.xlsx"$/);
+    const csv = await page.request.get(
+      `${projectUrl}/lancamentos/exportar?formato=csv`,
+    );
     expect(csv.status()).toBe(200);
     expect(csv.headers()["content-type"]).toContain("text/csv");
     const text = await csv.text();
@@ -141,5 +147,40 @@ test.describe("obra e gastos", () => {
     await expect(page.getByRole("button", { name: "Criar obra" })).toHaveCount(
       0,
     );
+  });
+
+  test("arquiva a obra, acha em arquivadas e reativa", async ({ page }) => {
+    const user = await createE2EUser("arquivo");
+    users.push(user);
+    const admin = adminClient();
+    await admin
+      .from("profiles")
+      .update({ onboarded_at: new Date().toISOString() })
+      .eq("id", user.id);
+    await admin
+      .from("projects")
+      .insert({ org_id: user.orgId, name: "Casa velha", created_by: user.id });
+
+    await signIn(page, user);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Casa velha" }),
+    ).toBeVisible();
+    await page.goto(`${page.url()}/configuracoes`);
+    await page.getByRole("button", { name: "Arquivar obra" }).click();
+
+    // Some da lista principal e aparece no link de arquivadas.
+    await expect(page.getByText("Nenhuma obra ainda")).toBeVisible();
+    await page.getByRole("link", { name: "1 obra arquivada" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Obras arquivadas" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: /Casa velha/ }).click();
+    await expect(page.getByText("Esta obra está arquivada.")).toBeVisible();
+
+    await page
+      .getByRole("link", { name: "Reativar nas configurações" })
+      .click();
+    await page.getByRole("button", { name: "Reativar obra" }).click();
+    await expect(page.getByText("Esta obra está arquivada.")).toHaveCount(0);
   });
 });

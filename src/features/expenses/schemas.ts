@@ -135,9 +135,12 @@ export function parseExpenseFilters(
 }
 
 /** Filtros de volta para a URL (para o link de exportar, por exemplo). */
-export function filtersToSearchParams(filters: ExpenseFilters): string {
+export function filtersToSearchParams(
+  filters: ExpenseFilters,
+  extra: Record<string, string> = {},
+): string {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
+  for (const [key, value] of Object.entries({ ...filters, ...extra })) {
     if (value) params.set(key, value);
   }
   const text = params.toString();

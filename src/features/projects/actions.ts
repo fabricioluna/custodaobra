@@ -164,6 +164,8 @@ export async function setProjectArchived(
     .eq("id", projectId);
   if (error) return { status: "error", message: errors.saveFailed };
 
+  // O layout da obra (aviso de arquivada) e a lista de obras mudam.
+  refresh();
   redirect(
     archived
       ? orgPath(org.slug, "obras")

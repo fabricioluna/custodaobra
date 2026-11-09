@@ -9,6 +9,17 @@ export const projectsCopy = {
     spent: "Gasto na construção",
     archived: "Arquivada",
     noExpenses: "Nenhum gasto ainda",
+    archivedLink: (count: number) =>
+      count === 1 ? "1 obra arquivada" : `${count} obras arquivadas`,
+  },
+  archived: {
+    title: "Obras arquivadas",
+    description:
+      "Obras guardadas: os gastos continuam aqui, só não aparecem na lista principal.",
+    emptyTitle: "Nenhuma obra arquivada",
+    emptyDescription:
+      "Quando uma obra terminar, arquive nas configurações dela para tirar da lista.",
+    back: "Obras",
   },
   create: {
     firstTitle: "Sua primeira obra",
@@ -31,6 +42,7 @@ export const projectsCopy = {
     archive: "Arquivar obra",
     unarchive: "Reativar obra",
     archivedNotice: "Esta obra está arquivada.",
+    archivedAction: "Reativar nas configurações",
   },
   form: {
     name: "Nome da obra",
