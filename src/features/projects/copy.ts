@@ -5,6 +5,8 @@ export const projectsCopy = {
     emptyTitle: "Nenhuma obra ainda",
     emptyDescription:
       "Cadastre sua primeira obra para começar a lançar gastos e acompanhar cada etapa.",
+    emptyGuestDescription:
+      "Você ainda não tem acesso a nenhuma obra desta conta. Peça a quem convidou você para liberar uma obra.",
     create: "Nova obra",
     spent: "Gasto na construção",
     archived: "Arquivada",
@@ -92,18 +94,23 @@ export const projectsCopy = {
         ? "1 gasto sem etapa. Toque para escolher a etapa."
         : `${count} gastos sem etapa. Toque em cada um para escolher a etapa.`,
     byStage: "Por etapa",
+    alertsTitle: "Atenção",
+    defineBudget: "Definir orçamento das etapas",
     byStageHint:
-      "O previsto de cada etapa e os alertas de estouro chegam na próxima versão.",
+      "Defina o previsto de cada etapa para comparar com o gasto e receber alertas antes de estourar.",
     byCategory: "Por categoria",
     byMonth: "Por mês",
     recent: "Últimos gastos",
     seeAll: "Ver todos os gastos",
+    payablesTitle: "Contas a pagar",
+    payablesSeeAll: "Ver todas as contas",
     noSpending: "—",
   },
   tabs: {
     dashboard: "Painel",
     expenses: "Gastos",
     stages: "Etapas",
+    payables: "Contas",
     settings: "Obra",
   },
   limit: {

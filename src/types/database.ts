@@ -7,6 +7,11 @@ export type Json =
   | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18";
+  };
   public: {
     Tables: {
       attachments: {
@@ -21,7 +26,6 @@ export type Database = {
           updated_at: string;
           uploaded_by: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           expense_id: string;
@@ -72,7 +76,6 @@ export type Database = {
           org_id: string;
           user_id: string | null;
         };
-        ComputedFields: never;
         Insert: {
           action: string;
           created_at?: string;
@@ -106,7 +109,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           code: string;
           created_at?: string;
@@ -150,7 +152,6 @@ export type Database = {
           unit_price_cents: number | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           description: string;
@@ -220,7 +221,6 @@ export type Database = {
           unit_price_cents: number | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           ai_confidence?: number | null;
           amount_cents: number;
@@ -291,6 +291,13 @@ export type Database = {
             referencedColumns: ["category_id"];
           },
           {
+            foreignKeyName: "expenses_payable_fkey";
+            columns: ["payable_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "payables";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
             foreignKeyName: "expenses_project_id_org_id_fkey";
             columns: ["project_id", "org_id"];
             isOneToOne: false;
@@ -327,6 +334,86 @@ export type Database = {
           },
         ];
       };
+      invitations: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+          label: string | null;
+          org_id: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_id: string | null;
+          project_role: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at: string | null;
+          token_hash: string;
+          updated_at: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          label?: string | null;
+          org_id: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_id?: string | null;
+          project_role?: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at?: string | null;
+          token_hash: string;
+          updated_at?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          label?: string | null;
+          org_id?: string;
+          org_role?: Database["public"]["Enums"]["org_role"];
+          project_id?: string | null;
+          project_role?: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at?: string | null;
+          token_hash?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitations_accepted_by_fkey";
+            columns: ["accepted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invitations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invitations_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "invitations_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id", "org_id"];
+          },
+        ];
+      };
       organization_members: {
         Row: {
           created_at: string;
@@ -335,7 +422,6 @@ export type Database = {
           updated_at: string;
           user_id: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           org_id: string;
@@ -378,7 +464,6 @@ export type Database = {
           timezone: string;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           created_by?: string | null;
@@ -401,6 +486,123 @@ export type Database = {
         };
         Relationships: [];
       };
+      payables: {
+        Row: {
+          amount_cents: number;
+          category_id: string;
+          created_at: string;
+          created_by: string | null;
+          description: string;
+          due_date: string;
+          id: string;
+          installment_group_id: string | null;
+          installment_number: number | null;
+          installment_total: number | null;
+          org_id: string;
+          paid_expense_id: string | null;
+          project_id: string;
+          stage_id: string | null;
+          status: Database["public"]["Enums"]["payable_status"];
+          supplier_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          amount_cents: number;
+          category_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          description: string;
+          due_date: string;
+          id?: string;
+          installment_group_id?: string | null;
+          installment_number?: number | null;
+          installment_total?: number | null;
+          org_id: string;
+          paid_expense_id?: string | null;
+          project_id: string;
+          stage_id?: string | null;
+          status?: Database["public"]["Enums"]["payable_status"];
+          supplier_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          amount_cents?: number;
+          category_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string;
+          due_date?: string;
+          id?: string;
+          installment_group_id?: string | null;
+          installment_number?: number | null;
+          installment_total?: number | null;
+          org_id?: string;
+          paid_expense_id?: string | null;
+          project_id?: string;
+          stage_id?: string | null;
+          status?: Database["public"]["Enums"]["payable_status"];
+          supplier_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payables_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payables_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_category_summary";
+            referencedColumns: ["category_id"];
+          },
+          {
+            foreignKeyName: "payables_paid_expense_id_project_id_fkey";
+            columns: ["paid_expense_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "payables_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id", "org_id"];
+          },
+          {
+            foreignKeyName: "payables_stage_id_project_id_fkey";
+            columns: ["stage_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "stages";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_stage_id_project_id_fkey";
+            columns: ["stage_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "v_stage_summary";
+            referencedColumns: ["stage_id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_supplier_id_org_id_fkey";
+            columns: ["supplier_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
       plans: {
         Row: {
           active: boolean;
@@ -417,7 +619,6 @@ export type Database = {
           updated_at: string;
           whatsapp_enabled: boolean;
         };
-        ComputedFields: never;
         Insert: {
           active?: boolean;
           code: string;
@@ -461,7 +662,6 @@ export type Database = {
           whatsapp_linked_at: string | null;
           whatsapp_phone: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           default_org_id?: string | null;
@@ -501,7 +701,6 @@ export type Database = {
           updated_at: string;
           user_id: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           org_id: string;
@@ -553,9 +752,9 @@ export type Database = {
         Row: {
           address: string | null;
           archived_at: string | null;
-          budget_total_cents: number | null;
           built_area_m2: number | null;
           city: string | null;
+          cost_per_m2_cents: number | null;
           created_at: string;
           created_by: string | null;
           expected_end_date: string | null;
@@ -568,13 +767,12 @@ export type Database = {
           status: Database["public"]["Enums"]["project_status"];
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           address?: string | null;
           archived_at?: string | null;
-          budget_total_cents?: number | null;
           built_area_m2?: number | null;
           city?: string | null;
+          cost_per_m2_cents?: number | null;
           created_at?: string;
           created_by?: string | null;
           expected_end_date?: string | null;
@@ -590,9 +788,9 @@ export type Database = {
         Update: {
           address?: string | null;
           archived_at?: string | null;
-          budget_total_cents?: number | null;
           built_area_m2?: number | null;
           city?: string | null;
+          cost_per_m2_cents?: number | null;
           created_at?: string;
           created_by?: string | null;
           expected_end_date?: string | null;
@@ -624,7 +822,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           default_percent: number;
@@ -656,7 +853,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           budget_cents?: number | null;
           created_at?: string;
@@ -712,7 +908,6 @@ export type Database = {
           trial_ends_at: string | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           current_period_end?: string | null;
@@ -767,7 +962,6 @@ export type Database = {
           phone: string | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           document?: string | null;
@@ -802,16 +996,15 @@ export type Database = {
     Views: {
       v_project_category_summary: {
         Row: {
-          category_code: string;
-          category_id: string;
-          category_name: string;
-          category_sort_order: number;
+          category_code: string | null;
+          category_id: string | null;
+          category_name: string | null;
+          category_sort_order: number | null;
           expense_count: number | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
           total_cents: number | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "expenses_project_id_org_id_fkey";
@@ -834,10 +1027,9 @@ export type Database = {
           construction_cents: number | null;
           land_cents: number | null;
           month: string | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "expenses_project_id_org_id_fkey";
@@ -861,11 +1053,10 @@ export type Database = {
           expense_count: number | null;
           land_cents: number | null;
           last_spent_on: string | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
           unclassified_count: number | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "projects_org_id_fkey";
@@ -881,15 +1072,14 @@ export type Database = {
           budget_cents: number | null;
           committed_cents: number | null;
           expense_count: number | null;
-          name: string;
-          org_id: string;
-          progress_percent: number;
-          project_id: string;
-          sort_order: number;
+          name: string | null;
+          org_id: string | null;
+          progress_percent: number | null;
+          project_id: string | null;
+          sort_order: number | null;
           spent_cents: number | null;
-          stage_id: string;
+          stage_id: string | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "stages_project_id_org_id_fkey";
@@ -909,7 +1099,49 @@ export type Database = {
       };
     };
     Functions: {
-      [_ in never]: never;
+      accept_invitation: {
+        Args: { p_token: string };
+        Returns: {
+          org_slug: string;
+          project_id: string;
+        }[];
+      };
+      get_invitation: {
+        Args: { p_token: string };
+        Returns: {
+          inviter_name: string;
+          org_name: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_name: string;
+          project_role: Database["public"]["Enums"]["project_role"];
+          status: string;
+        }[];
+      };
+      org_team: {
+        Args: { p_org_id: string };
+        Returns: {
+          email: string;
+          full_name: string;
+          joined_at: string;
+          projects: Json;
+          role: Database["public"]["Enums"]["org_role"];
+          user_id: string;
+        }[];
+      };
+      pay_payable: {
+        Args: {
+          p_amount_cents?: number;
+          p_has_invoice?: boolean;
+          p_paid_on: string;
+          p_payable_id: string;
+          p_payment_method?: Database["public"]["Enums"]["payment_method"];
+        };
+        Returns: string;
+      };
+      update_stage_plan: {
+        Args: { p_items: Json; p_project_id: string };
+        Returns: number;
+      };
     };
     Enums: {
       expense_source:
@@ -921,6 +1153,7 @@ export type Database = {
       expense_status: "pending" | "confirmed" | "cancelled";
       org_kind: "personal" | "business";
       org_role: "owner" | "admin" | "member";
+      payable_status: "open" | "paid" | "cancelled";
       payment_method:
         | "pix"
         | "dinheiro"
@@ -1071,6 +1304,7 @@ export const Constants = {
       expense_status: ["pending", "confirmed", "cancelled"],
       org_kind: ["personal", "business"],
       org_role: ["owner", "admin", "member"],
+      payable_status: ["open", "paid", "cancelled"],
       payment_method: [
         "pix",
         "dinheiro",

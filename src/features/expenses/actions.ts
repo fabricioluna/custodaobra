@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { orgPath } from "@/components/layout/nav";
 import { requireOrg } from "@/features/organizations/queries";
 import { getProjectAccess } from "@/features/projects/queries";
+import { resolveSupplier } from "@/features/suppliers/resolve";
 import { requireUserId } from "@/lib/auth/session";
 import { addDays, todayIn } from "@/lib/dates";
 import { fieldErrorsFrom, type FormState, textField } from "@/lib/forms";
@@ -56,40 +57,6 @@ function validateReceipt(file: File | null): string | null {
     return errors.receiptType;
   }
   if (file.size > MAX_RECEIPT_BYTES) return errors.receiptTooBig;
-  return null;
-}
-
-/**
- * Fornecedor pelo nome: usa o que já existe na organização (sem diferenciar
- * maiúsculas) ou cria um novo.
- */
-async function resolveSupplier(
-  supabase: Client,
-  orgId: string,
-  name: string | null,
-): Promise<string | null> {
-  if (!name) return null;
-  const pattern = name.replace(/[\\%_]/g, (c) => `\\${c}`);
-  const find = () =>
-    supabase
-      .from("suppliers")
-      .select("id")
-      .eq("org_id", orgId)
-      .ilike("name", pattern)
-      .limit(1)
-      .maybeSingle();
-
-  const existing = await find();
-  if (existing.data) return existing.data.id;
-
-  const created = await supabase
-    .from("suppliers")
-    .insert({ org_id: orgId, name })
-    .select("id")
-    .single();
-  if (created.data) return created.data.id;
-  // Alguém criou o mesmo nome ao mesmo tempo (índice único): usa o dele.
-  if (created.error?.code === "23505") return (await find()).data?.id ?? null;
   return null;
 }
 

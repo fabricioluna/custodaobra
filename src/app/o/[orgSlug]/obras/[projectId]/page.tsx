@@ -1,4 +1,4 @@
-import { Plus, ReceiptText } from "lucide-react";
+import { FileText, Plus, ReceiptText } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -9,9 +9,17 @@ import { orgPath } from "@/components/layout/nav";
 import { buttonVariants } from "@/components/ui/button";
 import { ExpenseList } from "@/features/expenses/components/expense-list";
 import { getProjectDashboard } from "@/features/expenses/queries";
+import { PayableList } from "@/features/payables/components/payable-list";
+import { payablesCopy } from "@/features/payables/copy";
+import { summarizeOpen } from "@/features/payables/installments";
+import { listUpcomingPayables } from "@/features/payables/queries";
 import { BarList } from "@/features/projects/components/bar-list";
 import { projectsCopy } from "@/features/projects/copy";
 import { requireProject } from "@/features/projects/queries";
+import { reportsCopy } from "@/features/reports/copy";
+import { PlanSummary } from "@/features/stages/components/plan-summary";
+import { StagePlanList } from "@/features/stages/components/stage-plan-list";
+import { getStagePlans, summarizePlans } from "@/features/stages/queries";
 import { formatMonth, todayIn } from "@/lib/dates";
 import { formatCents, formatCentsCompact } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -27,12 +35,18 @@ export default async function ProjectDashboardPage({
   const { orgSlug, projectId } = await params;
   const { org, project, access } = await requireProject(orgSlug, projectId);
   const query = await searchParams;
-  const dashboard = await getProjectDashboard(project.id);
+  const [dashboard, plans, payables] = await Promise.all([
+    getProjectDashboard(project.id),
+    getStagePlans(project.id),
+    listUpcomingPayables(project.id),
+  ]);
+  const plan = summarizePlans(plans);
   const today = todayIn(org.timezone);
 
   const base = orgPath(org.slug, "obras", project.id);
   const expenseHref = (id: string) => `${base}/lancamentos/${id}`;
   const launchHref = `${base}/lancamentos/novo`;
+  const stageHref = (stageId: string) => `${base}/lancamentos?etapa=${stageId}`;
   const { summary } = dashboard;
 
   const savedId = typeof query.lancado === "string" ? query.lancado : null;
@@ -143,6 +157,32 @@ export default async function ProjectDashboardPage({
         ) : null}
       </section>
 
+      {plan.alerts.length > 0 ? (
+        <Section title={copy.alertsTitle}>
+          <StagePlanList plans={plan.alerts} hrefFor={stageHref} />
+        </Section>
+      ) : null}
+
+      {payables.upcoming.length > 0 ? (
+        <Section title={copy.payablesTitle}>
+          <PayablesTotals open={payables.open} today={today} />
+          <PayableList
+            payables={payables.upcoming}
+            hrefFor={(payable) => `${base}/contas/${payable.id}`}
+            today={today}
+          />
+          <Link
+            href={`${base}/contas`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "lg" }),
+              "mt-4 rounded-xl",
+            )}
+          >
+            {copy.payablesSeeAll}
+          </Link>
+        </Section>
+      ) : null}
+
       {dashboard.unclassified.length > 0 ? (
         <Section title={copy.unclassifiedTitle}>
           <p className="mb-3 text-sm text-muted-foreground">
@@ -158,21 +198,42 @@ export default async function ProjectDashboardPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={copy.byStage}>
-          <BarList
-            items={[...stagesWithSpending, ...quietStages].map((stage) => ({
-              key: stage.stage_id ?? stage.name ?? "",
-              label: stage.name ?? "",
-              cents: stage.spent_cents ?? 0,
-              muted: (stage.spent_cents ?? 0) === 0,
-              href: stage.stage_id
-                ? `${base}/lancamentos?etapa=${stage.stage_id}`
-                : undefined,
-            }))}
-            emptyLabel={copy.noSpending}
-          />
-          <p className="mt-4 text-sm text-muted-foreground">
-            {copy.byStageHint}
-          </p>
+          {plan.hasBudget ? (
+            <>
+              <PlanSummary
+                summary={plan}
+                className="mb-5 border-0 bg-transparent p-0 md:p-0"
+              />
+              <StagePlanList plans={plans} hrefFor={stageHref} />
+            </>
+          ) : (
+            <>
+              <BarList
+                items={[...stagesWithSpending, ...quietStages].map((stage) => ({
+                  key: stage.stage_id ?? stage.name ?? "",
+                  label: stage.name ?? "",
+                  cents: stage.spent_cents ?? 0,
+                  muted: (stage.spent_cents ?? 0) === 0,
+                  href: stage.stage_id ? stageHref(stage.stage_id) : undefined,
+                }))}
+                emptyLabel={copy.noSpending}
+              />
+              <p className="mt-4 text-sm text-muted-foreground">
+                {copy.byStageHint}
+              </p>
+              {access.canEdit ? (
+                <Link
+                  href={`${base}/etapas/orcamento`}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "lg" }),
+                    "mt-4 rounded-xl",
+                  )}
+                >
+                  {copy.defineBudget}
+                </Link>
+              ) : null}
+            </>
+          )}
         </Section>
 
         <div className="flex flex-col gap-6">
@@ -213,13 +274,62 @@ export default async function ProjectDashboardPage({
           {copy.seeAll}
         </Link>
       </Section>
+
+      <Link
+        href={`${base}/relatorio`}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "lg" }),
+          "rounded-xl",
+        )}
+      >
+        <FileText aria-hidden />
+        {reportsCopy.link}
+      </Link>
     </>
+  );
+}
+
+/** Total em aberto, com o atrasado e o que vence logo em destaque. */
+function PayablesTotals({
+  open,
+  today,
+}: {
+  open: { amount_cents: number; due_date: string }[];
+  today: string;
+}) {
+  const totals = summarizeOpen(open, today);
+  const list = payablesCopy.list;
+  return (
+    <div className="mb-4">
+      <p className="flex items-baseline justify-between gap-3">
+        <span className="text-muted-foreground">{list.totalOpen}</span>
+        <span className="text-lg font-bold money">
+          {formatCents(totals.totalCents)}
+        </span>
+      </p>
+      {totals.overdueCount > 0 ? (
+        <p className="mt-1 text-sm font-semibold text-status-danger">
+          {list.overdueTotal(
+            formatCents(totals.overdueCents),
+            totals.overdueCount,
+          )}
+        </p>
+      ) : null}
+      {totals.soonCents > 0 ? (
+        <p className="mt-1 text-sm font-medium text-status-warn">
+          {list.soonTotal(formatCents(totals.soonCents))}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-6 rounded-2xl border bg-card p-4 md:p-5">
+    <section
+      aria-label={title}
+      className="mb-6 rounded-2xl border bg-card p-4 md:p-5"
+    >
       <h2 className="mb-4 text-lg heading">{title}</h2>
       {children}
     </section>

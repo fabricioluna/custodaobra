@@ -1,4 +1,4 @@
-import { Download, ReceiptText } from "lucide-react";
+import { Download, FileText, ReceiptText } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState } from "@/components/empty-state";
@@ -18,6 +18,7 @@ import {
   parseExpenseFilters,
 } from "@/features/expenses/schemas";
 import { requireProject } from "@/features/projects/queries";
+import { reportsCopy } from "@/features/reports/copy";
 import { todayIn } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,13 @@ export default async function ProjectExpensesPage({
               className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-4"
             >
               {copy.exportCsv}
+            </a>
+            <a
+              href={`${orgPath(org.slug, "obras", project.id, "relatorio")}?gastos=1`}
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground underline underline-offset-4"
+            >
+              <FileText className="size-4" aria-hidden />
+              {reportsCopy.link}
             </a>
           </div>
         </>

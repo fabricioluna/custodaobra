@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
 import { layoutCopy } from "./copy";
 import {
+  canLaunchExpense,
   getActiveNavKey,
   getLaunchExpenseHref,
   getOrgNavItems,
+  type LaunchAccess,
   type NavItem,
   type NavKey,
 } from "./nav";
@@ -22,8 +24,10 @@ const focusRing =
 /**
  * Navegação da área logada: barra inferior no celular e barra lateral no
  * computador. Lê a URL, então precisa estar dentro de <Suspense> (cacheComponents).
+ * `access` decide se a tecla "Lançar gasto" aparece (quem só acompanha a obra
+ * não lança).
  */
-export function AppNav() {
+export function AppNav({ access }: { access: LaunchAccess }) {
   const { orgSlug, projectId } = useParams<{
     orgSlug: string;
     projectId?: string;
@@ -32,7 +36,9 @@ export function AppNav() {
 
   const items = getOrgNavItems(orgSlug);
   const activeKey = getActiveNavKey(pathname, items);
-  const launchHref = getLaunchExpenseHref(orgSlug, projectId);
+  const launchHref = canLaunchExpense(access, projectId)
+    ? getLaunchExpenseHref(orgSlug, projectId)
+    : null;
 
   return (
     <>
@@ -45,7 +51,7 @@ export function AppNav() {
 type NavViewProps = {
   items: NavItem[];
   activeKey: NavKey | null;
-  launchHref: string;
+  launchHref: string | null;
 };
 
 function BottomNav({ items, activeKey, launchHref }: NavViewProps) {
@@ -64,7 +70,7 @@ function BottomNav({ items, activeKey, launchHref }: NavViewProps) {
           />
         ))}
         <li className="flex justify-center">
-          <LaunchKey href={launchHref} />
+          {launchHref ? <LaunchKey href={launchHref} /> : null}
         </li>
         {rest.map((item) => (
           <BottomNavItem
@@ -133,16 +139,18 @@ function SideNav({ items, activeKey, launchHref }: NavViewProps) {
       <div className="px-2">
         <BrandMark />
       </div>
-      <Link
-        href={launchHref}
-        className={cn(
-          "flex h-13 items-center justify-center gap-2 rounded-xl bg-action text-base font-bold text-action-foreground shadow-[0_3px_0_0_rgb(0_0_0/0.28)] transition-transform active:translate-y-0.5 active:shadow-none motion-reduce:transition-none",
-          focusRing,
-        )}
-      >
-        <Plus className="size-5" strokeWidth={2.75} aria-hidden />
-        {layoutCopy.nav.launchExpense}
-      </Link>
+      {launchHref ? (
+        <Link
+          href={launchHref}
+          className={cn(
+            "flex h-13 items-center justify-center gap-2 rounded-xl bg-action text-base font-bold text-action-foreground shadow-[0_3px_0_0_rgb(0_0_0/0.28)] transition-transform active:translate-y-0.5 active:shadow-none motion-reduce:transition-none",
+            focusRing,
+          )}
+        >
+          <Plus className="size-5" strokeWidth={2.75} aria-hidden />
+          {layoutCopy.nav.launchExpense}
+        </Link>
+      ) : null}
       <nav aria-label={layoutCopy.nav.label}>
         <ul className="flex flex-col gap-1">
           {items.map((item) => {

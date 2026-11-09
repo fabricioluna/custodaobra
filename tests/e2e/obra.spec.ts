@@ -44,6 +44,7 @@ test.describe("obra e gastos", () => {
 
     // Etapas padrão criadas junto com a obra.
     await page.getByRole("link", { name: "Etapas" }).click();
+    await page.getByRole("link", { name: "Organizar etapas" }).click();
     await expect(
       page.getByLabel("Nome da etapa 1", { exact: true }),
     ).toHaveValue("Projetos e documentação");

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canLaunchExpense,
   getActiveNavKey,
   getLaunchExpenseHref,
   getOrgNavItems,
@@ -70,5 +71,25 @@ describe("getActiveNavKey", () => {
   it("não ativa nada fora da organização", () => {
     expect(getActiveNavKey("/", items)).toBeNull();
     expect(getActiveNavKey("/o/outra/obras", items)).toBeNull();
+  });
+});
+
+describe("canLaunchExpense", () => {
+  it("dono e admin lançam em qualquer lugar", () => {
+    expect(canLaunchExpense({ all: true, projectIds: [] })).toBe(true);
+    expect(canLaunchExpense({ all: true, projectIds: [] }, "obra-1")).toBe(
+      true,
+    );
+  });
+
+  it("convidado lança só nas obras em que é editor", () => {
+    const access = { all: false, projectIds: ["obra-1"] };
+    expect(canLaunchExpense(access, "obra-1")).toBe(true);
+    expect(canLaunchExpense(access, "obra-2")).toBe(false);
+    expect(canLaunchExpense(access)).toBe(true);
+  });
+
+  it("quem só acompanha não lança", () => {
+    expect(canLaunchExpense({ all: false, projectIds: [] })).toBe(false);
   });
 });

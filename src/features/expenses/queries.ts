@@ -87,7 +87,7 @@ export async function getExpense(projectId: string, expenseId: string) {
   const { data } = await supabase
     .from("expenses")
     .select(
-      "id, org_id, project_id, description, amount_cents, spent_on, has_invoice, invoice_number, payment_method, quantity, unit, unit_price_cents, stage_id, category_id, status, source, created_at, category:categories(id, code, name), stage:stages(id, name), supplier:suppliers(id, name), attachments(id, storage_path, mime_type, size_bytes, created_at)",
+      "id, org_id, project_id, description, amount_cents, spent_on, has_invoice, invoice_number, payment_method, quantity, unit, unit_price_cents, stage_id, category_id, payable_id, status, source, created_at, category:categories(id, code, name), stage:stages(id, name), supplier:suppliers(id, name), attachments(id, storage_path, mime_type, size_bytes, created_at)",
     )
     .eq("project_id", projectId)
     .eq("id", expenseId)

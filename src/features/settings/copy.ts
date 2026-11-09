@@ -1,7 +1,17 @@
 export const settingsCopy = {
   title: "Configurações",
   description: "Sua conta, sua equipe, seu plano e o WhatsApp.",
-  comingSoonTitle: "Em construção",
+  account: "Conta",
+  accountsTitle: "Suas contas",
+  accountsDescription:
+    "Você participa de mais de uma conta. Toque para trocar.",
+  current: "atual",
+  team: "Equipe",
+  teamDescription: (people: number) =>
+    people === 1
+      ? "Só você por enquanto. Convide quem vai acompanhar a obra."
+      : `${people} pessoas com acesso.`,
+  comingSoonTitle: "Em breve",
   comingSoonDescription:
-    "Em breve você ajusta aqui os dados da conta, convida pessoas e conecta o WhatsApp.",
+    "Plano, dados da conta e a conexão com o WhatsApp vão aparecer aqui.",
 } as const;

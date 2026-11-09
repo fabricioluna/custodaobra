@@ -16,7 +16,7 @@ export type LimitResult =
   { ok: true } | { ok: false; reason: LimitReason; limit?: number };
 
 export type LimitReason =
-  "no_subscription" | "subscription_inactive" | "max_projects";
+  "no_subscription" | "subscription_inactive" | "max_projects" | "max_members";
 
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
 
@@ -57,6 +57,22 @@ export function checkProjectCount(
   return { ok: true };
 }
 
+/**
+ * Regra pura: dá para convidar mais uma pessoa? Conta cada pessoa com acesso
+ * uma vez (quem é convidado para uma obra também é membro da organização) e os
+ * convites ainda pendentes.
+ */
+export function checkMemberCount(
+  plan: Pick<Plan, "max_members">,
+  members: number,
+  pendingInvitations: number,
+): LimitResult {
+  if (members + pendingInvitations >= plan.max_members) {
+    return { ok: false, reason: "max_members", limit: plan.max_members };
+  }
+  return { ok: true };
+}
+
 async function getOrgPlan(supabase: Client, orgId: string) {
   const { data } = await supabase
     .from("subscriptions")
@@ -87,4 +103,40 @@ export async function canCreateProject(
   }
 
   return checkProjectCount(subscription.plans, count);
+}
+
+/** Pode convidar mais uma pessoa para esta organização? */
+export async function canInviteMember(
+  supabase: Client,
+  orgId: string,
+): Promise<LimitResult> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+
+  const [members, invitations] = await Promise.all([
+    supabase
+      .from("organization_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("org_id", orgId),
+    supabase
+      .from("invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString()),
+  ]);
+  if (
+    members.error ||
+    members.count === null ||
+    invitations.error ||
+    invitations.count === null
+  ) {
+    throw new Error("Não foi possível contar as pessoas da organização.");
+  }
+
+  return checkMemberCount(subscription.plans, members.count, invitations.count);
 }
