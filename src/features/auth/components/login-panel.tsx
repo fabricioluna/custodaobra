@@ -123,7 +123,6 @@ function EmailFlow({
             pattern="[0-9 ]*"
             maxLength={9}
             required
-            autoFocus
             aria-invalid={verifyState.status === "error" || undefined}
             className="h-14 text-center text-2xl font-bold tracking-[0.4em] tabular-nums"
           />

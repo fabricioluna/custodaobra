@@ -430,6 +430,7 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 ## 15. Estado atual
 
 - **Fase atual:** 0, em andamento na branch `fase-0/fundacao`. Feito: projeto Next.js 16 (cacheComponents) com Tailwind v4, shadcn/ui, ESLint, Prettier e Vitest; identidade visual (cores da logo, Archivo, ícones e manifest do PWA); layout com navegação inferior; banco no projeto `dev` com identidade, organizações, planos e assinaturas (RLS); login com Google e com código ou link por e-mail; primeiro acesso (nome da conta); testes de unidade e de RLS; CI com lint, formatação, tipos, testes, build e RLS em Supabase local. Falta: Playwright, deploy na Vercel com preview por PR, projeto Supabase de produção.
+- **E-mail (SMTP próprio): pendente.** Sem SMTP, o Supabase não deixa editar os modelos e só entrega e-mail para quem é da equipe do projeto. Hoje o e-mail de acesso é o padrão (só link; abre no mesmo navegador). Ao configurar o SMTP (ex.: Resend, depois de registrar o domínio), colar `supabase/templates/acesso.html` nos modelos "Magic Link" e "Confirm signup" com o assunto `Seu código de acesso: {{ .Token }}`: o e-mail passa a trazer o código e um link que funciona em outro aparelho. Obrigatório antes do lançamento.
 - **Nome:** Custo da Obra (verificar e registrar o domínio custodaobra.com.br; criar logo próprio e depositar como marca mista no INPI, classes 42 e 9)
 - **Banco e autenticação:** Supabase (decidido)
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
