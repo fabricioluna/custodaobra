@@ -28,16 +28,19 @@ export function AppShell({
         {layoutCopy.skipToContent}
       </a>
 
-      <header className="sticky top-0 z-30 flex h-14 items-center bg-sidebar px-4 pt-[env(safe-area-inset-top)] text-sidebar-foreground md:hidden">
+      <header className="sticky top-0 z-30 flex h-14 items-center bg-sidebar px-4 pt-[env(safe-area-inset-top)] text-sidebar-foreground md:hidden print:hidden">
         <BrandMark />
       </header>
 
-      <Suspense fallback={<AppNavFallback />}>{nav}</Suspense>
+      {/* Na impressão (relatório em PDF) só o conteúdo vai para o papel. */}
+      <div className="contents print:hidden">
+        <Suspense fallback={<AppNavFallback />}>{nav}</Suspense>
+      </div>
 
-      <div className="flex flex-1 flex-col md:pl-64">
+      <div className="flex flex-1 flex-col md:pl-64 print:pl-0">
         <main
           id={MAIN_ID}
-          className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-10"
+          className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-10 print:max-w-none print:p-0"
         >
           {children}
         </main>

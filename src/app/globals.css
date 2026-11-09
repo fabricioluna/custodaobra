@@ -201,3 +201,29 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Impressão ("Salvar como PDF" do relatório da obra): folha A4, fundo branco
+ * e cores do tema claro, mantendo as cores dos alertas no papel.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+  :root,
+  .dark {
+    --background: #ffffff;
+    --foreground: var(--color-brand-navy);
+    --card: #ffffff;
+    --card-foreground: var(--color-brand-navy);
+    --muted-foreground: var(--color-graphite);
+    --border: #d8dee6;
+  }
+  html,
+  body {
+    background: #ffffff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

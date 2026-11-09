@@ -1,4 +1,4 @@
-import { Plus, ReceiptText } from "lucide-react";
+import { FileText, Plus, ReceiptText } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -16,6 +16,7 @@ import { listUpcomingPayables } from "@/features/payables/queries";
 import { BarList } from "@/features/projects/components/bar-list";
 import { projectsCopy } from "@/features/projects/copy";
 import { requireProject } from "@/features/projects/queries";
+import { reportsCopy } from "@/features/reports/copy";
 import { PlanSummary } from "@/features/stages/components/plan-summary";
 import { StagePlanList } from "@/features/stages/components/stage-plan-list";
 import { getStagePlans, summarizePlans } from "@/features/stages/queries";
@@ -273,6 +274,17 @@ export default async function ProjectDashboardPage({
           {copy.seeAll}
         </Link>
       </Section>
+
+      <Link
+        href={`${base}/relatorio`}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "lg" }),
+          "rounded-xl",
+        )}
+      >
+        <FileText aria-hidden />
+        {reportsCopy.link}
+      </Link>
     </>
   );
 }
