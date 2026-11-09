@@ -276,6 +276,8 @@ tests/
 - Textos da interface centralizados por domínio (`features/*/copy.ts`) para facilitar revisão e futura tradução.
 - Server Components por padrão. Client Components só quando houver interação.
 - Mutações via server actions, sempre com: validação Zod, checagem de sessão, checagem de limite do plano quando aplicável, registro em `audit_log`.
+- Toda página de `/o/[orgSlug]/...` que busca dados chama `requireOrg(orgSlug)` (`src/features/organizations/queries.ts`) antes. A checagem do layout é só experiência: no Next.js, layout e página rodam em paralelo, então o layout não impede o código da página de rodar. A barreira final é sempre o RLS.
+- Com `cacheComponents`, tudo que lê sessão, cookies ou `searchParams` fica dentro de `<Suspense>`. Prefira ler `searchParams` no servidor (prop da página, passada adiante) a `useSearchParams` no cliente, para o conteúdo já vir no HTML.
 - Nada de `any`. Tipos do banco gerados com `supabase gen types`.
 - Toda mudança de banco é uma migration em `supabase/migrations/`. Nunca alterar o banco pelo painel do Supabase.
 - Toda migration que cria tabela já cria as políticas RLS da tabela.
@@ -427,7 +429,7 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 
 ## 15. Estado atual
 
-- **Fase atual:** 0 (nada implementado)
+- **Fase atual:** 0, em andamento na branch `fase-0/fundacao`. Feito: projeto Next.js 16 (cacheComponents) com Tailwind v4, shadcn/ui, ESLint, Prettier e Vitest; identidade visual (cores da logo, Archivo, ícones e manifest do PWA); layout com navegação inferior; banco no projeto `dev` com identidade, organizações, planos e assinaturas (RLS); login com Google e com código ou link por e-mail; primeiro acesso (nome da conta); testes de unidade e de RLS; CI com lint, formatação, tipos, testes, build e RLS em Supabase local. Falta: Playwright, deploy na Vercel com preview por PR, projeto Supabase de produção.
 - **Nome:** Custo da Obra (verificar e registrar o domínio custodaobra.com.br; criar logo próprio e depositar como marca mista no INPI, classes 42 e 9)
 - **Banco e autenticação:** Supabase (decidido)
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
