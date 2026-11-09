@@ -85,7 +85,10 @@ test.describe("obra e gastos", () => {
 
     // Classificar: escolhe a etapa.
     await row.click();
-    await page.getByLabel("Etapa").selectOption({ label: "Alvenaria" });
+    await expect(page).toHaveURL(/\/lancamentos\/[0-9a-f-]{36}$/);
+    await page
+      .getByLabel("Etapa", { exact: true })
+      .selectOption({ label: "Alvenaria" });
     await page.getByRole("button", { name: /^Salvar alterações/ }).click();
     await expect(page).toHaveURL(/\/lancamentos$/);
     await expect(page.getByRole("link", { name: /pedreiro/ })).toContainText(
@@ -101,6 +104,7 @@ test.describe("obra e gastos", () => {
 
     // Excluir.
     await page.getByRole("link", { name: /pedreiro/ }).click();
+    await expect(page).toHaveURL(/\/lancamentos\/[0-9a-f-]{36}$/);
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Excluir gasto" }).click();
     await expect(page).toHaveURL(/\/lancamentos$/);
