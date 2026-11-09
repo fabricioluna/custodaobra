@@ -1,6 +1,7 @@
 import "server-only";
 
 import { GRAPH_API_VERSION, whatsappEnv } from "./env";
+import { phoneVariants } from "./phone";
 
 /**
  * Envio pela WhatsApp Cloud API (oficial da Meta). Texto livre só vale dentro
@@ -127,8 +128,9 @@ async function graphFetch(path: string, init?: RequestInit) {
   });
   if (!response.ok) {
     const details: unknown = await response.json().catch(() => null);
+    const code = metaErrorCode(details);
     throw new WhatsAppApiError(
-      `WhatsApp API respondeu ${response.status}`,
+      `WhatsApp API respondeu ${response.status}${code ? ` (#${code})` : ""}`,
       response.status,
       details,
     );
@@ -136,19 +138,51 @@ async function graphFetch(path: string, init?: RequestInit) {
   return response;
 }
 
-/** Envia a mensagem e devolve o id que a Meta deu a ela (wamid). */
+/** Código de erro da Meta (ex.: 131030) dentro da resposta. */
+export function metaErrorCode(details: unknown): number | null {
+  if (typeof details !== "object" || details === null) return null;
+  const error = (details as { error?: { code?: unknown } }).error;
+  return typeof error?.code === "number" ? error.code : null;
+}
+
+/**
+ * "Destinatário fora da lista de permissões": só acontece com o número de
+ * teste da Meta. A lista guarda o celular como a pessoa digitou (com o nono
+ * dígito), mas o wa_id pode vir sem ele, e a Meta não considera iguais.
+ */
+const RECIPIENT_NOT_ALLOWED = 131030;
+
+/**
+ * Envia a mensagem e devolve o id que a Meta deu a ela (wamid). Se a Meta
+ * recusar o número por não estar na lista de teste, tenta a outra forma
+ * (com ou sem o nono dígito).
+ */
 export async function sendMessage(
   to: string,
   message: OutgoingMessage,
 ): Promise<string | null> {
   const phoneNumberId = whatsappEnv("WHATSAPP_PHONE_NUMBER_ID");
-  const response = await graphFetch(`${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildMessageBody(to, message)),
-  });
-  const data = (await response.json()) as { messages?: { id?: string }[] };
-  return data.messages?.[0]?.id ?? null;
+  const [first, ...others] = phoneVariants(to);
+  const candidates = first ? [first, ...others] : [to];
+
+  for (const [index, recipient] of candidates.entries()) {
+    try {
+      const response = await graphFetch(`${phoneNumberId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildMessageBody(recipient, message)),
+      });
+      const data = (await response.json()) as { messages?: { id?: string }[] };
+      return data.messages?.[0]?.id ?? null;
+    } catch (error) {
+      const retry =
+        error instanceof WhatsAppApiError &&
+        metaErrorCode(error.details) === RECIPIENT_NOT_ALLOWED &&
+        index < candidates.length - 1;
+      if (!retry) throw error;
+    }
+  }
+  return null;
 }
 
 /**

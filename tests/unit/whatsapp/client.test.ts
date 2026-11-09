@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { buildMessageBody: build } = await import("@/lib/whatsapp/client");
+const { buildMessageBody: build, sendMessage } =
+  await import("@/lib/whatsapp/client");
 
 /** Parte interativa do corpo (botões ou lista), para conferir os limites. */
 type Interactive = {
@@ -72,5 +73,60 @@ describe("buildMessageBody", () => {
         rows: [...rows, { id: "a", title: "a" }],
       }),
     ).toThrow();
+  });
+});
+
+describe("sendMessage", () => {
+  const reply = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status });
+  const notAllowed = () =>
+    reply(400, { error: { code: 131030, message: "not in allowed list" } });
+
+  const mockFetch = (...responses: Response[]) => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        calls.push((JSON.parse(String(init.body)) as { to: string }).to);
+        return responses.shift() ?? reply(500, {});
+      }),
+    );
+    return calls;
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "123");
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "token");
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("número de teste sem o nono dígito: tenta com o 9", async () => {
+    const calls = mockFetch(
+      notAllowed(),
+      reply(200, { messages: [{ id: "wamid.ok" }] }),
+    );
+    await expect(
+      sendMessage("558791728787", { type: "text", body: "oi" }),
+    ).resolves.toBe("wamid.ok");
+    expect(calls).toEqual(["558791728787", "5587991728787"]);
+  });
+
+  it("outros erros não tentam de novo", async () => {
+    const calls = mockFetch(reply(401, { error: { code: 190 } }));
+    await expect(
+      sendMessage("558791728787", { type: "text", body: "oi" }),
+    ).rejects.toThrow("(#190)");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("sem outra forma do número, devolve o erro", async () => {
+    const calls = mockFetch(notAllowed(), notAllowed());
+    await expect(
+      sendMessage("558791728787", { type: "text", body: "oi" }),
+    ).rejects.toThrow("(#131030)");
+    expect(calls).toHaveLength(2);
   });
 });
