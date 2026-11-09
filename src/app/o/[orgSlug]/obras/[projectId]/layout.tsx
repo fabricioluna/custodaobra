@@ -50,6 +50,7 @@ export default async function ProjectLayout({
           { href: base, label: tabs.dashboard, exact: true },
           { href: `${base}/lancamentos`, label: tabs.expenses },
           { href: `${base}/etapas`, label: tabs.stages },
+          { href: `${base}/contas`, label: tabs.payables },
           { href: `${base}/configuracoes`, label: tabs.settings },
         ]}
       />

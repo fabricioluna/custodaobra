@@ -100,12 +100,15 @@ export const projectsCopy = {
     byMonth: "Por mês",
     recent: "Últimos gastos",
     seeAll: "Ver todos os gastos",
+    payablesTitle: "Contas a pagar",
+    payablesSeeAll: "Ver todas as contas",
     noSpending: "—",
   },
   tabs: {
     dashboard: "Painel",
     expenses: "Gastos",
     stages: "Etapas",
+    payables: "Contas",
     settings: "Obra",
   },
   limit: {

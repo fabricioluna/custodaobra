@@ -29,6 +29,32 @@ export function addDays(isoDate: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Soma meses a uma data "AAAA-MM-DD". Se o dia não existe no mês de destino,
+ * usa o último dia dele (31/01 + 1 mês = 28/02 ou 29/02).
+ */
+export function addMonths(isoDate: string, months: number): string {
+  const date = parseIsoDate(isoDate);
+  if (!date) throw new Error(`Data inválida: ${isoDate}`);
+  const day = date.getUTCDate();
+  const target = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1),
+  );
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+/** Dias de `from` até `to` (negativo se `to` vem antes). */
+export function daysBetween(from: string, to: string): number {
+  const a = parseIsoDate(from);
+  const b = parseIsoDate(to);
+  if (!a || !b) throw new Error(`Data inválida: ${from} / ${to}`);
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
 /** "AAAA-MM-DD" válido (inclusive dia que existe no calendário). */
 export function isIsoDate(value: string): boolean {
   return parseIsoDate(value) !== null;

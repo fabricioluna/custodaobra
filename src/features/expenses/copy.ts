@@ -58,6 +58,9 @@ export const expensesCopy = {
     receipt: "Comprovante",
     openReceipt: "Abrir comprovante",
     noPermission: "Você só pode ver este gasto.",
+    fromPayable:
+      "Este gasto é o pagamento de uma conta. Se excluir, a conta volta a ficar em aberto.",
+    seePayable: "Ver a conta",
   },
   form: {
     amount: "Valor",

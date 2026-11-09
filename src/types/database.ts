@@ -291,6 +291,13 @@ export type Database = {
             referencedColumns: ["category_id"];
           },
           {
+            foreignKeyName: "expenses_payable_fkey";
+            columns: ["payable_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "payables";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
             foreignKeyName: "expenses_project_id_org_id_fkey";
             columns: ["project_id", "org_id"];
             isOneToOne: false;
@@ -398,6 +405,123 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      payables: {
+        Row: {
+          amount_cents: number;
+          category_id: string;
+          created_at: string;
+          created_by: string | null;
+          description: string;
+          due_date: string;
+          id: string;
+          installment_group_id: string | null;
+          installment_number: number | null;
+          installment_total: number | null;
+          org_id: string;
+          paid_expense_id: string | null;
+          project_id: string;
+          stage_id: string | null;
+          status: Database["public"]["Enums"]["payable_status"];
+          supplier_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          amount_cents: number;
+          category_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          description: string;
+          due_date: string;
+          id?: string;
+          installment_group_id?: string | null;
+          installment_number?: number | null;
+          installment_total?: number | null;
+          org_id: string;
+          paid_expense_id?: string | null;
+          project_id: string;
+          stage_id?: string | null;
+          status?: Database["public"]["Enums"]["payable_status"];
+          supplier_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          amount_cents?: number;
+          category_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string;
+          due_date?: string;
+          id?: string;
+          installment_group_id?: string | null;
+          installment_number?: number | null;
+          installment_total?: number | null;
+          org_id?: string;
+          paid_expense_id?: string | null;
+          project_id?: string;
+          stage_id?: string | null;
+          status?: Database["public"]["Enums"]["payable_status"];
+          supplier_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payables_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payables_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_category_summary";
+            referencedColumns: ["category_id"];
+          },
+          {
+            foreignKeyName: "payables_paid_expense_id_project_id_fkey";
+            columns: ["paid_expense_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "payables_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id", "org_id"];
+          },
+          {
+            foreignKeyName: "payables_stage_id_project_id_fkey";
+            columns: ["stage_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "stages";
+            referencedColumns: ["id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_stage_id_project_id_fkey";
+            columns: ["stage_id", "project_id"];
+            isOneToOne: false;
+            referencedRelation: "v_stage_summary";
+            referencedColumns: ["stage_id", "project_id"];
+          },
+          {
+            foreignKeyName: "payables_supplier_id_org_id_fkey";
+            columns: ["supplier_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
       };
       plans: {
         Row: {
@@ -895,6 +1019,16 @@ export type Database = {
       };
     };
     Functions: {
+      pay_payable: {
+        Args: {
+          p_amount_cents?: number;
+          p_has_invoice?: boolean;
+          p_paid_on: string;
+          p_payable_id: string;
+          p_payment_method?: Database["public"]["Enums"]["payment_method"];
+        };
+        Returns: string;
+      };
       update_stage_plan: {
         Args: { p_items: Json; p_project_id: string };
         Returns: number;
@@ -910,6 +1044,7 @@ export type Database = {
       expense_status: "pending" | "confirmed" | "cancelled";
       org_kind: "personal" | "business";
       org_role: "owner" | "admin" | "member";
+      payable_status: "open" | "paid" | "cancelled";
       payment_method:
         | "pix"
         | "dinheiro"
@@ -1060,6 +1195,7 @@ export const Constants = {
       expense_status: ["pending", "confirmed", "cancelled"],
       org_kind: ["personal", "business"],
       org_role: ["owner", "admin", "member"],
+      payable_status: ["open", "paid", "cancelled"],
       payment_method: [
         "pix",
         "dinheiro",

@@ -1,8 +1,10 @@
 import { FileText } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { FormMessage } from "@/components/form-message";
+import { orgPath } from "@/components/layout/nav";
 import { deleteExpense, updateExpense } from "@/features/expenses/actions";
 import { DeleteExpenseButton } from "@/features/expenses/components/delete-expense-button";
 import { ExpenseForm } from "@/features/expenses/components/expense-form";
@@ -40,6 +42,24 @@ export default async function ExpensePage({
       url: await getReceiptUrl(attachment.storage_path),
     })),
   );
+
+  const payableNote = expense.payable_id ? (
+    <p className="mb-6 max-w-xl rounded-xl bg-muted px-4 py-3">
+      {copy.fromPayable}{" "}
+      <Link
+        href={orgPath(
+          org.slug,
+          "obras",
+          project.id,
+          "contas",
+          expense.payable_id,
+        )}
+        className="font-semibold underline underline-offset-4"
+      >
+        {copy.seePayable}
+      </Link>
+    </p>
+  ) : null;
 
   const receiptList =
     receipts.length > 0 ? (
@@ -101,6 +121,7 @@ export default async function ExpensePage({
     return (
       <>
         <FormMessage className="mb-5">{copy.noPermission}</FormMessage>
+        {payableNote}
         <dl className="mb-6 grid max-w-xl grid-cols-[auto_1fr] gap-x-6 gap-y-3 rounded-2xl border bg-card p-4">
           {rows.map(([label, value]) => (
             <div key={label} className="contents">
@@ -117,6 +138,7 @@ export default async function ExpensePage({
   return (
     <>
       <h2 className="mb-5 text-xl heading">{copy.title}</h2>
+      {payableNote}
       {receiptList}
       <ExpenseForm
         action={updateExpense.bind(null, org.slug, project.id, expense.id)}

@@ -9,6 +9,10 @@ import { orgPath } from "@/components/layout/nav";
 import { buttonVariants } from "@/components/ui/button";
 import { ExpenseList } from "@/features/expenses/components/expense-list";
 import { getProjectDashboard } from "@/features/expenses/queries";
+import { PayableList } from "@/features/payables/components/payable-list";
+import { payablesCopy } from "@/features/payables/copy";
+import { summarizeOpen } from "@/features/payables/installments";
+import { listUpcomingPayables } from "@/features/payables/queries";
 import { BarList } from "@/features/projects/components/bar-list";
 import { projectsCopy } from "@/features/projects/copy";
 import { requireProject } from "@/features/projects/queries";
@@ -30,9 +34,10 @@ export default async function ProjectDashboardPage({
   const { orgSlug, projectId } = await params;
   const { org, project, access } = await requireProject(orgSlug, projectId);
   const query = await searchParams;
-  const [dashboard, plans] = await Promise.all([
+  const [dashboard, plans, payables] = await Promise.all([
     getProjectDashboard(project.id),
     getStagePlans(project.id),
+    listUpcomingPayables(project.id),
   ]);
   const plan = summarizePlans(plans);
   const today = todayIn(org.timezone);
@@ -157,6 +162,26 @@ export default async function ProjectDashboardPage({
         </Section>
       ) : null}
 
+      {payables.upcoming.length > 0 ? (
+        <Section title={copy.payablesTitle}>
+          <PayablesTotals open={payables.open} today={today} />
+          <PayableList
+            payables={payables.upcoming}
+            hrefFor={(payable) => `${base}/contas/${payable.id}`}
+            today={today}
+          />
+          <Link
+            href={`${base}/contas`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "lg" }),
+              "mt-4 rounded-xl",
+            )}
+          >
+            {copy.payablesSeeAll}
+          </Link>
+        </Section>
+      ) : null}
+
       {dashboard.unclassified.length > 0 ? (
         <Section title={copy.unclassifiedTitle}>
           <p className="mb-3 text-sm text-muted-foreground">
@@ -249,6 +274,41 @@ export default async function ProjectDashboardPage({
         </Link>
       </Section>
     </>
+  );
+}
+
+/** Total em aberto, com o atrasado e o que vence logo em destaque. */
+function PayablesTotals({
+  open,
+  today,
+}: {
+  open: { amount_cents: number; due_date: string }[];
+  today: string;
+}) {
+  const totals = summarizeOpen(open, today);
+  const list = payablesCopy.list;
+  return (
+    <div className="mb-4">
+      <p className="flex items-baseline justify-between gap-3">
+        <span className="text-muted-foreground">{list.totalOpen}</span>
+        <span className="text-lg font-bold money">
+          {formatCents(totals.totalCents)}
+        </span>
+      </p>
+      {totals.overdueCount > 0 ? (
+        <p className="mt-1 text-sm font-semibold text-status-danger">
+          {list.overdueTotal(
+            formatCents(totals.overdueCents),
+            totals.overdueCount,
+          )}
+        </p>
+      ) : null}
+      {totals.soonCents > 0 ? (
+        <p className="mt-1 text-sm font-medium text-status-warn">
+          {list.soonTotal(formatCents(totals.soonCents))}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
