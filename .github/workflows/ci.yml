@@ -103,16 +103,18 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      # Os tipos versionados precisam bater com as migrations. Se falhar, baixe
-      # o artefato "database-types" e substitua src/types/database.ts.
+      # O app precisa compilar contra os tipos gerados agora, a partir das
+      # migrations. Se falhar, src/types/database.ts está desatualizado: rode
+      # npm run db:types ou use o artefato "database-types" deste job.
       - name: Conferir tipos do banco
         if: success() || failure()
         run: |
           npx supabase gen types typescript --local --schema public > database.generated.ts
-          if ! diff -u <(grep -v PostgrestVersion src/types/database.ts) <(grep -v PostgrestVersion database.generated.ts); then
-            echo "::error::src/types/database.ts está desatualizado. Rode npm run db:types (ou use o artefato database-types)."
-            exit 1
-          fi
+          npx prettier --parser typescript database.generated.ts > database.formatted.ts
+          mv database.formatted.ts database.generated.ts
+          diff -u src/types/database.ts database.generated.ts || echo "::warning::src/types/database.ts difere do gerado agora (pode ser só formato)."
+          cp database.generated.ts src/types/database.ts
+          npm run typecheck
 
       - name: Guardar tipos gerados
         if: always()

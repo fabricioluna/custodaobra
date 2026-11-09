@@ -56,8 +56,17 @@ export function getOrgNavItems(orgSlug: string): NavItem[] {
   ];
 }
 
-export function getLaunchExpenseHref(orgSlug: string): string {
-  return orgPath(orgSlug, "lancamentos", "novo");
+/**
+ * Destino da tecla "Lançar gasto". Dentro de uma obra, vai direto para o
+ * formulário dela; fora, para a escolha da obra (ou direto, se só houver uma).
+ */
+export function getLaunchExpenseHref(
+  orgSlug: string,
+  projectId?: string,
+): string {
+  return projectId
+    ? orgPath(orgSlug, "obras", projectId, "lancamentos", "novo")
+    : orgPath(orgSlug, "lancamentos", "novo");
 }
 
 /**

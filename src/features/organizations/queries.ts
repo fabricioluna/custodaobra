@@ -13,7 +13,7 @@ export const getOrgBySlug = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("organizations")
-    .select("id, name, slug, kind")
+    .select("id, name, slug, kind, timezone")
     .eq("slug", slug)
     .maybeSingle();
   return data;
