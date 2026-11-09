@@ -78,6 +78,7 @@ test.describe("obra e gastos", () => {
 
     // "pedreiro" vira Mão de obra sozinho.
     await page.getByRole("link", { name: "Gastos" }).first().click();
+    await expect(page).toHaveURL(/\/lancamentos$/);
     const row = page.getByRole("link", { name: /pedreiro/ });
     await expect(row).toContainText("Mão de obra");
     await expect(row).toContainText("Sem etapa");
