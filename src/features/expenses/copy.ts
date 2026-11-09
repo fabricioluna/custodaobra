@@ -43,6 +43,9 @@ export const expensesCopy = {
     noProjectDescription:
       "Os gastos ficam dentro de uma obra. Cadastre a sua para começar.",
     noProjectAction: "Cadastrar obra",
+    viewOnlyTitle: "Você só acompanha as obras",
+    viewOnlyDescription:
+      "Seu acesso nesta conta é só para ver. Para lançar gastos, peça a quem convidou você para mudar o seu acesso.",
     submit: "Salvar gasto",
     submitting: "Salvando…",
     saved: (amount: string) => `Gasto de ${amount} lançado.`,

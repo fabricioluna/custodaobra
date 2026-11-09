@@ -69,6 +69,23 @@ export function getLaunchExpenseHref(
     : orgPath(orgSlug, "lancamentos", "novo");
 }
 
+/** Onde a pessoa pode lançar gastos: todas as obras ou só algumas. */
+export type LaunchAccess = { all: boolean; projectIds: string[] };
+
+/**
+ * Mostra a tecla "Lançar gasto"? Dentro de uma obra, só para quem edita a
+ * obra; fora, para quem edita alguma. Quem só acompanha não vê a tecla.
+ */
+export function canLaunchExpense(
+  access: LaunchAccess,
+  projectId?: string,
+): boolean {
+  if (access.all) return true;
+  return projectId
+    ? access.projectIds.includes(projectId)
+    : access.projectIds.length > 0;
+}
+
 /**
  * Item ativo para o caminho atual: o de href mais longo que seja igual ao
  * caminho ou um prefixo dele por segmento ("/obras" casa "/obras/123",

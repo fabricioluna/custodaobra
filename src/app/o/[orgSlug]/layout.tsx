@@ -1,6 +1,8 @@
 import { type ReactNode, Suspense } from "react";
 
+import { AppNav } from "@/components/layout/app-nav";
 import { AppShell } from "@/components/layout/app-shell";
+import { getLaunchAccess } from "@/features/members/queries";
 import { requireOrg } from "@/features/organizations/queries";
 
 // A moldura (cabeçalho e navegação) fica pré-renderizada. Só o conteúdo
@@ -10,7 +12,7 @@ export default function OrgLayout({
   params,
 }: LayoutProps<"/o/[orgSlug]">) {
   return (
-    <AppShell>
+    <AppShell nav={<OrgNav params={params} />}>
       <Suspense fallback={<ContentFallback />}>
         <OrgGate params={params}>{children}</OrgGate>
       </Suspense>
@@ -34,6 +36,13 @@ async function OrgGate({
   const { orgSlug } = await params;
   await requireOrg(orgSlug);
   return children;
+}
+
+/** Navegação com a tecla "Lançar gasto" só para quem pode lançar. */
+async function OrgNav({ params }: { params: Promise<{ orgSlug: string }> }) {
+  const { orgSlug } = await params;
+  const access = await getLaunchAccess(orgSlug);
+  return <AppNav access={access} />;
 }
 
 function ContentFallback() {

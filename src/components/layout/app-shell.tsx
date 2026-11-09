@@ -1,6 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 
-import { AppNav, AppNavFallback } from "./app-nav";
+import { AppNavFallback } from "./app-nav";
 import { BrandMark } from "./brand-mark";
 import { layoutCopy } from "./copy";
 
@@ -9,8 +9,16 @@ const MAIN_ID = "conteudo";
 /**
  * Moldura da área logada, mobile first: cabeçalho azul-marinho e barra de
  * navegação inferior no celular; barra lateral fixa a partir de md.
+ * `nav` é a navegação (lê a URL e o acesso da pessoa), que entra dentro de
+ * <Suspense> para o resto da moldura continuar pré-renderizado.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  nav,
+}: {
+  children: ReactNode;
+  nav: ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh flex-col">
       <a
@@ -24,9 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <BrandMark />
       </header>
 
-      <Suspense fallback={<AppNavFallback />}>
-        <AppNav />
-      </Suspense>
+      <Suspense fallback={<AppNavFallback />}>{nav}</Suspense>
 
       <div className="flex flex-1 flex-col md:pl-64">
         <main

@@ -5,6 +5,8 @@ export const projectsCopy = {
     emptyTitle: "Nenhuma obra ainda",
     emptyDescription:
       "Cadastre sua primeira obra para começar a lançar gastos e acompanhar cada etapa.",
+    emptyGuestDescription:
+      "Você ainda não tem acesso a nenhuma obra desta conta. Peça a quem convidou você para liberar uma obra.",
     create: "Nova obra",
     spent: "Gasto na construção",
     archived: "Arquivada",

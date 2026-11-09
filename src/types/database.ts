@@ -334,6 +334,86 @@ export type Database = {
           },
         ];
       };
+      invitations: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+          label: string | null;
+          org_id: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_id: string | null;
+          project_role: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at: string | null;
+          token_hash: string;
+          updated_at: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          label?: string | null;
+          org_id: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_id?: string | null;
+          project_role?: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at?: string | null;
+          token_hash: string;
+          updated_at?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          label?: string | null;
+          org_id?: string;
+          org_role?: Database["public"]["Enums"]["org_role"];
+          project_id?: string | null;
+          project_role?: Database["public"]["Enums"]["project_role"] | null;
+          revoked_at?: string | null;
+          token_hash?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitations_accepted_by_fkey";
+            columns: ["accepted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invitations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invitations_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "invitations_project_id_org_id_fkey";
+            columns: ["project_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id", "org_id"];
+          },
+        ];
+      };
       organization_members: {
         Row: {
           created_at: string;
@@ -1019,6 +1099,35 @@ export type Database = {
       };
     };
     Functions: {
+      accept_invitation: {
+        Args: { p_token: string };
+        Returns: {
+          org_slug: string;
+          project_id: string;
+        }[];
+      };
+      get_invitation: {
+        Args: { p_token: string };
+        Returns: {
+          inviter_name: string;
+          org_name: string;
+          org_role: Database["public"]["Enums"]["org_role"];
+          project_name: string;
+          project_role: Database["public"]["Enums"]["project_role"];
+          status: string;
+        }[];
+      };
+      org_team: {
+        Args: { p_org_id: string };
+        Returns: {
+          email: string;
+          full_name: string;
+          joined_at: string;
+          projects: Json;
+          role: Database["public"]["Enums"]["org_role"];
+          user_id: string;
+        }[];
+      };
       pay_payable: {
         Args: {
           p_amount_cents?: number;

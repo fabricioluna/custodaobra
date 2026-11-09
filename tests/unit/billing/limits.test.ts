@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { checkProjectCount, isSubscriptionUsable } =
+const { checkMemberCount, checkProjectCount, isSubscriptionUsable } =
   await import("@/lib/billing/limits");
 
 describe("checkProjectCount", () => {
@@ -45,5 +45,20 @@ describe("isSubscriptionUsable", () => {
         now,
       ),
     ).toBe(false);
+  });
+});
+
+describe("checkMemberCount", () => {
+  it("conta membros e convites pendentes juntos", () => {
+    expect(checkMemberCount({ max_members: 3 }, 1, 1)).toEqual({ ok: true });
+    expect(checkMemberCount({ max_members: 3 }, 2, 1)).toEqual({
+      ok: false,
+      reason: "max_members",
+      limit: 3,
+    });
+  });
+
+  it("bloqueia quando só os membros já ocupam o plano", () => {
+    expect(checkMemberCount({ max_members: 3 }, 3, 0).ok).toBe(false);
   });
 });

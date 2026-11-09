@@ -59,7 +59,9 @@ export default async function ProjectsPage({
         <EmptyState
           icon={House}
           title={copy.emptyTitle}
-          description={copy.emptyDescription}
+          description={
+            canManage ? copy.emptyDescription : copy.emptyGuestDescription
+          }
           action={newProjectLink}
         />
         {archivedLink}

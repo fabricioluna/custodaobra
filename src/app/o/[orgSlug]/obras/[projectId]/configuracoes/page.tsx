@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ProjectPeople } from "@/features/members/components/project-people";
 import { setProjectArchived, updateProject } from "@/features/projects/actions";
 import { ArchiveProjectButton } from "@/features/projects/components/archive-project-button";
 import { ProjectForm } from "@/features/projects/components/project-form";
@@ -41,6 +42,14 @@ export default async function ProjectSettingsPage({
         showStatus
         disabled={!access.canEdit}
       />
+
+      {access.isOrgAdmin ? (
+        <ProjectPeople
+          orgId={org.id}
+          orgSlug={org.slug}
+          projectId={project.id}
+        />
+      ) : null}
 
       {access.isOrgAdmin ? (
         <section className="mt-10 max-w-xl border-t pt-6">

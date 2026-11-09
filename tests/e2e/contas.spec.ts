@@ -48,6 +48,10 @@ test.describe("contas a pagar", () => {
       .getByRole("link", { name: "Contas", exact: true })
       .first()
       .click();
+    // "Contas" da navegação redireciona para a obra (no dev, compila na 1ª vez).
+    await expect(page).toHaveURL(/\/obras\/[0-9a-f-]{36}\/contas$/, {
+      timeout: 20_000,
+    });
     await expect(page.getByText("Nenhuma conta a pagar")).toBeVisible();
     await page.getByRole("link", { name: "Nova conta" }).click();
     await page.getByLabel("Do que é a conta").fill("Boleto da madeira");
