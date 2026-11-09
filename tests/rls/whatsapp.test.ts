@@ -253,10 +253,10 @@ describe("WhatsApp (RLS e vínculo)", () => {
       expect(sent[0]?.body).toContain("não vale");
       expect(await phoneOf(ana)).toBe(phone);
 
-      // Ana já ligada: mensagem comum recebe o "em breve", não o cadastro.
+      // Ana já ligada (sem obra): mensagem comum não recebe o cadastro.
       sent.length = 0;
       await handleIncomingMessage(admin, textMessage(phone, "300 pedreiro"));
-      expect(sent[0]?.body).toContain("em breve");
+      expect(sent[0]?.body).toContain("não tem uma obra");
     });
 
     it("o mesmo celular, sem o nono dígito, é a mesma pessoa", async () => {
@@ -267,7 +267,7 @@ describe("WhatsApp (RLS e vínculo)", () => {
       phones.push(old);
       sent.length = 0;
       await handleIncomingMessage(admin, textMessage(old, "oi"));
-      expect(sent[0]?.body).toContain("em breve");
+      expect(sent[0]?.body).toContain("não tem uma obra");
     });
 
     it("o número passa para quem ligou por último", async () => {

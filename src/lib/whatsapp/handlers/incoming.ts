@@ -6,7 +6,9 @@ import { APP_URL } from "@/config/app";
 import { LOGIN_PATH } from "@/lib/auth/paths";
 import type { Database, Json } from "@/types/database";
 
-import { type OutgoingMessage, sendMessage } from "../client";
+import { parseAction } from "../actions";
+import type { OutgoingMessage } from "../client";
+import { getConversation } from "../conversation";
 import { whatsappEnv } from "../env";
 import {
   hashLinkCode,
@@ -16,7 +18,9 @@ import {
 } from "../link-code";
 import { botMessages } from "../messages";
 import { phoneVariants } from "../phone";
+import { sendAndLog } from "../send";
 import { type IncomingMessage, messageText } from "../webhook";
+import { handleAction, handleText } from "./expense";
 
 type Admin = SupabaseClient<Database>;
 
@@ -96,11 +100,7 @@ export async function handleIncomingMessage(
       return;
     }
 
-    // Fase 3, partes 2 e 3: lançamento por texto.
-    await reply(admin, message.from, sender, {
-      type: "text",
-      body: botMessages.comingSoon,
-    });
+    await handleFromSender(admin, message, sender, logId);
     await finish();
   } catch (error) {
     await finish({ error: errorText(error) });
@@ -161,24 +161,52 @@ async function linkNumber(
 }
 
 /** Manda a resposta e grava no log (direção "out"). */
-async function reply(
+function reply(
   admin: Admin,
   to: string,
   sender: Sender | null,
   message: OutgoingMessage,
 ): Promise<void> {
-  const waMessageId = await sendMessage(to, message);
-  const { error } = await admin.from("whatsapp_messages").insert({
-    wa_message_id: waMessageId ?? `out-${crypto.randomUUID()}`,
-    direction: "out",
-    from_phone: to,
-    user_id: sender?.id ?? null,
-    org_id: sender?.orgId ?? null,
-    type: message.type,
-    payload: message as unknown as Json,
-    processed_at: new Date().toISOString(),
-  });
-  if (error) console.error("[whatsapp] falha ao gravar resposta no log", error);
+  return sendAndLog(
+    admin,
+    to,
+    { userId: sender?.id ?? null, orgId: sender?.orgId ?? null },
+    message,
+  );
+}
+
+/**
+ * Mensagem de quem já está ligado: toque em botão ou lista (pelo id que o bot
+ * mandou), texto (gasto novo ou resposta a uma pergunta) ou outro tipo (foto e
+ * áudio chegam na Fase 4).
+ */
+async function handleFromSender(
+  admin: Admin,
+  message: IncomingMessage,
+  sender: Sender,
+  logId: string,
+): Promise<void> {
+  const conversation = await getConversation(admin, sender.id);
+  const session = {
+    admin,
+    userId: sender.id,
+    conversation,
+    send: (outgoing: OutgoingMessage) =>
+      reply(admin, message.from, sender, outgoing),
+  };
+
+  if (message.type === "interactive") {
+    const action = parseAction(
+      message.interactive?.button_reply?.id ??
+        message.interactive?.list_reply?.id,
+    );
+    if (action) return handleAction(session, action);
+    return session.send({ type: "text", body: botMessages.howTo });
+  }
+
+  const text = message.type === "text" ? message.text?.body?.trim() : "";
+  if (!text) return session.send({ type: "text", body: botMessages.onlyText });
+  return handleText(session, text, logId);
 }
 
 function firstName(fullName: string | null): string | null {
