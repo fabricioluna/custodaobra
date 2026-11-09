@@ -16,7 +16,13 @@ export type LimitResult =
   { ok: true } | { ok: false; reason: LimitReason; limit?: number };
 
 export type LimitReason =
-  "no_subscription" | "subscription_inactive" | "max_projects" | "max_members";
+  | "no_subscription"
+  | "subscription_inactive"
+  | "max_projects"
+  | "max_members"
+  | "whatsapp_disabled"
+  | "max_whatsapp_entries"
+  | "max_ai_calls";
 
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
 
@@ -71,6 +77,42 @@ export function checkMemberCount(
     return { ok: false, reason: "max_members", limit: plan.max_members };
   }
   return { ok: true };
+}
+
+/** Regra pura: dá para lançar mais um gasto pelo WhatsApp este mês? */
+export function checkWhatsappEntries(
+  plan: Pick<Plan, "whatsapp_enabled" | "max_whatsapp_entries_month">,
+  usedThisMonth: number,
+): LimitResult {
+  if (!plan.whatsapp_enabled) return { ok: false, reason: "whatsapp_disabled" };
+  if (usedThisMonth >= plan.max_whatsapp_entries_month) {
+    return {
+      ok: false,
+      reason: "max_whatsapp_entries",
+      limit: plan.max_whatsapp_entries_month,
+    };
+  }
+  return { ok: true };
+}
+
+/** Regra pura: dá para chamar a IA mais uma vez este mês? */
+export function checkAiCalls(
+  plan: Pick<Plan, "max_ai_calls_month">,
+  usedThisMonth: number,
+): LimitResult {
+  if (usedThisMonth >= plan.max_ai_calls_month) {
+    return {
+      ok: false,
+      reason: "max_ai_calls",
+      limit: plan.max_ai_calls_month,
+    };
+  }
+  return { ok: true };
+}
+
+/** Primeiro dia do mês (AAAA-MM-01) de uma data AAAA-MM-DD. */
+export function monthOf(isoDate: string): string {
+  return `${isoDate.slice(0, 7)}-01`;
 }
 
 async function getOrgPlan(supabase: Client, orgId: string) {
@@ -139,4 +181,40 @@ export async function canInviteMember(
   }
 
   return checkMemberCount(subscription.plans, members.count, invitations.count);
+}
+
+async function getUsage(supabase: Client, orgId: string, month: string) {
+  const { data, error } = await supabase
+    .from("usage_counters")
+    .select("whatsapp_entries, ai_calls")
+    .eq("org_id", orgId)
+    .eq("month", month)
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível ler o uso do plano.");
+  return data ?? { whatsapp_entries: 0, ai_calls: 0 };
+}
+
+/**
+ * Pode lançar mais um gasto pelo WhatsApp e chamar a IA para lê-lo? Usado
+ * pelo webhook (cliente service_role, sem sessão). `today` é a data no fuso
+ * da organização: o mês do plano vira no fuso dela.
+ */
+export async function canUseWhatsappAi(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<LimitResult> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+
+  const usage = await getUsage(supabase, orgId, monthOf(today));
+  const entries = checkWhatsappEntries(
+    subscription.plans,
+    usage.whatsapp_entries,
+  );
+  if (!entries.ok) return entries;
+  return checkAiCalls(subscription.plans, usage.ai_calls);
 }
