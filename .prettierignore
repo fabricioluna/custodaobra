@@ -1,0 +1,12 @@
+.next
+node_modules
+coverage
+test-results
+playwright-report
+package-lock.json
+next-env.d.ts
+src/types/database.ts
+
+# Documentos mantidos à mão
+CLAUDE.md
+AGENTS.md

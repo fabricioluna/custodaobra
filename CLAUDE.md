@@ -17,14 +17,19 @@ A logo é uma casa em contorno amarelo-dourado com três barras de gráfico dent
 
   | Token | Cor | Uso |
   |---|---|---|
-  | `brand-navy` | `#1C2A44` | fundo de destaque, cabeçalho, tela de login, ícone do app |
-  | `brand-gold` | `#ECB72D` | ação principal (botão "Lançar gasto"), destaques, gráficos |
-  | `brand-white` | `#FFFFFF` | texto sobre o azul-marinho |
+  | `brand-navy` (azul planta) | `#002344` | estrutura: cabeçalho, navegação, tela de login, ícone do app, texto principal |
+  | `brand-gold` (dourado lápis) | `#FFB800` | só para dinheiro: botão "Lançar gasto", item ativo sobre o azul, "realizado" nos gráficos |
+  | `brand-white` | `#FFFFFF` | texto sobre o azul |
+  | `concrete` | `#F2F4F7` | fundo do app no tema claro |
+  | `graphite` | `#4E5D72` | texto secundário |
+
+  Cores tiradas da logo (o JPEG está em Adobe RGB; os valores acima já estão convertidos para sRGB).
 
 - O dourado não tem contraste suficiente para texto pequeno sobre fundo branco. Sobre fundo claro, use o dourado só em botões (com texto azul-marinho dentro) e elementos gráficos; texto corrido fica em azul-marinho ou cinza escuro.
 - Alertas do previsto x realizado usam cores próprias (verde, amarelo, vermelho), separadas da paleta da marca, para o dourado nunca ser confundido com "atenção".
 - Tema claro como padrão, com versão escura usando o azul-marinho como fundo.
-- Fonte da interface: sem serifa, legível e com números tabulares para valores em dinheiro (sugestão: Inter ou Plus Jakarta Sans via `next/font`).
+- Fonte da interface: **Archivo** (via `next/font`, com eixo de largura). Corpo na largura normal; títulos com o utilitário `heading` (largura expandida, peso 800, como letra de placa de obra). Números tabulares em valores em dinheiro (utilitário `money`).
+- Princípios visuais: tudo alinhado à esquerda; o azul enquadra a tela (cabeçalho e navegação); o dourado é reservado ao dinheiro; a tecla dourada "Lançar gasto" é o elemento mais forte da tela e o resto fica quieto. A grade de planta baixa (`blueprint-grid`) aparece só em superfícies azuis de abertura (início e login). Ícones regenerados com `npm run icons`.
 
 App web (PWA) para quem está construindo ou reformando uma casa controlar os gastos da obra. O diferencial é lançar despesas pelo WhatsApp (texto, foto de cupom, áudio) e acompanhar o **previsto x realizado por etapa** enquanto a obra acontece, a tempo de corrigir o rumo.
 
@@ -84,7 +89,7 @@ Regras:
 Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `updated_at` (`timestamptz`) em todas as tabelas, trigger para `updated_at`. Nomes de tabelas e colunas em inglês, `snake_case`. Valores em dinheiro sempre `bigint` em **centavos**.
 
 ### Identidade e contas
-- `profiles`: `id` (= `auth.users.id`), `full_name`, `whatsapp_phone` (formato E.164, único, nulo até vincular), `whatsapp_linked_at`, `default_org_id`
+- `profiles`: `id` (= `auth.users.id`), `full_name`, `whatsapp_phone` (formato E.164, único, nulo até vincular), `whatsapp_linked_at`, `default_org_id`, `onboarded_at` (preenchido quando a pessoa conclui o primeiro acesso, em que escolhe o nome da conta)
 - `organizations`: `id`, `name`, `slug` (único), `kind` (`personal` | `business`), `timezone` (padrão `America/Recife`), `created_by`
 - `organization_members`: `org_id`, `user_id`, `role` (`owner` | `admin` | `member`). PK composta.
 - `invitations`: `id`, `org_id`, `project_id` (nulo se o convite é para a organização toda), `email` ou `phone`, `role`, `token_hash`, `expires_at`, `accepted_at`, `invited_by`
@@ -98,7 +103,7 @@ Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `up
 
 ### Gastos
 - `suppliers` (fornecedores): `id`, `org_id`, `name`, `document` (CPF ou CNPJ, opcional), `phone`, `kind` (`loja` | `profissional` | `empresa` | `outro`)
-- `expenses` (lançamentos): `id`, `org_id`, `project_id`, `stage_id` (nulo = sem etapa), `category_id`, `supplier_id` (nulo), `description`, `amount_cents`, `spent_on` (`date`), `payment_method` (`pix` | `dinheiro` | `cartao_credito` | `cartao_debito` | `boleto` | `transferencia` | `outro`), `has_invoice` (bool), `invoice_number`, `nfe_access_key`, `status` (`pending` | `confirmed` | `cancelled`), `source` (`app` | `whatsapp_text` | `whatsapp_audio` | `whatsapp_image` | `import`), `raw_input` (texto original ou transcrição), `ai_confidence` (0 a 1, nulo se manual), `payable_id` (nulo), `created_by`, `deleted_at`
+- `expenses` (lançamentos): `id`, `org_id`, `project_id`, `stage_id` (nulo = sem etapa), `category_id`, `supplier_id` (nulo), `description`, `amount_cents`, `quantity` (numérico, nulo), `unit` (ex.: `saco`, `m³`, `milheiro`, nulo), `unit_price_cents` (nulo), `spent_on` (`date`), `payment_method` (`pix` | `dinheiro` | `cartao_credito` | `cartao_debito` | `boleto` | `transferencia` | `outro`), `has_invoice` (bool), `invoice_number`, `nfe_access_key`, `status` (`pending` | `confirmed` | `cancelled`), `source` (`app` | `whatsapp_text` | `whatsapp_audio` | `whatsapp_image` | `import`), `raw_input` (texto original ou transcrição), `ai_confidence` (0 a 1, nulo se manual), `payable_id` (nulo), `created_by`, `deleted_at`
 - `expense_items` (itens de um cupom, fase 4): `id`, `org_id`, `expense_id`, `description`, `quantity`, `unit`, `unit_price_cents`, `total_cents`
 - `attachments` (comprovantes): `id`, `org_id`, `expense_id`, `storage_path`, `mime_type`, `size_bytes`, `uploaded_by`
 - `payables` (contas a pagar): `id`, `org_id`, `project_id`, `stage_id`, `category_id`, `supplier_id`, `description`, `amount_cents`, `due_date`, `status` (`open` | `paid` | `cancelled`), `installment_group_id`, `installment_number`, `installment_total`, `paid_expense_id`
@@ -109,7 +114,7 @@ Convenções: chaves primárias `uuid` (`gen_random_uuid()`), `created_at` e `up
 - `whatsapp_messages` (log): `id`, `wa_message_id` (único, garante idempotência), `direction` (`in` | `out`), `from_phone`, `user_id`, `org_id`, `type`, `payload` (jsonb), `expense_id`, `processed_at`, `error`
 
 ### Comercial
-- `plans` (global): `code`, `name`, `max_projects`, `max_members`, `whatsapp_enabled`, `max_whatsapp_entries_month`, `max_ai_calls_month`, `price_cents_month`, `active`
+- `plans` (global): `code`, `name`, `max_projects`, `max_members`, `whatsapp_enabled`, `max_whatsapp_entries_month`, `max_ai_calls_month`, `price_cents_month`, `trial_days` (dias de teste de uma conta nova), `is_default` (plano em que toda conta nova começa; só um), `active`
 - `subscriptions`: `id`, `org_id` (único), `plan_code`, `status` (`trialing` | `active` | `past_due` | `cancelled`), `trial_ends_at`, `current_period_end`, `provider`, `provider_customer_id`, `provider_subscription_id`
 - `usage_counters`: `org_id`, `month` (`date`, primeiro dia do mês), `whatsapp_entries`, `ai_calls`, `ai_input_tokens`, `ai_output_tokens`. PK `(org_id, month)`.
 - `audit_log`: `id`, `org_id`, `user_id`, `entity`, `entity_id`, `action`, `diff` (jsonb), `created_at`
@@ -145,7 +150,9 @@ Views precisam respeitar RLS (`security_invoker = true`).
   | Limpeza e entrega | 3 |
 
   Esses percentuais são uma referência aproximada e editável, nunca apresentados como dado técnico exato.
-- **Categorias padrão**: Material, Mão de obra, Serviço terceirizado, Aluguel de equipamentos, Frete, Taxas e documentação, Outros.
+- **Categorias padrão**: Material, Mão de obra, Serviço terceirizado, Aluguel de equipamentos, Frete, Taxas e documentação, Terreno, Outros.
+- **Terreno** (compra do lote, ITBI, escritura do terreno): aparece no total investido, mas fica **fora** do custo da construção, do custo por m² e da comparação previsto x realizado das etapas, para não distorcer esses números. O painel mostra os dois valores separados: "Construção" e "Terreno".
+- **Quantidade × valor unitário** (opcional, em "mais detalhes" do lançamento): a pessoa informa, por exemplo, 20 sacos × R$ 39,00 e o app calcula o total. O valor gravado continua sendo `amount_cents`; quantidade, unidade e valor unitário são só detalhe do lançamento.
 - Lançamento sem etapa aparece numa lista "Para classificar" no painel.
 - Lançamentos `pending` **não** entram em nenhum total. Pendentes com mais de 24 h são cancelados por um cron diário.
 - Exclusão de lançamento é sempre lógica (`deleted_at`). Toda criação, edição e exclusão gera registro em `audit_log`.
@@ -253,7 +260,7 @@ src/
     database.ts             gerado pelo Supabase CLI, nunca editar à mão
 supabase/
   migrations/
-  seed.sql                  planos, stage_templates, categorias padrão, dados de demonstração
+  seed.sql                  só dados de demonstração (planos, stage_templates e categorias padrão vêm por migration)
 tests/
   unit/
   e2e/
@@ -269,9 +276,12 @@ tests/
 - Textos da interface centralizados por domínio (`features/*/copy.ts`) para facilitar revisão e futura tradução.
 - Server Components por padrão. Client Components só quando houver interação.
 - Mutações via server actions, sempre com: validação Zod, checagem de sessão, checagem de limite do plano quando aplicável, registro em `audit_log`.
+- Toda página de `/o/[orgSlug]/...` que busca dados chama `requireOrg(orgSlug)` (`src/features/organizations/queries.ts`) antes. A checagem do layout é só experiência: no Next.js, layout e página rodam em paralelo, então o layout não impede o código da página de rodar. A barreira final é sempre o RLS.
+- Com `cacheComponents`, tudo que lê sessão, cookies ou `searchParams` fica dentro de `<Suspense>`. Prefira ler `searchParams` no servidor (prop da página, passada adiante) a `useSearchParams` no cliente, para o conteúdo já vir no HTML.
 - Nada de `any`. Tipos do banco gerados com `supabase gen types`.
 - Toda mudança de banco é uma migration em `supabase/migrations/`. Nunca alterar o banco pelo painel do Supabase.
 - Toda migration que cria tabela já cria as políticas RLS da tabela.
+- Dados de referência que precisam existir em todos os ambientes (planos, `stage_templates`, categorias padrão) entram por migration, não pelo `seed.sql`: o `seed.sql` só roda no Supabase local, e os ambientes `dev` e `prod` ficam na nuvem.
 - Componentes acessíveis: rótulos em todos os campos, foco visível, área de toque mínima de 44 px.
 - Botão flutuante "Lançar gasto" sempre visível na área da obra, abrindo um formulário curto: valor (teclado numérico), descrição, etapa (opcional), e o resto em "mais detalhes".
 - Estados vazios explicam o próximo passo ("Nenhum gasto ainda. Toque em Lançar gasto ou mande uma mensagem no WhatsApp").
@@ -286,7 +296,7 @@ tests/
 - Rate limit no webhook, no login e nos convites.
 - Testes de RLS obrigatórios: um usuário de uma organização nunca lê nem altera dados de outra. Esses testes rodam no CI.
 - Páginas de Termos de Uso e Política de Privacidade antes do lançamento comercial, informando que as mensagens do WhatsApp são processadas por IA.
-- O usuário pode exportar todos os seus dados (CSV/XLSX) e excluir a conta. Exclusão remove dados pessoais e anexos.
+- O usuário pode exportar todos os seus dados (CSV/XLSX) e excluir a conta. Exclusão remove dados pessoais e anexos. Atenção: apagar o usuário em `auth.users` **não** apaga a organização pessoal (`created_by` vira nulo); o fluxo de exclusão precisa apagar as organizações das quais a pessoa é a única dona.
 - Log de mensagens do WhatsApp guardado por 90 dias; depois disso o `payload` é apagado e fica só o vínculo com o lançamento.
 
 ---
@@ -328,9 +338,12 @@ npm run lint
 npm run typecheck      # tsc --noEmit
 npm run test           # vitest
 npm run test:e2e       # playwright
-npx supabase db push   # aplicar migrations no projeto ligado
-npx supabase gen types typescript --linked > src/types/database.ts
+npm run db:push       # aplica as migrations no projeto ligado (supabase db push --remote)
+npm run db:types      # regenera src/types/database.ts a partir do projeto ligado
+npm run icons         # regenera favicon e ícones do PWA
 ```
+
+Supabase CLI 3: sem `--remote`, `db push` e `gen types` miram o Supabase local (Docker). Por isso os scripts acima já passam `--remote`. O projeto ligado hoje é o `custodaobra-dev` (`vkaobopcusfuwlwaacam`); `npx supabase login` e `npx supabase link --project-ref <ref>` são feitos uma vez por máquina.
 
 Supabase: usar um projeto na nuvem separado para desenvolvimento (`dev`) e outro para produção, em vez do Supabase local, para não depender de Docker no Windows.
 
@@ -357,10 +370,10 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 
 ### Fase 1: MVP web
 - CRUD de obras com etapas padrão criadas automaticamente
-- Lançamento de gasto pelo app com foto do comprovante
+- Lançamento de gasto pelo app com foto do comprovante, e quantidade × valor unitário opcional em "mais detalhes"
 - Fornecedores (criados automaticamente ao digitar um nome novo)
 - Lista de lançamentos com filtros (período, etapa, categoria, fornecedor, com ou sem nota) e busca
-- Painel da obra: total gasto, gasto por etapa, por categoria e por mês, lista "Para classificar"
+- Painel da obra: total gasto (construção e terreno separados), gasto por etapa, por categoria e por mês, lista "Para classificar"
 - Exportar lançamentos em XLSX e CSV
 - PWA instalável
 
@@ -416,9 +429,12 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 
 ## 15. Estado atual
 
-- **Fase atual:** 0 (nada implementado)
+- **Fase atual:** 0, em andamento na branch `fase-0/fundacao`. Feito: projeto Next.js 16 (cacheComponents) com Tailwind v4, shadcn/ui, ESLint, Prettier e Vitest; identidade visual (cores da logo, Archivo, ícones e manifest do PWA); layout com navegação inferior; banco no projeto `dev` com identidade, organizações, planos e assinaturas (RLS); login com Google e com código ou link por e-mail; primeiro acesso (nome da conta); testes de unidade e de RLS; CI com lint, formatação, tipos, testes, build e RLS em Supabase local. Falta: Playwright, deploy na Vercel com preview por PR, projeto Supabase de produção.
+- **E-mail (SMTP próprio): pendente.** Sem SMTP, o Supabase não deixa editar os modelos e só entrega e-mail para quem é da equipe do projeto. Hoje o e-mail de acesso é o padrão (só link; abre no mesmo navegador). Ao configurar o SMTP (ex.: Resend, depois de registrar o domínio), colar `supabase/templates/acesso.html` nos modelos "Magic Link" e "Confirm signup" com o assunto `Seu código de acesso: {{ .Token }}`: o e-mail passa a trazer o código e um link que funciona em outro aparelho. Obrigatório antes do lançamento.
 - **Nome:** Custo da Obra (verificar e registrar o domínio custodaobra.com.br; criar logo próprio e depositar como marca mista no INPI, classes 42 e 9)
 - **Banco e autenticação:** Supabase (decidido)
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
+- **Planos:** provisórios, preço zero, 14 dias de teste. `pessoal` (padrão do cadastro): 1 obra, 3 membros, 300 lançamentos por WhatsApp e 600 chamadas de IA por mês. `profissional`: 10 obras, 10 membros, 3000 e 6000.
+- **Organização pessoal:** nasce com o nome da pessoa (Google) ou o começo do e-mail; no primeiro acesso a pessoa confirma ou troca (pelo próprio nome ou o da empresa).
 - **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos
 - **Contas necessárias:** Supabase (dev e prod), Vercel, chave da API da Anthropic (cobrada à parte da assinatura do Claude), conta de desenvolvedor Meta com app do WhatsApp Business
