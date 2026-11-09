@@ -10,6 +10,7 @@ import { type FormState, textField } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
 
 import { stagesCopy } from "./copy";
+import { parseBudgetForm, parseProgressForm } from "./schemas";
 
 export type StageFormState = FormState<"name">;
 
@@ -172,4 +173,88 @@ export async function removeStage(
 
   refresh();
   return { status: "success" };
+}
+
+export type StagePlanFormState = FormState<"area">;
+
+/** Ids das etapas da obra (o que vier de fora disso é ignorado). */
+async function projectStageIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+) {
+  const { data } = await supabase
+    .from("stages")
+    .select("id")
+    .eq("project_id", projectId);
+  return new Set((data ?? []).map((stage) => stage.id));
+}
+
+/** Salva o previsto de todas as etapas (e a estimativa usada, se houver). */
+export async function saveStageBudgets(
+  orgSlug: string,
+  projectId: string,
+  _prev: StagePlanFormState,
+  formData: FormData,
+): Promise<StagePlanFormState> {
+  const org = await guard(orgSlug, projectId);
+  if (!org) return { status: "error", message: errors.noPermission };
+
+  const supabase = await createClient();
+  const parsed = parseBudgetForm(
+    [...formData.entries()],
+    await projectStageIds(supabase, projectId),
+  );
+  if (!parsed.ok) {
+    return parsed.field
+      ? { status: "error", fieldErrors: { area: parsed.message } }
+      : { status: "error", message: parsed.message };
+  }
+
+  if (parsed.estimate) {
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        built_area_m2: parsed.estimate.areaM2,
+        cost_per_m2_cents: parsed.estimate.costPerM2Cents,
+      })
+      .eq("org_id", org.id)
+      .eq("id", projectId);
+    if (error) return { status: "error", message: errors.saveFailed };
+  }
+
+  const { error } = await supabase.rpc("update_stage_plan", {
+    p_project_id: projectId,
+    p_items: parsed.items,
+  });
+  if (error) return { status: "error", message: errors.saveFailed };
+
+  refresh();
+  return { status: "success", message: stagesCopy.budget.saved };
+}
+
+/** Salva o progresso informado de todas as etapas. */
+export async function saveStageProgress(
+  orgSlug: string,
+  projectId: string,
+  _prev: StagePlanFormState,
+  formData: FormData,
+): Promise<StagePlanFormState> {
+  const org = await guard(orgSlug, projectId);
+  if (!org) return { status: "error", message: errors.noPermission };
+
+  const supabase = await createClient();
+  const parsed = parseProgressForm(
+    [...formData.entries()],
+    await projectStageIds(supabase, projectId),
+  );
+  if (!parsed.ok) return { status: "error", message: parsed.message };
+
+  const { error } = await supabase.rpc("update_stage_plan", {
+    p_project_id: projectId,
+    p_items: parsed.items,
+  });
+  if (error) return { status: "error", message: errors.saveFailed };
+
+  refresh();
+  return { status: "success", message: stagesCopy.progress.saved };
 }

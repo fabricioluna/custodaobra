@@ -12,6 +12,9 @@ import { getProjectDashboard } from "@/features/expenses/queries";
 import { BarList } from "@/features/projects/components/bar-list";
 import { projectsCopy } from "@/features/projects/copy";
 import { requireProject } from "@/features/projects/queries";
+import { PlanSummary } from "@/features/stages/components/plan-summary";
+import { StagePlanList } from "@/features/stages/components/stage-plan-list";
+import { getStagePlans, summarizePlans } from "@/features/stages/queries";
 import { formatMonth, todayIn } from "@/lib/dates";
 import { formatCents, formatCentsCompact } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -27,12 +30,17 @@ export default async function ProjectDashboardPage({
   const { orgSlug, projectId } = await params;
   const { org, project, access } = await requireProject(orgSlug, projectId);
   const query = await searchParams;
-  const dashboard = await getProjectDashboard(project.id);
+  const [dashboard, plans] = await Promise.all([
+    getProjectDashboard(project.id),
+    getStagePlans(project.id),
+  ]);
+  const plan = summarizePlans(plans);
   const today = todayIn(org.timezone);
 
   const base = orgPath(org.slug, "obras", project.id);
   const expenseHref = (id: string) => `${base}/lancamentos/${id}`;
   const launchHref = `${base}/lancamentos/novo`;
+  const stageHref = (stageId: string) => `${base}/lancamentos?etapa=${stageId}`;
   const { summary } = dashboard;
 
   const savedId = typeof query.lancado === "string" ? query.lancado : null;
@@ -143,6 +151,12 @@ export default async function ProjectDashboardPage({
         ) : null}
       </section>
 
+      {plan.alerts.length > 0 ? (
+        <Section title={copy.alertsTitle}>
+          <StagePlanList plans={plan.alerts} hrefFor={stageHref} />
+        </Section>
+      ) : null}
+
       {dashboard.unclassified.length > 0 ? (
         <Section title={copy.unclassifiedTitle}>
           <p className="mb-3 text-sm text-muted-foreground">
@@ -158,21 +172,42 @@ export default async function ProjectDashboardPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={copy.byStage}>
-          <BarList
-            items={[...stagesWithSpending, ...quietStages].map((stage) => ({
-              key: stage.stage_id ?? stage.name ?? "",
-              label: stage.name ?? "",
-              cents: stage.spent_cents ?? 0,
-              muted: (stage.spent_cents ?? 0) === 0,
-              href: stage.stage_id
-                ? `${base}/lancamentos?etapa=${stage.stage_id}`
-                : undefined,
-            }))}
-            emptyLabel={copy.noSpending}
-          />
-          <p className="mt-4 text-sm text-muted-foreground">
-            {copy.byStageHint}
-          </p>
+          {plan.hasBudget ? (
+            <>
+              <PlanSummary
+                summary={plan}
+                className="mb-5 border-0 bg-transparent p-0 md:p-0"
+              />
+              <StagePlanList plans={plans} hrefFor={stageHref} />
+            </>
+          ) : (
+            <>
+              <BarList
+                items={[...stagesWithSpending, ...quietStages].map((stage) => ({
+                  key: stage.stage_id ?? stage.name ?? "",
+                  label: stage.name ?? "",
+                  cents: stage.spent_cents ?? 0,
+                  muted: (stage.spent_cents ?? 0) === 0,
+                  href: stage.stage_id ? stageHref(stage.stage_id) : undefined,
+                }))}
+                emptyLabel={copy.noSpending}
+              />
+              <p className="mt-4 text-sm text-muted-foreground">
+                {copy.byStageHint}
+              </p>
+              {access.canEdit ? (
+                <Link
+                  href={`${base}/etapas/orcamento`}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "lg" }),
+                    "mt-4 rounded-xl",
+                  )}
+                >
+                  {copy.defineBudget}
+                </Link>
+              ) : null}
+            </>
+          )}
         </Section>
 
         <div className="flex flex-col gap-6">
@@ -219,7 +254,10 @@ export default async function ProjectDashboardPage({
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-6 rounded-2xl border bg-card p-4 md:p-5">
+    <section
+      aria-label={title}
+      className="mb-6 rounded-2xl border bg-card p-4 md:p-5"
+    >
       <h2 className="mb-4 text-lg heading">{title}</h2>
       {children}
     </section>

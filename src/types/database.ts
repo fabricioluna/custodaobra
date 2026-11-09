@@ -7,6 +7,11 @@ export type Json =
   | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18";
+  };
   public: {
     Tables: {
       attachments: {
@@ -21,7 +26,6 @@ export type Database = {
           updated_at: string;
           uploaded_by: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           expense_id: string;
@@ -72,7 +76,6 @@ export type Database = {
           org_id: string;
           user_id: string | null;
         };
-        ComputedFields: never;
         Insert: {
           action: string;
           created_at?: string;
@@ -106,7 +109,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           code: string;
           created_at?: string;
@@ -150,7 +152,6 @@ export type Database = {
           unit_price_cents: number | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           description: string;
@@ -220,7 +221,6 @@ export type Database = {
           unit_price_cents: number | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           ai_confidence?: number | null;
           amount_cents: number;
@@ -335,7 +335,6 @@ export type Database = {
           updated_at: string;
           user_id: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           org_id: string;
@@ -378,7 +377,6 @@ export type Database = {
           timezone: string;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           created_by?: string | null;
@@ -417,7 +415,6 @@ export type Database = {
           updated_at: string;
           whatsapp_enabled: boolean;
         };
-        ComputedFields: never;
         Insert: {
           active?: boolean;
           code: string;
@@ -461,7 +458,6 @@ export type Database = {
           whatsapp_linked_at: string | null;
           whatsapp_phone: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           default_org_id?: string | null;
@@ -501,7 +497,6 @@ export type Database = {
           updated_at: string;
           user_id: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           org_id: string;
@@ -553,9 +548,9 @@ export type Database = {
         Row: {
           address: string | null;
           archived_at: string | null;
-          budget_total_cents: number | null;
           built_area_m2: number | null;
           city: string | null;
+          cost_per_m2_cents: number | null;
           created_at: string;
           created_by: string | null;
           expected_end_date: string | null;
@@ -568,13 +563,12 @@ export type Database = {
           status: Database["public"]["Enums"]["project_status"];
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           address?: string | null;
           archived_at?: string | null;
-          budget_total_cents?: number | null;
           built_area_m2?: number | null;
           city?: string | null;
+          cost_per_m2_cents?: number | null;
           created_at?: string;
           created_by?: string | null;
           expected_end_date?: string | null;
@@ -590,9 +584,9 @@ export type Database = {
         Update: {
           address?: string | null;
           archived_at?: string | null;
-          budget_total_cents?: number | null;
           built_area_m2?: number | null;
           city?: string | null;
+          cost_per_m2_cents?: number | null;
           created_at?: string;
           created_by?: string | null;
           expected_end_date?: string | null;
@@ -624,7 +618,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           default_percent: number;
@@ -656,7 +649,6 @@ export type Database = {
           sort_order: number;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           budget_cents?: number | null;
           created_at?: string;
@@ -712,7 +704,6 @@ export type Database = {
           trial_ends_at: string | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           current_period_end?: string | null;
@@ -767,7 +758,6 @@ export type Database = {
           phone: string | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           document?: string | null;
@@ -802,16 +792,15 @@ export type Database = {
     Views: {
       v_project_category_summary: {
         Row: {
-          category_code: string;
-          category_id: string;
-          category_name: string;
-          category_sort_order: number;
+          category_code: string | null;
+          category_id: string | null;
+          category_name: string | null;
+          category_sort_order: number | null;
           expense_count: number | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
           total_cents: number | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "expenses_project_id_org_id_fkey";
@@ -834,10 +823,9 @@ export type Database = {
           construction_cents: number | null;
           land_cents: number | null;
           month: string | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "expenses_project_id_org_id_fkey";
@@ -861,11 +849,10 @@ export type Database = {
           expense_count: number | null;
           land_cents: number | null;
           last_spent_on: string | null;
-          org_id: string;
-          project_id: string;
+          org_id: string | null;
+          project_id: string | null;
           unclassified_count: number | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "projects_org_id_fkey";
@@ -881,15 +868,14 @@ export type Database = {
           budget_cents: number | null;
           committed_cents: number | null;
           expense_count: number | null;
-          name: string;
-          org_id: string;
-          progress_percent: number;
-          project_id: string;
-          sort_order: number;
+          name: string | null;
+          org_id: string | null;
+          progress_percent: number | null;
+          project_id: string | null;
+          sort_order: number | null;
           spent_cents: number | null;
-          stage_id: string;
+          stage_id: string | null;
         };
-        ComputedFields: never;
         Relationships: [
           {
             foreignKeyName: "stages_project_id_org_id_fkey";
@@ -909,7 +895,10 @@ export type Database = {
       };
     };
     Functions: {
-      [_ in never]: never;
+      update_stage_plan: {
+        Args: { p_items: Json; p_project_id: string };
+        Returns: number;
+      };
     };
     Enums: {
       expense_source:
