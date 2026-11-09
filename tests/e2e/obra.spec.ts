@@ -86,8 +86,9 @@ test.describe("obra e gastos", () => {
     // Classificar: escolhe a etapa.
     await row.click();
     await expect(page).toHaveURL(/\/lancamentos\/[0-9a-f-]{36}$/);
+    // getByRole ignora as páginas visitadas que o Next.js guarda escondidas.
     await page
-      .getByLabel("Etapa", { exact: true })
+      .getByRole("combobox", { name: "Etapa", exact: true })
       .selectOption({ label: "Alvenaria" });
     await page.getByRole("button", { name: /^Salvar alterações/ }).click();
     await expect(page).toHaveURL(/\/lancamentos$/);
