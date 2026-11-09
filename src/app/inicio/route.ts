@@ -5,8 +5,9 @@ import { LOGIN_PATH, ONBOARDING_PATH } from "@/lib/auth/paths";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Para onde vai quem acabou de entrar: primeiro acesso (escolher o nome da
- * conta) ou as obras da organização padrão.
+ * Para onde vai quem acabou de entrar (e quem abre o app instalado): primeiro
+ * acesso (escolher o nome da conta), o painel da obra (se só houver uma) ou a
+ * lista de obras da organização padrão.
  */
 export async function GET(request: NextRequest) {
   const to = (path: string) =>
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "onboarded_at, default_org:organizations!profiles_default_org_id_fkey(slug)",
+      "onboarded_at, default_org:organizations!profiles_default_org_id_fkey(id, slug)",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -29,18 +30,29 @@ export async function GET(request: NextRequest) {
   if (!profile.onboarded_at) return to(ONBOARDING_PATH);
 
   let slug = profile.default_org?.slug;
+  let orgId = profile.default_org?.id;
   if (!slug) {
     // Sem organização padrão (ex.: foi removida): usa a primeira em que é membro.
     const { data: membership } = await supabase
       .from("organization_members")
-      .select("organizations(slug)")
+      .select("organizations(id, slug)")
       .eq("user_id", userId)
       .order("created_at")
       .limit(1)
       .maybeSingle();
     slug = membership?.organizations?.slug;
+    orgId = membership?.organizations?.id;
   }
-  if (!slug) return to(`${LOGIN_PATH}?erro=conta`);
+  if (!slug || !orgId) return to(`${LOGIN_PATH}?erro=conta`);
+
+  // Uma obra só: vai direto para o painel dela (o caso mais comum).
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .limit(2);
+  if (projects?.length === 1) return to(orgPath(slug, "obras", projects[0].id));
 
   return to(orgPath(slug, "obras"));
 }

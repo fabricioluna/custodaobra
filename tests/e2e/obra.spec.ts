@@ -44,12 +44,12 @@ test.describe("obra e gastos", () => {
 
     // Etapas padrão criadas junto com a obra.
     await page.getByRole("link", { name: "Etapas" }).click();
-    await expect(page.getByLabel("Nome da etapa 1")).toHaveValue(
-      "Projetos e documentação",
-    );
-    await expect(page.getByLabel("Nome da etapa 13")).toHaveValue(
-      "Limpeza e entrega",
-    );
+    await expect(
+      page.getByLabel("Nome da etapa 1", { exact: true }),
+    ).toHaveValue("Projetos e documentação");
+    await expect(
+      page.getByLabel("Nome da etapa 13", { exact: true }),
+    ).toHaveValue("Limpeza e entrega");
 
     // Lançar gasto: toque 1 (tecla dourada), digita o valor e a descrição,
     // toque 2 (salvar).
@@ -118,7 +118,16 @@ test.describe("obra e gastos", () => {
       .from("projects")
       .insert({ org_id: user.orgId, name: "Primeira", created_by: user.id });
 
+    // Com uma obra só, o app abre direto no painel dela.
     await signIn(page, user);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Primeira" }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("link", { name: "Obras", exact: true })
+      .first()
+      .click();
     await page.getByRole("link", { name: "Nova obra" }).click();
     await expect(
       page.getByText(/Seu plano permite 1 obra ativa/),

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 import type { Database } from "@/types/database";
 
@@ -13,6 +14,11 @@ import { getSupabasePublishableKey, getSupabaseUrl } from "./env";
  * Ler cookies é dado da requisição: em páginas, use dentro de <Suspense>.
  */
 export async function createClient() {
+  // Dados do usuário são sempre da requisição: nunca entram num prerender
+  // (nem no prefetch em tempo de execução, que já enxerga os cookies). Sem
+  // isto, o supabase-js lê o relógio para validar a sessão durante o
+  // prerender, e o Next.js acusa erro.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient<Database>(

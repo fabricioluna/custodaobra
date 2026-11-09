@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "icons": "node scripts/generate-icons.mjs",
     "db:push": "supabase db push --remote",
-    "db:types": "supabase gen types typescript --remote --schema public > src/types/database.ts",
+    "db:types": "supabase gen types typescript --remote --schema public > src/types/database.ts && prettier --parser typescript --ignore-path .gitignore --write src/types/database.ts",
     "test:rls": "vitest run --config vitest.rls.config.mts",
     "test:e2e": "playwright test"
   },
