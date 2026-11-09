@@ -3,7 +3,6 @@ import Link from "next/link";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +13,9 @@ import type { ExpenseFormOptions } from "./expense-form";
 const copy = expensesCopy.filters;
 
 /**
+ * Rótulos por aria-label, sem id: o Next.js guarda páginas visitadas escondidas
+ * no DOM, e ids repetidos ligariam o rótulo ao campo errado.
+ *
  * Filtros da lista como formulário GET: tudo vai para a URL, a página lê no
  * servidor e o resultado já vem no HTML. Funciona até sem JavaScript.
  */
@@ -39,16 +41,13 @@ export function ExpenseFilters({
     <form action={action} method="get" className="mb-5 flex flex-col gap-3">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Label htmlFor="q" className="sr-only">
-            {copy.search}
-          </Label>
           <Search
             aria-hidden
             className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            id="q"
             name="q"
+            aria-label={copy.search}
             type="search"
             defaultValue={filters.q ?? ""}
             placeholder={copy.searchPlaceholder}
@@ -68,28 +67,34 @@ export function ExpenseFilters({
         </summary>
         <div className="mt-3 grid gap-4 rounded-2xl border bg-card p-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="de">{copy.from}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.from}
+            </span>
             <Input
-              id="de"
               name="de"
+              aria-label={copy.from}
               type="date"
               defaultValue={filters.de ?? ""}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ate">{copy.to}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.to}
+            </span>
             <Input
-              id="ate"
               name="ate"
+              aria-label={copy.to}
               type="date"
               defaultValue={filters.ate ?? ""}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="etapa">{copy.stage}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.stage}
+            </span>
             <NativeSelect
-              id="etapa"
               name="etapa"
+              aria-label={copy.stage}
               defaultValue={filters.etapa ?? ""}
             >
               <option value="">{copy.any}</option>
@@ -102,10 +107,12 @@ export function ExpenseFilters({
             </NativeSelect>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="categoria">{copy.category}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.category}
+            </span>
             <NativeSelect
-              id="categoria"
               name="categoria"
+              aria-label={copy.category}
               defaultValue={filters.categoria ?? ""}
             >
               <option value="">{copy.any}</option>
@@ -117,10 +124,12 @@ export function ExpenseFilters({
             </NativeSelect>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="fornecedor">{copy.supplier}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.supplier}
+            </span>
             <NativeSelect
-              id="fornecedor"
               name="fornecedor"
+              aria-label={copy.supplier}
               defaultValue={filters.fornecedor ?? ""}
             >
               <option value="">{copy.anySupplier}</option>
@@ -134,10 +143,12 @@ export function ExpenseFilters({
             </NativeSelect>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="nota">{copy.invoice}</Label>
+            <span aria-hidden className="text-base font-semibold">
+              {copy.invoice}
+            </span>
             <NativeSelect
-              id="nota"
               name="nota"
+              aria-label={copy.invoice}
               defaultValue={filters.nota ?? ""}
             >
               <option value="">{copy.any}</option>

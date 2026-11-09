@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useId } from "react";
 
 import { fieldA11y, FormField } from "@/components/form-field";
 import { FormMessage } from "@/components/form-message";
@@ -54,6 +54,10 @@ export function ProjectForm({
   showStatus?: boolean;
   disabled?: boolean;
 }) {
+  // Ids únicos: o Next.js guarda páginas visitadas escondidas no DOM, e ids
+  // repetidos fariam o rótulo apontar para o campo da página escondida.
+  const uid = useId();
+  const fid = (name: string) => `${uid}-${name}`;
   const [state, formAction, pending] = useActionState(action, {
     status: "idle",
   });
@@ -72,9 +76,9 @@ export function ProjectForm({
       noValidate
     >
       <fieldset disabled={disabled} className="flex flex-col gap-6">
-        <FormField id="name" label={copy.name} error={errors?.name}>
+        <FormField id={fid("name")} label={copy.name} error={errors?.name}>
           <Input
-            {...fieldA11y("name", undefined, errors?.name)}
+            {...fieldA11y(fid("name"), undefined, errors?.name)}
             name="name"
             defaultValue={defaults.name}
             placeholder={copy.namePlaceholder}
@@ -85,9 +89,9 @@ export function ProjectForm({
         </FormField>
 
         <div className="grid grid-cols-[1fr_6.5rem] gap-3">
-          <FormField id="city" label={copy.city} error={errors?.city}>
+          <FormField id={fid("city")} label={copy.city} error={errors?.city}>
             <Input
-              {...fieldA11y("city", undefined, errors?.city)}
+              {...fieldA11y(fid("city"), undefined, errors?.city)}
               name="city"
               defaultValue={defaults.city}
               autoComplete="address-level2"
@@ -95,9 +99,9 @@ export function ProjectForm({
               maxLength={80}
             />
           </FormField>
-          <FormField id="state" label={copy.state} error={errors?.state}>
+          <FormField id={fid("state")} label={copy.state} error={errors?.state}>
             <NativeSelect
-              {...fieldA11y("state", undefined, errors?.state)}
+              {...fieldA11y(fid("state"), undefined, errors?.state)}
               name="state"
               defaultValue={defaults.state}
               autoComplete="address-level1"
@@ -113,13 +117,17 @@ export function ProjectForm({
         </div>
 
         <FormField
-          id="builtArea"
+          id={fid("builtArea")}
           label={copy.builtArea}
           hint={copy.builtAreaHint}
           error={errors?.builtArea}
         >
           <Input
-            {...fieldA11y("builtArea", copy.builtAreaHint, errors?.builtArea)}
+            {...fieldA11y(
+              fid("builtArea"),
+              copy.builtAreaHint,
+              errors?.builtArea,
+            )}
             name="builtArea"
             defaultValue={defaults.builtArea}
             inputMode="decimal"
@@ -127,9 +135,13 @@ export function ProjectForm({
           />
         </FormField>
 
-        <FormField id="standard" label={copy.standard} error={errors?.standard}>
+        <FormField
+          id={fid("standard")}
+          label={copy.standard}
+          error={errors?.standard}
+        >
           <NativeSelect
-            {...fieldA11y("standard", undefined, errors?.standard)}
+            {...fieldA11y(fid("standard"), undefined, errors?.standard)}
             name="standard"
             defaultValue={defaults.standard}
           >
@@ -143,12 +155,12 @@ export function ProjectForm({
         </FormField>
 
         <FormField
-          id="startDate"
+          id={fid("startDate")}
           label={copy.startDate}
           error={errors?.startDate}
         >
           <Input
-            {...fieldA11y("startDate", undefined, errors?.startDate)}
+            {...fieldA11y(fid("startDate"), undefined, errors?.startDate)}
             name="startDate"
             type="date"
             defaultValue={defaults.startDate}
@@ -157,9 +169,13 @@ export function ProjectForm({
         </FormField>
 
         {showStatus ? (
-          <FormField id="status" label={copy.status} error={errors?.status}>
+          <FormField
+            id={fid("status")}
+            label={copy.status}
+            error={errors?.status}
+          >
             <NativeSelect
-              {...fieldA11y("status", undefined, errors?.status)}
+              {...fieldA11y(fid("status"), undefined, errors?.status)}
               name="status"
               defaultValue={defaults.status}
             >
@@ -172,9 +188,13 @@ export function ProjectForm({
           </FormField>
         ) : null}
 
-        <FormField id="address" label={copy.address} error={errors?.address}>
+        <FormField
+          id={fid("address")}
+          label={copy.address}
+          error={errors?.address}
+        >
           <Input
-            {...fieldA11y("address", undefined, errors?.address)}
+            {...fieldA11y(fid("address"), undefined, errors?.address)}
             name="address"
             defaultValue={defaults.address}
             autoComplete="street-address"

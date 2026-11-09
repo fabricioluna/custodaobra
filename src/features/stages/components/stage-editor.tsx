@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Check, Plus, Trash2 } from "lucide-react";
 import {
   startTransition,
   useActionState,
+  useId,
   useState,
   useTransition,
 } from "react";
@@ -204,6 +205,7 @@ function AddStageForm({
   });
   const [name, setName] = useState("");
   const fieldError = state.status === "error" ? state.fieldErrors?.name : null;
+  const inputId = useId();
 
   return (
     <form
@@ -217,10 +219,10 @@ function AddStageForm({
       }}
       className="flex flex-col gap-2.5"
     >
-      <Label htmlFor="new-stage">{copy.addLabel}</Label>
+      <Label htmlFor={inputId}>{copy.addLabel}</Label>
       <div className="flex gap-2">
         <Input
-          id="new-stage"
+          id={inputId}
           name="name"
           value={name}
           onChange={(event) => setName(event.target.value)}

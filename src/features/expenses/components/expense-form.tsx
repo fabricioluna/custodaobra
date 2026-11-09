@@ -1,7 +1,13 @@
 "use client";
 
 import { ChevronDown, Paperclip } from "lucide-react";
-import { startTransition, useActionState, useMemo, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 
 import { fieldA11y, FormField } from "@/components/form-field";
 import { FormMessage } from "@/components/form-message";
@@ -62,6 +68,10 @@ export function ExpenseForm({
   submittingLabel: string;
   detailsOpen?: boolean;
 }) {
+  // Ids únicos: o Next.js guarda páginas visitadas escondidas no DOM, e ids
+  // repetidos fariam o rótulo apontar para o campo da página escondida.
+  const uid = useId();
+  const fid = (name: string) => `${uid}-${name}`;
   const [state, formAction, pending] = useActionState(action, {
     status: "idle",
   });
@@ -134,9 +144,13 @@ export function ExpenseForm({
       className="flex max-w-xl flex-col gap-6"
       noValidate
     >
-      <FormField id="amount" label={copy.amount} error={errors?.amountCents}>
+      <FormField
+        id={fid("amount")}
+        label={copy.amount}
+        error={errors?.amountCents}
+      >
         <MoneyInput
-          {...fieldA11y("amount", undefined, errors?.amountCents)}
+          {...fieldA11y(fid("amount"), undefined, errors?.amountCents)}
           name="amountCents"
           cents={amountCents}
           onCentsChange={setAmountCents}
@@ -147,7 +161,7 @@ export function ExpenseForm({
       </FormField>
 
       <FormField
-        id="description"
+        id={fid("description")}
         label={copy.description}
         optional={copy.optional}
         hint={copy.descriptionHint}
@@ -155,7 +169,7 @@ export function ExpenseForm({
       >
         <Input
           {...fieldA11y(
-            "description",
+            fid("description"),
             copy.descriptionHint,
             errors?.description,
           )}
@@ -173,9 +187,9 @@ export function ExpenseForm({
         />
       </FormField>
 
-      <FormField id="stageId" label={copy.stage} error={errors?.stageId}>
+      <FormField id={fid("stageId")} label={copy.stage} error={errors?.stageId}>
         <NativeSelect
-          {...fieldA11y("stageId", undefined, errors?.stageId)}
+          {...fieldA11y(fid("stageId"), undefined, errors?.stageId)}
           name="stageId"
           defaultValue={defaults.stageId}
         >
@@ -207,12 +221,12 @@ export function ExpenseForm({
 
         <div className="flex flex-col gap-6 border-t px-4 pt-5 pb-6">
           <FormField
-            id="categoryId"
+            id={fid("categoryId")}
             label={copy.category}
             error={errors?.categoryId}
           >
             <NativeSelect
-              {...fieldA11y("categoryId", undefined, errors?.categoryId)}
+              {...fieldA11y(fid("categoryId"), undefined, errors?.categoryId)}
               name="categoryId"
               value={categoryId}
               onChange={(event) => {
@@ -228,9 +242,13 @@ export function ExpenseForm({
             </NativeSelect>
           </FormField>
 
-          <FormField id="spentOn" label={copy.spentOn} error={errors?.spentOn}>
+          <FormField
+            id={fid("spentOn")}
+            label={copy.spentOn}
+            error={errors?.spentOn}
+          >
             <Input
-              {...fieldA11y("spentOn", undefined, errors?.spentOn)}
+              {...fieldA11y(fid("spentOn"), undefined, errors?.spentOn)}
               name="spentOn"
               type="date"
               defaultValue={defaults.spentOn}
@@ -240,22 +258,26 @@ export function ExpenseForm({
           </FormField>
 
           <FormField
-            id="supplierName"
+            id={fid("supplierName")}
             label={copy.supplier}
             optional={copy.optional}
             error={errors?.supplierName}
           >
             <Input
-              {...fieldA11y("supplierName", undefined, errors?.supplierName)}
+              {...fieldA11y(
+                fid("supplierName"),
+                undefined,
+                errors?.supplierName,
+              )}
               name="supplierName"
               defaultValue={defaults.supplierName}
               placeholder={copy.supplierPlaceholder}
-              list="supplier-options"
+              list={fid("supplier-options")}
               autoCapitalize="words"
               autoComplete="off"
               maxLength={120}
             />
-            <datalist id="supplier-options">
+            <datalist id={fid("supplier-options")}>
               {options.suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.name} />
               ))}
@@ -263,12 +285,16 @@ export function ExpenseForm({
           </FormField>
 
           <FormField
-            id="paymentMethod"
+            id={fid("paymentMethod")}
             label={copy.paymentMethod}
             error={errors?.paymentMethod}
           >
             <NativeSelect
-              {...fieldA11y("paymentMethod", undefined, errors?.paymentMethod)}
+              {...fieldA11y(
+                fid("paymentMethod"),
+                undefined,
+                errors?.paymentMethod,
+              )}
               name="paymentMethod"
               defaultValue={defaults.paymentMethod}
             >
@@ -296,14 +322,14 @@ export function ExpenseForm({
             </label>
             {hasInvoice ? (
               <FormField
-                id="invoiceNumber"
+                id={fid("invoiceNumber")}
                 label={copy.invoiceNumber}
                 optional={copy.optional}
                 error={errors?.invoiceNumber}
               >
                 <Input
                   {...fieldA11y(
-                    "invoiceNumber",
+                    fid("invoiceNumber"),
                     undefined,
                     errors?.invoiceNumber,
                   )}
@@ -326,12 +352,12 @@ export function ExpenseForm({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <FormField
-                id="quantity"
+                id={fid("quantity")}
                 label={copy.quantity}
                 error={errors?.quantity}
               >
                 <Input
-                  {...fieldA11y("quantity", undefined, errors?.quantity)}
+                  {...fieldA11y(fid("quantity"), undefined, errors?.quantity)}
                   name="quantity"
                   value={quantity}
                   inputMode="decimal"
@@ -341,17 +367,21 @@ export function ExpenseForm({
                   }}
                 />
               </FormField>
-              <FormField id="unit" label={copy.unit} error={errors?.unit}>
+              <FormField
+                id={fid("unit")}
+                label={copy.unit}
+                error={errors?.unit}
+              >
                 <Input
-                  {...fieldA11y("unit", undefined, errors?.unit)}
+                  {...fieldA11y(fid("unit"), undefined, errors?.unit)}
                   name="unit"
                   defaultValue={defaults.unit}
                   placeholder={copy.unitPlaceholder}
-                  list="unit-options"
+                  list={fid("unit-options")}
                   autoComplete="off"
                   maxLength={20}
                 />
-                <datalist id="unit-options">
+                <datalist id={fid("unit-options")}>
                   {expensesCopy.units.map((unit) => (
                     <option key={unit} value={unit} />
                   ))}
@@ -359,12 +389,16 @@ export function ExpenseForm({
               </FormField>
             </div>
             <FormField
-              id="unitPrice"
+              id={fid("unitPrice")}
               label={copy.unitPrice}
               error={errors?.unitPriceCents}
             >
               <MoneyInput
-                {...fieldA11y("unitPrice", undefined, errors?.unitPriceCents)}
+                {...fieldA11y(
+                  fid("unitPrice"),
+                  undefined,
+                  errors?.unitPriceCents,
+                )}
                 name="unitPriceCents"
                 cents={unitPriceCents}
                 onCentsChange={(cents) => {
@@ -377,7 +411,7 @@ export function ExpenseForm({
           </fieldset>
 
           <FormField
-            id="receipt"
+            id={fid("receipt")}
             label={copy.receipt}
             optional={copy.optional}
             hint={receiptBusy ? copy.receiptProcessing : copy.receiptHint}
@@ -386,7 +420,7 @@ export function ExpenseForm({
             <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-input bg-background px-4 py-3 text-base focus-within:ring-3 focus-within:ring-ring/30">
               <Paperclip className="size-5 text-muted-foreground" aria-hidden />
               <input
-                {...fieldA11y("receipt", copy.receiptHint, receiptMessage)}
+                {...fieldA11y(fid("receipt"), copy.receiptHint, receiptMessage)}
                 type="file"
                 name="receipt"
                 accept={RECEIPT_MIME_TYPES.join(",")}
