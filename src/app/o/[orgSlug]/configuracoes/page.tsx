@@ -1,4 +1,10 @@
-import { ChevronRight, LogOut, Settings, Users } from "lucide-react";
+import {
+  ChevronRight,
+  LogOut,
+  MessageCircle,
+  Settings,
+  Users,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -17,6 +23,9 @@ import {
 } from "@/features/members/queries";
 import { requireOrg } from "@/features/organizations/queries";
 import { settingsCopy as copy } from "@/features/settings/copy";
+import { whatsappCopy } from "@/features/whatsapp/copy";
+import { getMyWhatsapp } from "@/features/whatsapp/queries";
+import { formatPhone } from "@/lib/whatsapp/phone";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: copy.title };
@@ -29,7 +38,11 @@ export default async function SettingsPage({
 }: PageProps<"/o/[orgSlug]/configuracoes">) {
   const { orgSlug } = await params;
   const org = await requireOrg(orgSlug);
-  const [role, orgs] = await Promise.all([getOrgRole(org.id), listMyOrgs()]);
+  const [role, orgs, whatsapp] = await Promise.all([
+    getOrgRole(org.id),
+    listMyOrgs(),
+    getMyWhatsapp(),
+  ]);
   const canManage = isOrgAdminRole(role);
   const team = canManage ? await listTeam(org.id) : [];
 
@@ -38,6 +51,35 @@ export default async function SettingsPage({
       <PageHeader title={copy.title} description={org.name} />
 
       <div className="flex max-w-xl flex-col gap-8">
+        <section>
+          <h2 className="mb-3 text-lg heading">{whatsappCopy.title}</h2>
+          <Link
+            href={orgPath(org.slug, "configuracoes", "whatsapp")}
+            className={rowClass}
+          >
+            <MessageCircle
+              className="size-6 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            <span className="flex flex-1 flex-col">
+              <span className="font-semibold">
+                {whatsapp.phone
+                  ? whatsappCopy.connectedTitle
+                  : whatsappCopy.disconnectedTitle}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {whatsapp.phone
+                  ? whatsappCopy.rowConnected(formatPhone(whatsapp.phone))
+                  : whatsappCopy.rowDisconnected}
+              </span>
+            </span>
+            <ChevronRight
+              className="size-5 text-muted-foreground"
+              aria-hidden
+            />
+          </Link>
+        </section>
+
         {canManage ? (
           <section>
             <h2 className="mb-3 text-lg heading">{copy.team}</h2>
