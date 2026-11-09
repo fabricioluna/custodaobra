@@ -44,3 +44,39 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  rls:
+    name: Isolamento entre organizações (RLS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Supabase local dentro do runner (Docker), com as migrations do
+      # repositório. Não usa nenhum projeto da nuvem nem segredo.
+      - name: Subir Supabase local
+        run: >-
+          npx supabase start
+          -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Exportar endereço e chaves locais
+        run: |
+          npx supabase status -o env \
+            | grep -E '^[A-Z_]+=' \
+            | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+          npx supabase status -o env | grep -oE '^[A-Z_]+=' | tr '\n' ' '
+
+      - name: Testes de RLS
+        run: npm run test:rls
+
+      - name: Parar Supabase local
+        if: always()
+        run: npx supabase stop --no-backup
