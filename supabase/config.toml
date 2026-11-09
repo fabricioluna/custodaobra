@@ -245,6 +245,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# E-mail de acesso do app (código + link). No projeto da nuvem, copie o mesmo
+# conteúdo em Authentication > Emails > Templates (Magic Link e Confirm signup).
+[auth.email.template.magic_link]
+subject = "Seu código de acesso: {{ .Token }}"
+content_path = "./supabase/templates/acesso.html"
+
+[auth.email.template.confirmation]
+subject = "Seu código de acesso: {{ .Token }}"
+content_path = "./supabase/templates/acesso.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

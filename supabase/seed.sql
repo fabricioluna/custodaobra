@@ -1,0 +1,3 @@
+-- Dados de demonstração para o Supabase local (só rodam em `supabase db reset`).
+-- Planos, etapas padrão e categorias padrão NÃO ficam aqui: entram por
+-- migration, porque precisam existir também nos projetos da nuvem.
