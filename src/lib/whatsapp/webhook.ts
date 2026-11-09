@@ -77,7 +77,27 @@ const changeValue = z.object({
     )
     .optional(),
   messages: z.array(incomingMessage).optional(),
+  statuses: z.array(z.unknown()).optional(),
 });
+
+/** Aviso de entrega de uma mensagem que o bot mandou. */
+const messageStatus = z.object({
+  id: z.string(),
+  status: z.string(),
+  recipient_id: z.string().optional(),
+  errors: z
+    .array(
+      z.object({
+        code: z.number(),
+        title: z.string().optional(),
+        message: z.string().optional(),
+        error_data: z.object({ details: z.string() }).optional(),
+      }),
+    )
+    .optional(),
+});
+
+export type FailedDelivery = { waMessageId: string; error: string };
 
 const webhookPayload = z.object({
   object: z.literal("whatsapp_business_account"),
@@ -88,29 +108,58 @@ const webhookPayload = z.object({
   ),
 });
 
-/**
- * Mensagens recebidas no número do bot. Avisos de entrega e leitura
- * (`statuses`) e mudanças de outros campos são ignorados, assim como
- * mensagens para outro número da mesma conta Business.
- */
-export function extractMessages(
-  body: unknown,
-  phoneNumberId: string,
-): IncomingMessage[] {
+/** Valores das mudanças "messages" do nosso número. */
+function messageChanges(body: unknown, phoneNumberId: string) {
   const parsed = webhookPayload.safeParse(body);
   if (!parsed.success) return [];
-
-  const messages: IncomingMessage[] = [];
+  const values: z.infer<typeof changeValue>[] = [];
   for (const entry of parsed.data.entry) {
     for (const change of entry.changes) {
       if (change.field !== "messages") continue;
       const value = changeValue.safeParse(change.value);
       if (!value.success) continue;
       if (value.data.metadata.phone_number_id !== phoneNumberId) continue;
-      messages.push(...(value.data.messages ?? []));
+      values.push(value.data);
     }
   }
-  return messages;
+  return values;
+}
+
+/**
+ * Mensagens recebidas no número do bot. Mudanças de outros campos e
+ * mensagens para outro número da mesma conta Business são ignoradas.
+ */
+export function extractMessages(
+  body: unknown,
+  phoneNumberId: string,
+): IncomingMessage[] {
+  return messageChanges(body, phoneNumberId).flatMap((v) => v.messages ?? []);
+}
+
+/**
+ * Mensagens do bot que a Meta aceitou mas não conseguiu entregar. Os avisos
+ * de "enviada", "entregue" e "lida" são ignorados.
+ */
+export function extractFailedDeliveries(
+  body: unknown,
+  phoneNumberId: string,
+): FailedDelivery[] {
+  const failures: FailedDelivery[] = [];
+  for (const value of messageChanges(body, phoneNumberId)) {
+    for (const raw of value.statuses ?? []) {
+      const status = messageStatus.safeParse(raw);
+      if (!status.success || status.data.status !== "failed") continue;
+      const error = status.data.errors?.[0];
+      const text = error
+        ? `entrega falhou (#${error.code}) ${error.error_data?.details ?? error.message ?? error.title ?? ""}`
+        : "entrega falhou";
+      failures.push({
+        waMessageId: status.data.id,
+        error: text.trim().slice(0, 500),
+      });
+    }
+  }
+  return failures;
 }
 
 /** Texto que a pessoa mandou (mensagem, legenda ou título do botão tocado). */

@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  extractFailedDeliveries,
   extractMessages,
   messageText,
   verifySignature,
@@ -163,5 +164,35 @@ describe("messageText", () => {
     expect(button && messageText(button)).toBe("Confirmar");
     expect(list && messageText(list)).toBe("Fundação");
     expect(image && messageText(image)).toBe("cimento");
+  });
+});
+
+describe("extractFailedDeliveries", () => {
+  it("pega só as entregas que falharam", () => {
+    const body = payload([], PHONE_NUMBER_ID, {
+      messages: undefined,
+      statuses: [
+        { id: "wamid.ok", status: "delivered", recipient_id: "5587" },
+        {
+          id: "wamid.bad",
+          status: "failed",
+          recipient_id: "5587",
+          errors: [
+            {
+              code: 131026,
+              title: "Message undeliverable",
+              error_data: { details: "Número sem WhatsApp" },
+            },
+          ],
+        },
+      ],
+    });
+    expect(extractFailedDeliveries(body, PHONE_NUMBER_ID)).toEqual([
+      {
+        waMessageId: "wamid.bad",
+        error: "entrega falhou (#131026) Número sem WhatsApp",
+      },
+    ]);
+    expect(extractFailedDeliveries(body, "outro")).toEqual([]);
   });
 });

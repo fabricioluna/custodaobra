@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { whatsappEnv } from "@/lib/whatsapp/env";
 import { handleIncomingMessage } from "@/lib/whatsapp/handlers/incoming";
 import {
+  extractFailedDeliveries,
   extractMessages,
   verifySignature,
   verifySubscription,
@@ -45,11 +46,10 @@ export async function POST(request: NextRequest) {
     return new Response("Bad request", { status: 400 });
   }
 
-  const messages = extractMessages(
-    body,
-    whatsappEnv("WHATSAPP_PHONE_NUMBER_ID"),
-  );
-  if (messages.length) {
+  const phoneNumberId = whatsappEnv("WHATSAPP_PHONE_NUMBER_ID");
+  const messages = extractMessages(body, phoneNumberId);
+  const failures = extractFailedDeliveries(body, phoneNumberId);
+  if (messages.length || failures.length) {
     after(async () => {
       const admin = createAdminClient();
       // Uma por vez, na ordem em que chegaram.
@@ -63,6 +63,15 @@ export async function POST(request: NextRequest) {
             error,
           );
         }
+      }
+      // Resposta do bot que não chegou: fica anotada no log.
+      for (const failure of failures) {
+        console.error("[whatsapp]", failure.waMessageId, failure.error);
+        await admin
+          .from("whatsapp_messages")
+          .update({ error: failure.error })
+          .eq("wa_message_id", failure.waMessageId)
+          .eq("direction", "out");
       }
     });
   }
