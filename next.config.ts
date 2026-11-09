@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
+  // O "N" do Next.js (só em desenvolvimento) ficava em cima da navegação
+  // inferior. Erros continuam aparecendo na tela normalmente.
+  devIndicators: false,
   partialPrefetching: true,
   experimental: {
     serverActions: {
