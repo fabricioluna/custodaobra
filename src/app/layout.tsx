@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
 
 import { APP_LOCALE, APP_NAME, APP_TAGLINE, APP_URL } from "@/config/app";
+import { ServiceWorker } from "@/components/service-worker";
 import { BRAND_COLORS } from "@/config/brand";
 
 import "./globals.css";
@@ -36,7 +37,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang={APP_LOCALE}
       className={`${archivo.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

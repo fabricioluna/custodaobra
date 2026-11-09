@@ -24,12 +24,15 @@ const focusRing =
  * computador. Lê a URL, então precisa estar dentro de <Suspense> (cacheComponents).
  */
 export function AppNav() {
-  const { orgSlug } = useParams<{ orgSlug: string }>();
+  const { orgSlug, projectId } = useParams<{
+    orgSlug: string;
+    projectId?: string;
+  }>();
   const pathname = usePathname();
 
   const items = getOrgNavItems(orgSlug);
   const activeKey = getActiveNavKey(pathname, items);
-  const launchHref = getLaunchExpenseHref(orgSlug);
+  const launchHref = getLaunchExpenseHref(orgSlug, projectId);
 
   return (
     <>

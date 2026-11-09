@@ -40,6 +40,12 @@ describe("getOrgNavItems", () => {
       "/o/minha-casa/lancamentos/novo",
     );
   });
+
+  it("dentro de uma obra, Lançar gasto vai direto para a obra", () => {
+    expect(getLaunchExpenseHref("minha-casa", "abc")).toBe(
+      "/o/minha-casa/obras/abc/lancamentos/novo",
+    );
+  });
 });
 
 describe("getActiveNavKey", () => {

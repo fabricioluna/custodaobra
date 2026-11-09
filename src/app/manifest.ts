@@ -10,7 +10,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: APP_NAME,
     description: APP_TAGLINE,
     lang: APP_LOCALE,
-    start_url: "/",
+    id: "/",
+    // Instalado, o app abre direto nas obras (ou no login, se precisar).
+    start_url: "/inicio",
     display: "standalone",
     orientation: "portrait",
     background_color: BRAND_COLORS.navy,
