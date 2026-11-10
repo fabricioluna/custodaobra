@@ -299,6 +299,69 @@ describe("lançamento pelo WhatsApp", () => {
     expect((await usageOf()).whatsapp_entries).toBe(before.whatsapp_entries);
   });
 
+  const supplierNamed = async (name: string) => {
+    const { data } = await admin
+      .from("suppliers")
+      .select("id")
+      .eq("org_id", ana.orgId)
+      .eq("name", name);
+    return data ?? [];
+  };
+
+  /**
+   * O bot aceita 20 mensagens por minuto por número: os testes da Ana somam
+   * mais que isso. Tira do log as mensagens já tratadas para abrir a janela.
+   */
+  const resetRateWindow = () =>
+    admin.from("whatsapp_messages").delete().eq("from_phone", anaPhone);
+
+  it("fornecedor lido só é cadastrado ao confirmar", async () => {
+    await resetRateWindow();
+    extractExpense.mockResolvedValueOnce(
+      read({ categoryCode: "material", supplierName: "Loja do Zé" }),
+    );
+    await say(anaPhone, "2 sacos de cimento 78 na loja do zé");
+    expect(last()?.body).toContain("Loja do Zé");
+    const pending = await latestExpense();
+    const { data: row } = await admin
+      .from("expenses")
+      .select("supplier_id")
+      .eq("id", pending?.id ?? "")
+      .single();
+    expect(row?.supplier_id).toBeNull();
+    expect(await supplierNamed("Loja do Zé")).toHaveLength(0);
+
+    // Escolher a etapa confirma: o fornecedor nasce agora, ligado ao gasto.
+    await tap(anaPhone, optionId("Fundação"), true);
+    const supplier = await supplierNamed("Loja do Zé");
+    expect(supplier).toHaveLength(1);
+    const { data: confirmed } = await admin
+      .from("expenses")
+      .select("status, supplier_id")
+      .eq("id", pending?.id ?? "")
+      .single();
+    expect(confirmed).toEqual({
+      status: "confirmed",
+      supplier_id: supplier[0]?.id,
+    });
+    expect(last()?.body).toContain("Loja do Zé");
+  });
+
+  it("fornecedor de um gasto cancelado não fica cadastrado", async () => {
+    const cobertura = stages.find((s) => s.name === "Cobertura")?.id ?? null;
+    extractExpense.mockResolvedValueOnce(
+      read({ stageId: cobertura, supplierName: "Depósito Fantasma" }),
+    );
+    await say(anaPhone, "500 telha no depósito fantasma");
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Data"), true);
+    await tap(anaPhone, optionId("Hoje"), true);
+    expect(last()?.body).toContain("Depósito Fantasma");
+    await tap(anaPhone, optionId("Cancelar"));
+    expect((await latestExpense())?.status).toBe("cancelled");
+    expect(await supplierNamed("Depósito Fantasma")).toHaveLength(0);
+  });
+
   it("quem só acompanha a obra não lança", async () => {
     const calls = extractExpense.mock.calls.length;
     await say(brunoPhone, "300 pedreiro");
@@ -307,6 +370,7 @@ describe("lançamento pelo WhatsApp", () => {
   });
 
   it("com duas obras, pergunta qual e segue com a mensagem", async () => {
+    await resetRateWindow();
     const { data: second } = await ana.client
       .from("projects")
       .insert({ org_id: ana.orgId, name: "Reforma", created_by: ana.id })

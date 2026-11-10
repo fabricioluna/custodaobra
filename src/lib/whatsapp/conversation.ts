@@ -30,7 +30,21 @@ export type ConversationContext = {
   /** Comando à espera da escolha da obra (ex.: "resumo" com várias obras). */
   pendingCommand?: "summary";
   draft?: ExpenseDraft;
+  /**
+   * Fornecedor lido pela IA para o gasto pendente. Só vira cadastro em
+   * `suppliers` quando a pessoa confirma: se ela cancela, nada sobra.
+   */
+  pendingSupplier?: { expenseId: string; name: string };
 };
+
+/** Mantém o fornecedor do pendente ao trocar o resto do contexto. */
+export function keepPendingSupplier(
+  context: ConversationContext,
+): ConversationContext {
+  return context.pendingSupplier
+    ? { pendingSupplier: context.pendingSupplier }
+    : {};
+}
 
 export type Conversation = Omit<ConversationRow, "context"> & {
   context: ConversationContext;

@@ -19,6 +19,7 @@ import type { OutgoingMessage } from "../client";
 import {
   type Conversation,
   type ConversationState,
+  keepPendingSupplier,
   resetConversation,
   saveConversation,
   WHATSAPP_SOURCES,
@@ -287,7 +288,7 @@ export async function handleAction(
     }
     case "edit":
       await Promise.all([
-        setState(session, "awaiting_confirmation", pending.id),
+        setState(session, "awaiting_confirmation", pending),
         session.send(editMenuMessage(pending.id)),
       ]);
       return;
@@ -365,7 +366,7 @@ async function editField(
     setState(
       session,
       field === "amount" ? "awaiting_amount" : "awaiting_confirmation",
-      pending.id,
+      pending,
     ),
     session.send(editFieldMessage(pending, field)),
   ]);
@@ -398,8 +399,15 @@ async function confirm(
   pending: PendingExpense,
   extra: ExpenseUpdate = {},
 ): Promise<void> {
+  // O fornecedor só é cadastrado agora, na confirmação.
+  const supplierId = await resolveSupplier(
+    session.admin,
+    pending.orgId,
+    pending.supplierName,
+  );
   const ok = await updatePending(session, pending, {
     ...extra,
+    supplier_id: supplierId,
     status: "confirmed",
   });
   if (!ok) {
@@ -433,7 +441,7 @@ async function chooseProject(
     state: "idle",
     activeOrgId: project.orgId,
     activeProjectId: project.id,
-    context: {},
+    context: keepPendingSupplier(conversation.context),
   });
   if (pendingText && pendingCommand !== "summary") {
     // A leitura grava o estado da conversa depois: espera a troca da obra.
@@ -490,7 +498,7 @@ async function loadPending(
     admin
       .from("expenses")
       .select(
-        "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), suppliers(name), projects(name, organizations(timezone), stages(id, name, sort_order))",
+        "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), projects(name, organizations(timezone), stages(id, name, sort_order))",
       )
       .eq("id", expenseId)
       .eq("created_by", userId)
@@ -515,6 +523,12 @@ async function loadPending(
     return null;
   }
 
+  // O nome lido fica na conversa até a confirmação (o pendente não tem
+  // fornecedor gravado).
+  const { pendingSupplier } = session.conversation.context;
+  const supplierName =
+    pendingSupplier?.expenseId === data.id ? pendingSupplier.name : null;
+
   const stages = [...(data.projects?.stages ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(({ id, name }) => ({ id, name }));
@@ -530,7 +544,7 @@ async function loadPending(
     categoryCode: data.categories?.code ?? "outros",
     stageId: data.stage_id,
     stageName: stages.find((s) => s.id === data.stage_id)?.name ?? null,
-    supplierName: data.suppliers?.name ?? null,
+    supplierName,
     spentOn: data.spent_on,
     paymentMethod: data.payment_method,
     hasInvoice: data.has_invoice,
@@ -597,7 +611,7 @@ async function presentPending(
     setState(
       session,
       askStage ? "awaiting_stage" : "awaiting_confirmation",
-      pending.id,
+      pending,
     ),
     session.send(
       askStage
@@ -613,15 +627,23 @@ async function presentPending(
   ]);
 }
 
+/** Estado da conversa com o pendente; o fornecedor lido vai junto. */
 function setState(
   session: BotSession,
   state: ConversationState,
-  pendingExpenseId: string,
+  pending: PendingExpense,
 ) {
   return saveConversation(session.admin, session.userId, {
     state,
-    pendingExpenseId,
-    context: {},
+    pendingExpenseId: pending.id,
+    context: pending.supplierName
+      ? {
+          pendingSupplier: {
+            expenseId: pending.id,
+            name: pending.supplierName,
+          },
+        }
+      : {},
   });
 }
 
@@ -665,10 +687,9 @@ async function insertPending(
 ): Promise<PendingExpense> {
   const { admin, userId } = session;
 
-  const [categoryId, supplierId] = await Promise.all([
-    categoryIdOf(admin, expense.categoryCode),
-    resolveSupplier(admin, project.orgId, expense.supplierName),
-  ]);
+  // Sem fornecedor no pendente: o nome lido fica na conversa (setState) e o
+  // cadastro só nasce se a pessoa confirmar.
+  const categoryId = await categoryIdOf(admin, expense.categoryCode);
 
   const { data, error } = await admin
     .from("expenses")
@@ -677,7 +698,7 @@ async function insertPending(
       project_id: project.id,
       stage_id: expense.stageId,
       category_id: categoryId,
-      supplier_id: supplierId,
+      supplier_id: null,
       description: expense.description,
       amount_cents: expense.amountCents,
       quantity: expense.quantity,
@@ -733,7 +754,7 @@ async function insertPending(
     categoryCode: expense.categoryCode,
     stageId: expense.stageId,
     stageName: stages.find((s) => s.id === expense.stageId)?.name ?? null,
-    supplierName: supplierId ? expense.supplierName : null,
+    supplierName: expense.supplierName,
     spentOn: expense.spentOn,
     paymentMethod: expense.paymentMethod,
     hasInvoice: expense.hasInvoice,

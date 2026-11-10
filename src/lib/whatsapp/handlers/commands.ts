@@ -3,7 +3,11 @@ import "server-only";
 import { todayIn } from "@/lib/dates";
 
 import type { BotCommand } from "../commands";
-import { saveConversation, WHATSAPP_SOURCES } from "../conversation";
+import {
+  keepPendingSupplier,
+  saveConversation,
+  WHATSAPP_SOURCES,
+} from "../conversation";
 import {
   botMessages,
   formatProjectSummary,
@@ -79,7 +83,10 @@ async function summary(session: BotSession): Promise<void> {
     await Promise.all([
       saveConversation(admin, userId, {
         state: "awaiting_project",
-        context: { pendingCommand: "summary" },
+        context: {
+          ...keepPendingSupplier(conversation.context),
+          pendingCommand: "summary",
+        },
       }),
       session.send(
         projectListMessage(projects, hasManyOrgs(projects), {
