@@ -3,10 +3,10 @@
  * Nos componentes, use as classes do Tailwind (bg-brand-navy etc.), nunca estes valores.
  * Precisam bater com os tokens de src/app/globals.css (há um teste que confere).
  *
- * Valores tirados da logo (convertida de Adobe RGB para sRGB).
+ * Valores tirados da logo (public/brand/logo-original.jpeg, sRGB).
  */
 export const BRAND_COLORS = {
-  navy: "#002344",
-  gold: "#ffb800",
+  navy: "#132a42",
+  gold: "#f5ad02",
   white: "#ffffff",
 } as const;

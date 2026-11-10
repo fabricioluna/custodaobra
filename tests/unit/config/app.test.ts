@@ -4,7 +4,7 @@ import { APP_DOMAIN, APP_NAME, APP_TAGLINE, APP_URL } from "@/config/app";
 
 describe("config/app", () => {
   it("define nome, domínio e slogan", () => {
-    expect(APP_NAME).toBe("Custo da Obra");
+    expect(APP_NAME).toBe("Valor da Obra");
     expect(APP_TAGLINE.length).toBeGreaterThan(0);
   });
 

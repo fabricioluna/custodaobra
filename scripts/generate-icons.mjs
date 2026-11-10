@@ -2,7 +2,7 @@
  * Gera o ícone vetorial provisório e os ícones do app (favicon, PWA, iPhone).
  *
  * A casa com as três barras foi redesenhada em SVG com as medidas da logo
- * original (public/brand/logo-original.jpeg, 1022x779), mas com as cores
+ * original (public/brand/logo-original.jpeg), mas com as cores
  * oficiais de src/config/brand.ts. Quando a logo vetorial definitiva chegar,
  * troque public/brand/icon.svg por ela e ajuste este script.
  *
