@@ -23,6 +23,8 @@ export type ConversationContext = {
   /** Mensagem guardada enquanto a pessoa escolhe a obra. */
   pendingText?: string;
   pendingLogId?: string | null;
+  /** Comando à espera da escolha da obra (ex.: "resumo" com várias obras). */
+  pendingCommand?: "summary";
   draft?: ExpenseDraft;
 };
 

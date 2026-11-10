@@ -7,6 +7,7 @@ import { LOGIN_PATH } from "@/lib/auth/paths";
 import type { Database, Json } from "@/types/database";
 
 import { parseAction } from "../actions";
+import { parseCommand } from "../commands";
 import { markReadWithTyping, type OutgoingMessage } from "../client";
 import { getConversation } from "../conversation";
 import { whatsappEnv } from "../env";
@@ -20,6 +21,7 @@ import { botMessages } from "../messages";
 import { phoneVariants } from "../phone";
 import { sendAndLog } from "../send";
 import { type IncomingMessage, messageText } from "../webhook";
+import { handleCommand } from "./commands";
 import { handleAction, handleText } from "./expense";
 
 type Admin = SupabaseClient<Database>;
@@ -218,6 +220,8 @@ async function handleFromSender(
 
   const text = message.type === "text" ? message.text?.body?.trim() : "";
   if (!text) return session.send({ type: "text", body: botMessages.onlyText });
+  const command = parseCommand(text);
+  if (command) return handleCommand(session, command);
   return handleText(session, text, logId);
 }
 

@@ -35,6 +35,7 @@ import {
   summaryMessage,
 } from "../messages";
 import { type LaunchableProject, listLaunchableProjects } from "../projects";
+import { sendProjectSummary } from "./commands";
 
 type Admin = SupabaseClient<Database>;
 
@@ -400,13 +401,16 @@ async function chooseProject(
   if (!project) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
-  const { pendingText, pendingLogId } = conversation.context;
+  const { pendingText, pendingLogId, pendingCommand } = conversation.context;
   await saveConversation(admin, userId, {
     state: "idle",
     activeOrgId: project.orgId,
     activeProjectId: project.id,
     context: {},
   });
+  if (pendingCommand === "summary") {
+    return sendProjectSummary(session, project);
+  }
   if (pendingText) {
     return readExpense(session, project, pendingText, pendingLogId ?? null);
   }

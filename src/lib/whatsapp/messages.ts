@@ -22,7 +22,17 @@ export const botMessages = {
     "Muitas tentativas com código errado. Espere uma hora, gere um código novo no app e tente de novo.",
 
   howTo:
-    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_",
+    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nMande *ajuda* para ver os comandos.",
+  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_.\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+  projectsQuestion: "Para qual obra vão os próximos gastos?",
+  onlyProject: (name: string) =>
+    `Sua obra é *${name}*. Os gastos vão para ela.`,
+  summaryWhichProject: "De qual obra você quer o resumo?",
+  undone: (summary: string) => `↩️ Desfeito. Cancelei:\n${summary}`,
+  nothingToUndo:
+    "Não achei lançamento seu confirmado nos últimos 10 minutos. Para mudar um gasto mais antigo, use o app.",
+  rateLimited:
+    "Recebi muitas mensagens em pouco tempo. Espere um minuto e mande de novo.",
   notUnderstood:
     "Não consegui entender esse gasto. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
   onlyText:
@@ -228,17 +238,83 @@ export function dateListMessage(
 export function projectListMessage(
   projects: { id: string; name: string; orgName: string }[],
   showOrg: boolean,
+  options: { body?: string; activeId?: string | null } = {},
 ): OutgoingMessage {
   return {
     type: "list",
-    body: botMessages.chooseProject,
+    body: options.body ?? botMessages.chooseProject,
     buttonLabel: botMessages.chooseProjectButton,
-    rows: projects.slice(0, 10).map((project) => ({
-      id: actionId.project(project.id),
-      title: project.name,
-      ...(showOrg ? { description: project.orgName } : {}),
-    })),
+    rows: projects.slice(0, 10).map((project) => {
+      const notes = [
+        project.id === options.activeId ? "Obra ativa" : null,
+        showOrg ? project.orgName : null,
+      ].filter(Boolean);
+      return {
+        id: actionId.project(project.id),
+        title: project.name,
+        ...(notes.length ? { description: notes.join(" · ") } : {}),
+      };
+    }),
   };
+}
+
+export type ProjectSummary = {
+  projectName: string;
+  constructionCents: number;
+  landCents: number;
+  budgetCents: number;
+  committedCents: number;
+  unclassifiedCount: number;
+  stages: { name: string; spentCents: number; budgetCents: number | null }[];
+};
+
+/** Resposta do "resumo": total gasto, previsto e as 5 etapas com mais gasto. */
+export function formatProjectSummary(summary: ProjectSummary): string {
+  const lines = [`*Resumo · ${summary.projectName}*`];
+  lines.push(
+    `Gasto na construção: *${formatCents(summary.constructionCents)}*`,
+  );
+  if (summary.budgetCents > 0) {
+    const percent = Math.round(
+      (summary.constructionCents / summary.budgetCents) * 100,
+    );
+    lines.push(
+      `Previsto: ${formatCents(summary.budgetCents)} (${percent}% usado)`,
+    );
+  } else {
+    lines.push("Previsto: ainda não definido");
+  }
+  if (summary.committedCents > 0) {
+    lines.push(`Contas a pagar: ${formatCents(summary.committedCents)}`);
+  }
+  if (summary.landCents > 0) {
+    lines.push(`Terreno: ${formatCents(summary.landCents)}`);
+  }
+
+  const top = summary.stages
+    .filter((stage) => stage.spentCents > 0)
+    .sort((a, b) => b.spentCents - a.spentCents)
+    .slice(0, 5);
+  if (top.length) {
+    lines.push("", "Etapas com mais gasto:");
+    for (const stage of top) {
+      const budget = stage.budgetCents
+        ? ` de ${formatCents(stage.budgetCents)}`
+        : "";
+      lines.push(`• ${stage.name}: ${formatCents(stage.spentCents)}${budget}`);
+    }
+  } else if (summary.constructionCents === 0) {
+    lines.push("", "Nenhum gasto confirmado ainda.");
+  }
+  if (summary.unclassifiedCount > 0) {
+    lines.push(
+      "",
+      summary.unclassifiedCount === 1
+        ? "1 gasto sem etapa: classifique no app."
+        : `${summary.unclassifiedCount} gastos sem etapa: classifique no app.`,
+    );
+  }
+  return lines.join("\n");
 }
 
 /** "300", "R$ 1.250,50", "300 reais": só o valor, para a pergunta do valor. */

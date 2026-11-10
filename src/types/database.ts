@@ -1324,6 +1324,10 @@ export type Database = {
           project_id: string;
         }[];
       };
+      expire_pending_expenses: {
+        Args: { p_older_than?: string };
+        Returns: number;
+      };
       get_invitation: {
         Args: { p_token: string };
         Returns: {
@@ -1375,6 +1379,7 @@ export type Database = {
         };
         Returns: string;
       };
+      purge_whatsapp_log: { Args: { p_older_than?: string }; Returns: number };
       unlink_whatsapp: { Args: never; Returns: undefined };
       update_stage_plan: {
         Args: { p_items: Json; p_project_id: string };
