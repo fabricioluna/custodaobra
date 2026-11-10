@@ -12,10 +12,10 @@
  */
 @theme {
   /* Azul planta: estrutura (cabeçalho, navegação, texto principal). */
-  --color-brand-navy: #002344;
-  --color-brand-navy-soft: #0e3a66;
+  --color-brand-navy: #132a42;
+  --color-brand-navy-soft: #214164;
   /* Dourado lápis: só para dinheiro (Lançar gasto, item ativo, "realizado"). */
-  --color-brand-gold: #ffb800;
+  --color-brand-gold: #f5ad02;
   --color-brand-gold-soft: #fff4cc;
   --color-brand-white: #ffffff;
   /* Concreto e grafite: fundo e texto secundário do tema claro. */

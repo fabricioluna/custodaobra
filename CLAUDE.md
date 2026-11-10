@@ -6,24 +6,24 @@ Este arquivo orienta o Claude Code neste repositório. Leia tudo antes de qualqu
 
 ## 1. O produto
 
-**Nome: Custo da Obra.** Domínio pretendido: custodaobra.com.br. Slogan de trabalho: "Cada real da sua casa na ponta do lápis". O nome é descritivo, então a identidade visual (logo, cores, mascote) é o que diferencia a marca: mantenha os elementos visuais centralizados e consistentes em todo o app. Mesmo com o nome definido, nunca escreva o nome direto em componentes, textos ou metadados: use sempre `APP_NAME` (e `APP_DOMAIN`, `APP_TAGLINE`) de `src/config/app.ts`.
+**Nome: Valor da Obra.** Domínio: valordaobra.com.br (registrado). O produto se chamava "Custo da Obra" até a fase 3; o domínio custodaobra.com.br já era de outra pessoa. Slogan de trabalho: "Cada real da sua casa na ponta do lápis". O nome é descritivo, então a identidade visual (logo, cores, mascote) é o que diferencia a marca: mantenha os elementos visuais centralizados e consistentes em todo o app. Mesmo com o nome definido, nunca escreva o nome direto em componentes, textos ou metadados: use sempre `APP_NAME` (e `APP_DOMAIN`, `APP_TAGLINE`) de `src/config/app.ts`.
 
 ### Identidade visual
 
-A logo é uma casa em contorno amarelo-dourado com três barras de gráfico dentro (duas brancas e uma dourada, em altura crescente) sobre fundo azul-marinho, com o nome "Custo da Obra" em branco, fonte sem serifa robusta.
+A logo é uma casa com chaminé em contorno amarelo-dourado com três barras de gráfico dentro (duas brancas e uma dourada, em altura crescente) sobre fundo azul-marinho, com o nome "Valor da Obra" em branco, fonte sem serifa robusta.
 
-- Arquivos: `public/brand/`. Hoje existe só a versão em JPEG (`logo-original.jpeg`); a versão vetorial (`logo.svg`, `icon.svg`) está pendente. Enquanto o SVG não chegar, use o JPEG apenas como referência e gere favicon e ícones PWA a partir dele, de forma provisória.
+- Arquivos: `public/brand/`. A logo existe só em JPEG (`logo-original.jpeg`, referência). O ícone vetorial (`icon.svg`) é um redesenho da casa gerado por `npm run icons` com as cores de `src/config/brand.ts`; a logo vetorial completa (`logo.svg`) está pendente.
 - Cores (tokens em `src/app/globals.css` e no tema do Tailwind, nunca valores soltos nos componentes):
 
   | Token | Cor | Uso |
   |---|---|---|
-  | `brand-navy` (azul planta) | `#002344` | estrutura: cabeçalho, navegação, tela de login, ícone do app, texto principal |
-  | `brand-gold` (dourado lápis) | `#FFB800` | só para dinheiro: botão "Lançar gasto", item ativo sobre o azul, "realizado" nos gráficos |
+  | `brand-navy` (azul planta) | `#132A42` | estrutura: cabeçalho, navegação, tela de login, ícone do app, texto principal |
+  | `brand-gold` (dourado lápis) | `#F5AD02` | só para dinheiro: botão "Lançar gasto", item ativo sobre o azul, "realizado" nos gráficos |
   | `brand-white` | `#FFFFFF` | texto sobre o azul |
   | `concrete` | `#F2F4F7` | fundo do app no tema claro |
   | `graphite` | `#4E5D72` | texto secundário |
 
-  Cores tiradas da logo (o JPEG está em Adobe RGB; os valores acima já estão convertidos para sRGB).
+  Cores tiradas da logo (JPEG em sRGB). Antes da troca de nome eram `#002344` e `#FFB800`.
 
 - O dourado não tem contraste suficiente para texto pequeno sobre fundo branco. Sobre fundo claro, use o dourado só em botões (com texto azul-marinho dentro) e elementos gráficos; texto corrido fica em azul-marinho ou cinza escuro.
 - Alertas do previsto x realizado usam cores próprias (verde, amarelo, vermelho), separadas da paleta da marca, para o dourado nunca ser confundido com "atenção".
@@ -439,8 +439,8 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 - **Decisões da fase 3 (confirmadas):** código de vínculo guardado como HMAC com `WHATSAPP_LINK_CODE_SECRET` (não SHA-256 puro, por serem só 1 milhão de combinações) e no máximo 5 códigos errados por número por hora, contados no log (`error = 'link_code_invalid'`); número já ligado a outra pessoa passa para quem ligou por último; envio com `fetch`, sem SDK da Meta; extração com structured outputs em vez de tool use forçado (o esquema vale direto na resposta); a IA devolve valor em reais e a etapa pelo número da lista (menos erro que centavos e UUIDs).
 - **Decisões da fase 2 (confirmadas):** o orçamento vale por etapa e o total da obra é a soma delas (`projects.budget_total_cents` sai de uso); a estimativa usa o custo por m² digitado pela pessoa, sem valor de CUB embutido no app; convite por link de uso único (7 dias) que a pessoa copia ou manda pelo WhatsApp, e-mail só depois do SMTP; limite de membros conta cada pessoa com acesso uma vez (organização + convidados por obra) mais os convites pendentes; relatório em PDF como página própria para impressão ("Salvar como PDF" do navegador), sem dependência nova.
 - **Decisões da fase 1 (confirmadas):** auditoria gravada por gatilho no banco (`private.audit_row`), em vez de `src/lib/audit.ts`, para nada escapar (app, WhatsApp, cron); gráficos com barras em HTML/CSS em vez de Recharts por enquanto; formulários com `useActionState` + Zod, sem React Hook Form; service worker próprio mínimo em vez de Serwist; comprovante enviado junto com o formulário (limite de 4 MB por causa da Vercel; fotos ficam com ~300 KB depois de reduzidas); `exceljs` aprovado para exportar XLSX.
-- **E-mail (SMTP próprio): pendente.** Sem SMTP, o Supabase não deixa editar os modelos e só entrega e-mail para quem é da equipe do projeto. Hoje o e-mail de acesso é o padrão (só link; abre no mesmo navegador). Ao configurar o SMTP (ex.: Resend, depois de registrar o domínio), colar `supabase/templates/acesso.html` nos modelos "Magic Link" e "Confirm signup" com o assunto `Seu código de acesso: {{ .Token }}`: o e-mail passa a trazer o código e um link que funciona em outro aparelho. Obrigatório antes do lançamento.
-- **Nome:** Custo da Obra (verificar e registrar o domínio custodaobra.com.br; criar logo próprio e depositar como marca mista no INPI, classes 42 e 9)
+- **E-mail (SMTP próprio): pendente.** Sem SMTP, o Supabase não deixa editar os modelos e só entrega e-mail para quem é da equipe do projeto. Hoje o e-mail de acesso é o padrão (só link; abre no mesmo navegador). Ao configurar o SMTP (ex.: Resend, com o domínio valordaobra.com.br), colar `supabase/templates/acesso.html` nos modelos "Magic Link" e "Confirm signup" com o assunto `Seu código de acesso: {{ .Token }}`: o e-mail passa a trazer o código e um link que funciona em outro aparelho. Obrigatório antes do lançamento.
+- **Nome:** Valor da Obra (domínio valordaobra.com.br registrado em novembro de 2026; falta a busca no INPI e o depósito como marca mista, classes 42 e 9). Nome anterior: Custo da Obra.
 - **Banco e autenticação:** Supabase (decidido)
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
 - **Planos:** provisórios, preço zero, 14 dias de teste. `pessoal` (padrão do cadastro): 1 obra, 3 membros, 300 lançamentos por WhatsApp e 600 chamadas de IA por mês. `profissional`: 10 obras, 10 membros, 3000 e 6000.
