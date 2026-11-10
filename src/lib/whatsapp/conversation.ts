@@ -94,7 +94,7 @@ export async function saveConversation(
         ? { active_project_id: patch.activeProjectId }
         : {}),
       ...(patch.context !== undefined
-        ? { context: patch.context as unknown as Json }
+        ? { context: patch.context as unknown as NonNullable<Json> }
         : {}),
     })
     .eq("user_id", userId);
