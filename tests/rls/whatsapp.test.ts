@@ -17,6 +17,7 @@ vi.mock("server-only", () => ({}));
 // Nada sai para a Meta: o envio é trocado por um registro do que seria mandado.
 const sent: { to: string; body: string }[] = [];
 vi.mock("@/lib/whatsapp/client", () => ({
+  markReadWithTyping: async () => {},
   sendMessage: async (to: string, message: { body: string }) => {
     sent.push({ to, body: message.body });
     return `wamid.out.${crypto.randomUUID()}`;

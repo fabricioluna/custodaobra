@@ -115,7 +115,11 @@ async function readExpense(
   const { admin, userId } = session;
   const today = todayIn(project.timezone);
 
-  const allowed = await canUseWhatsappAi(admin, project.orgId, today);
+  // Limite do plano e contexto da obra ao mesmo tempo.
+  const [allowed, context] = await Promise.all([
+    canUseWhatsappAi(admin, project.orgId, today),
+    loadExtractionContext(admin, project.orgId, project.id, project.timezone),
+  ]);
   if (!allowed.ok) {
     const body =
       allowed.reason === "whatsapp_disabled"
@@ -127,54 +131,61 @@ async function readExpense(
     return session.send({ type: "text", body });
   }
 
-  const context = await loadExtractionContext(
-    admin,
-    project.orgId,
-    project.id,
-    project.timezone,
-  );
   const result = await extractExpense(text, context);
-  if (result.usage) {
-    await recordUsage(admin, project.orgId, today, {
-      aiCalls: 1,
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-    });
-  }
+  const usage = result.usage
+    ? recordUsage(admin, project.orgId, today, {
+        aiCalls: 1,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+      })
+    : Promise.resolve();
 
-  if (result.kind === "failed") {
-    return session.send({
-      type: "text",
-      body:
-        result.reason === "unavailable"
-          ? botMessages.unavailable
-          : botMessages.notUnderstood,
-    });
-  }
-  if (result.kind === "not_expense") {
-    return session.send({ type: "text", body: botMessages.howTo });
+  if (result.kind !== "expense") {
+    await Promise.all([
+      usage,
+      session.send({
+        type: "text",
+        body:
+          result.kind === "not_expense"
+            ? botMessages.howTo
+            : result.reason === "unavailable"
+              ? botMessages.unavailable
+              : botMessages.notUnderstood,
+      }),
+    ]);
+    return;
   }
 
   // Um pendente por vez: o anterior, se havia, é cancelado.
-  await discardPending(session);
+  await Promise.all([usage, discardPending(session)]);
 
   const { expense } = result;
   if (expense.amountCents === null) {
-    await saveConversation(admin, userId, {
-      state: "awaiting_amount",
-      pendingExpenseId: null,
-      context: {
-        draft: { projectId: project.id, expense, rawInput: text, logId },
-      },
-    });
-    return session.send({
-      type: "text",
-      body: botMessages.askAmount(expense.description),
-    });
+    await Promise.all([
+      saveConversation(admin, userId, {
+        state: "awaiting_amount",
+        pendingExpenseId: null,
+        context: {
+          draft: { projectId: project.id, expense, rawInput: text, logId },
+        },
+      }),
+      session.send({
+        type: "text",
+        body: botMessages.askAmount(expense.description),
+      }),
+    ]);
+    return;
   }
 
-  const expenseId = await insertPending(session, project, expense, text, logId);
-  return presentExpense(session, expenseId, "new");
+  const pending = await insertPending(
+    session,
+    project,
+    context.stages,
+    { ...expense, amountCents: expense.amountCents },
+    text,
+    logId,
+  );
+  return presentPending(session, pending, "new");
 }
 
 /** Resposta à pergunta do valor: completa o rascunho ou corrige o pendente. */
@@ -188,14 +199,16 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
       await resetConversation(admin, userId);
       return session.send({ type: "text", body: botMessages.noProjects });
     }
-    const expenseId = await insertPending(
+    const stages = await stagesOf(admin, project.orgId, project.id);
+    const pending = await insertPending(
       session,
       project,
+      stages,
       { ...draft.expense, amountCents: cents },
       draft.rawInput,
       draft.logId,
     );
-    return presentExpense(session, expenseId, "new");
+    return presentPending(session, pending, "new");
   }
 
   const pending = conversation.pending_expense_id
@@ -205,8 +218,12 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
     await resetConversation(admin, userId);
     return session.send({ type: "text", body: botMessages.howTo });
   }
-  await updatePending(session, pending, { amount_cents: cents });
-  return presentExpense(session, pending.id, "updated");
+  return updateAndPresent(
+    session,
+    pending,
+    { amount_cents: cents },
+    { amountCents: cents },
+  );
 }
 
 // Toques em botões e listas ------------------------------------------------------------
@@ -229,13 +246,23 @@ export async function handleAction(
   switch (action.type) {
     case "confirm":
       return confirm(session, pending);
-    case "cancel":
-      await updatePending(session, pending, { status: "cancelled" });
-      await resetConversation(session.admin, session.userId);
-      return session.send({ type: "text", body: botMessages.cancelled });
+    case "cancel": {
+      const ok = await updatePending(session, pending, { status: "cancelled" });
+      await Promise.all([
+        resetConversation(session.admin, session.userId),
+        session.send({
+          type: "text",
+          body: ok ? botMessages.cancelled : botMessages.alreadyHandled,
+        }),
+      ]);
+      return;
+    }
     case "edit":
-      await setState(session, "awaiting_confirmation", pending.id);
-      return session.send(editMenuMessage(pending.id));
+      await Promise.all([
+        setState(session, "awaiting_confirmation", pending.id),
+        session.send(editMenuMessage(pending.id)),
+      ]);
+      return;
     case "edit_field":
       return editField(session, pending, action.field);
     case "stage": {
@@ -245,17 +272,22 @@ export async function handleAction(
       ) {
         return session.send({ type: "text", body: botMessages.alreadyHandled });
       }
-      await updatePending(session, pending, { stage_id: action.stageId });
+      const stageName =
+        pending.stages.find((s) => s.id === action.stageId)?.name ?? null;
       if (action.mode === "confirm") {
-        const stageName =
-          pending.stages.find((s) => s.id === action.stageId)?.name ?? null;
-        return confirm(session, {
-          ...pending,
-          stageId: action.stageId,
-          stageName,
-        });
+        // Etapa e confirmação numa gravação só.
+        return confirm(
+          session,
+          { ...pending, stageId: action.stageId, stageName },
+          { stage_id: action.stageId },
+        );
       }
-      return presentExpense(session, pending.id, "updated");
+      return updateAndPresent(
+        session,
+        pending,
+        { stage_id: action.stageId },
+        { stageId: action.stageId, stageName },
+      );
     }
     case "stage_page":
       return session.send(
@@ -275,15 +307,23 @@ export async function handleAction(
         return session.send({ type: "text", body: botMessages.alreadyHandled });
       }
       const categoryId = await categoryIdOf(session.admin, action.code);
-      await updatePending(session, pending, { category_id: categoryId });
-      return presentExpense(session, pending.id, "updated");
+      return updateAndPresent(
+        session,
+        pending,
+        { category_id: categoryId },
+        { categoryCode: action.code },
+      );
     }
     case "date": {
       if (!isIsoDate(action.date) || action.date > addDays(pending.today, 1)) {
         return session.send({ type: "text", body: botMessages.alreadyHandled });
       }
-      await updatePending(session, pending, { spent_on: action.date });
-      return presentExpense(session, pending.id, "updated");
+      return updateAndPresent(
+        session,
+        pending,
+        { spent_on: action.date },
+        { spentOn: action.date },
+      );
     }
   }
 }
@@ -293,49 +333,61 @@ async function editField(
   pending: PendingExpense,
   field: "amount" | "stage" | "category" | "date",
 ): Promise<void> {
-  await setState(
-    session,
-    field === "amount" ? "awaiting_amount" : "awaiting_confirmation",
-    pending.id,
-  );
+  await Promise.all([
+    setState(
+      session,
+      field === "amount" ? "awaiting_amount" : "awaiting_confirmation",
+      pending.id,
+    ),
+    session.send(editFieldMessage(pending, field)),
+  ]);
+}
+
+function editFieldMessage(
+  pending: PendingExpense,
+  field: "amount" | "stage" | "category" | "date",
+): OutgoingMessage {
   switch (field) {
     case "amount":
-      return session.send({
-        type: "text",
-        body: botMessages.askAmount(pending.description),
-      });
+      return { type: "text", body: botMessages.askAmount(pending.description) };
     case "stage":
-      return session.send(
-        stageListMessage({
-          body: botMessages.stageEditQuestion,
-          mode: "edit",
-          stages: pending.stages,
-          page: 0,
-          expenseId: pending.id,
-        }),
-      );
+      return stageListMessage({
+        body: botMessages.stageEditQuestion,
+        mode: "edit",
+        stages: pending.stages,
+        page: 0,
+        expenseId: pending.id,
+      });
     case "category":
-      return session.send(categoryListMessage(pending.id));
+      return categoryListMessage(pending.id);
     case "date":
-      return session.send(dateListMessage(pending.today, pending.id));
+      return dateListMessage(pending.today, pending.id);
   }
 }
 
 async function confirm(
   session: BotSession,
   pending: PendingExpense,
+  extra: ExpenseUpdate = {},
 ): Promise<void> {
-  const ok = await updatePending(session, pending, { status: "confirmed" });
-  if (!ok)
+  const ok = await updatePending(session, pending, {
+    ...extra,
+    status: "confirmed",
+  });
+  if (!ok) {
     return session.send({ type: "text", body: botMessages.alreadyHandled });
-  await recordUsage(session.admin, pending.orgId, pending.today, {
-    whatsappEntries: 1,
-  });
-  await resetConversation(session.admin, session.userId);
-  return session.send({
-    type: "text",
-    body: botMessages.confirmed(summaryOf(pending)),
-  });
+  }
+  // A resposta sai junto com a contagem do plano e a limpeza da conversa.
+  await Promise.all([
+    session.send({
+      type: "text",
+      body: botMessages.confirmed(summaryOf(pending)),
+    }),
+    recordUsage(session.admin, pending.orgId, pending.today, {
+      whatsappEntries: 1,
+    }),
+    resetConversation(session.admin, session.userId),
+  ]);
 }
 
 async function chooseProject(
@@ -397,7 +449,7 @@ async function loadPending(
   const { data, error } = await admin
     .from("expenses")
     .select(
-      "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), suppliers(name), projects(name, organizations(timezone))",
+      "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), suppliers(name), projects(name, organizations(timezone), stages(id, name, sort_order))",
     )
     .eq("id", expenseId)
     .eq("created_by", userId)
@@ -407,13 +459,9 @@ async function loadPending(
   if (error) throw error;
   if (!data) return null;
 
-  const { data: stages, error: stagesError } = await admin
-    .from("stages")
-    .select("id, name")
-    .eq("org_id", data.org_id)
-    .eq("project_id", data.project_id)
-    .order("sort_order");
-  if (stagesError) throw stagesError;
+  const stages = [...(data.projects?.stages ?? [])]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(({ id, name }) => ({ id, name }));
 
   return {
     id: data.id,
@@ -432,6 +480,17 @@ async function loadPending(
     hasInvoice: data.has_invoice,
     stages,
   };
+}
+
+async function stagesOf(admin: Admin, orgId: string, projectId: string) {
+  const { data, error } = await admin
+    .from("stages")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .eq("project_id", projectId)
+    .order("sort_order");
+  if (error) throw error;
+  return data;
 }
 
 type ExpenseUpdate = Database["public"]["Tables"]["expenses"]["Update"];
@@ -454,33 +513,48 @@ async function updatePending(
   return data.length > 0;
 }
 
-/** Mostra o pendente: lista de etapas (se faltou) ou o resumo com botões. */
-async function presentExpense(
+/** Grava a mudança e mostra o resumo de novo, sem reler o gasto. */
+async function updateAndPresent(
   session: BotSession,
-  expenseId: string,
-  mode: "new" | "updated",
+  pending: PendingExpense,
+  fields: ExpenseUpdate,
+  changes: Partial<PendingExpense>,
 ): Promise<void> {
-  const pending = await loadPending(session, expenseId);
-  if (!pending) {
+  const ok = await updatePending(session, pending, fields);
+  if (!ok) {
     await resetConversation(session.admin, session.userId);
     return session.send({ type: "text", body: botMessages.alreadyHandled });
   }
-  const summary = summaryOf(pending);
+  return presentPending(session, { ...pending, ...changes }, "updated");
+}
 
-  if (mode === "new" && !pending.stageId && pending.stages.length) {
-    await setState(session, "awaiting_stage", pending.id);
-    return session.send(
-      stageListMessage({
-        body: `${summary}\n\n${botMessages.stageQuestion}`,
-        mode: "confirm",
-        stages: pending.stages,
-        page: 0,
-        expenseId: pending.id,
-      }),
-    );
-  }
-  await setState(session, "awaiting_confirmation", pending.id);
-  return session.send(summaryMessage(summary, pending.id));
+/** Mostra o pendente: lista de etapas (se faltou) ou o resumo com botões. */
+async function presentPending(
+  session: BotSession,
+  pending: PendingExpense,
+  mode: "new" | "updated",
+): Promise<void> {
+  const summary = summaryOf(pending);
+  const askStage =
+    mode === "new" && !pending.stageId && pending.stages.length > 0;
+  await Promise.all([
+    setState(
+      session,
+      askStage ? "awaiting_stage" : "awaiting_confirmation",
+      pending.id,
+    ),
+    session.send(
+      askStage
+        ? stageListMessage({
+            body: `${summary}\n\n${botMessages.stageQuestion}`,
+            mode: "confirm",
+            stages: pending.stages,
+            page: 0,
+            expenseId: pending.id,
+          })
+        : summaryMessage(summary, pending.id),
+    ),
+  ]);
 }
 
 function setState(
@@ -507,7 +581,12 @@ async function discardPending(session: BotSession): Promise<void> {
     .eq("status", "pending");
 }
 
+/** Categorias padrão do sistema não mudam: guarda os ids depois da 1ª leitura. */
+const categoryIds = new Map<string, string>();
+
 async function categoryIdOf(admin: Admin, code: string): Promise<string> {
+  const cached = categoryIds.get(code);
+  if (cached) return cached;
   const { data, error } = await admin
     .from("categories")
     .select("id")
@@ -515,18 +594,20 @@ async function categoryIdOf(admin: Admin, code: string): Promise<string> {
     .eq("code", code)
     .single();
   if (error) throw error;
+  categoryIds.set(code, data.id);
   return data.id;
 }
 
+/** Cria o gasto pendente e devolve os dados para o resumo. */
 async function insertPending(
   session: BotSession,
   project: LaunchableProject,
-  expense: ExtractedExpense & { amountCents: number | null },
+  stages: { id: string; name: string }[],
+  expense: ExtractedExpense & { amountCents: number },
   rawInput: string,
   logId: string | null,
-): Promise<string> {
+): Promise<PendingExpense> {
   const { admin, userId } = session;
-  if (expense.amountCents === null) throw new Error("Gasto sem valor.");
 
   const [categoryId, supplierId] = await Promise.all([
     categoryIdOf(admin, expense.categoryCode),
@@ -559,10 +640,28 @@ async function insertPending(
   if (error) throw error;
 
   if (logId) {
-    await admin
+    const { error: logError } = await admin
       .from("whatsapp_messages")
       .update({ expense_id: data.id, org_id: project.orgId })
       .eq("id", logId);
+    if (logError) console.error("[whatsapp] log sem o gasto", logError);
   }
-  return data.id;
+
+  return {
+    id: data.id,
+    orgId: project.orgId,
+    projectId: project.id,
+    projectName: project.name,
+    today: todayIn(project.timezone),
+    amountCents: expense.amountCents,
+    description: expense.description,
+    categoryCode: expense.categoryCode,
+    stageId: expense.stageId,
+    stageName: stages.find((s) => s.id === expense.stageId)?.name ?? null,
+    supplierName: supplierId ? expense.supplierName : null,
+    spentOn: expense.spentOn,
+    paymentMethod: expense.paymentMethod,
+    hasInvoice: expense.hasInvoice,
+    stages,
+  };
 }

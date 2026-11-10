@@ -204,13 +204,15 @@ export async function canUseWhatsappAi(
   orgId: string,
   today: string,
 ): Promise<LimitResult> {
-  const subscription = await getOrgPlan(supabase, orgId);
+  const [subscription, usage] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+  ]);
   if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
   if (!isSubscriptionUsable(subscription)) {
     return { ok: false, reason: "subscription_inactive" };
   }
 
-  const usage = await getUsage(supabase, orgId, monthOf(today));
   const entries = checkWhatsappEntries(
     subscription.plans,
     usage.whatsapp_entries,

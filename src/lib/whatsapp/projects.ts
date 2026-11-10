@@ -12,6 +12,7 @@ export type LaunchableProject = {
   orgId: string;
   orgName: string;
   timezone: string;
+  createdAt: string;
 };
 
 /**
@@ -24,10 +25,14 @@ export async function listLaunchableProjects(
   admin: Admin,
   userId: string,
 ): Promise<LaunchableProject[]> {
+  // Duas consultas em paralelo: as contas (com as obras de cada uma) e as
+  // obras em que a pessoa é "editor".
   const [memberships, editorOf] = await Promise.all([
     admin
       .from("organization_members")
-      .select("org_id, role, organizations(name, timezone)")
+      .select(
+        "org_id, role, organizations(name, timezone, projects(id, name, archived_at, created_at))",
+      )
       .eq("user_id", userId),
     admin
       .from("project_members")
@@ -38,38 +43,23 @@ export async function listLaunchableProjects(
   if (memberships.error) throw memberships.error;
   if (editorOf.error) throw editorOf.error;
 
-  const orgs = new Map(
-    memberships.data.map((m) => [
-      m.org_id,
-      {
-        manager: m.role === "owner" || m.role === "admin",
-        name: m.organizations?.name ?? "",
-        timezone: m.organizations?.timezone ?? "America/Recife",
-      },
-    ]),
-  );
-  if (!orgs.size) return [];
-
-  const { data: projects, error } = await admin
-    .from("projects")
-    .select("id, name, org_id")
-    .in("org_id", [...orgs.keys()])
-    .is("archived_at", null)
-    .order("created_at");
-  if (error) throw error;
-
   const editable = new Set(editorOf.data.map((row) => row.project_id));
-  return projects.flatMap((project) => {
-    const org = orgs.get(project.org_id);
-    if (!org || !(org.manager || editable.has(project.id))) return [];
-    return [
-      {
-        id: project.id,
-        name: project.name,
-        orgId: project.org_id,
-        orgName: org.name,
-        timezone: org.timezone,
-      },
-    ];
-  });
+  return memberships.data
+    .flatMap((membership) => {
+      const org = membership.organizations;
+      if (!org) return [];
+      const manager =
+        membership.role === "owner" || membership.role === "admin";
+      return org.projects
+        .filter((p) => !p.archived_at && (manager || editable.has(p.id)))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          orgId: membership.org_id,
+          orgName: org.name,
+          timezone: org.timezone,
+          createdAt: p.created_at,
+        }));
+    })
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

@@ -35,18 +35,25 @@ export async function getConversation(
   admin: Admin,
   userId: string,
 ): Promise<Conversation> {
-  await admin
-    .from("whatsapp_conversations")
-    .upsert(
-      { user_id: userId },
-      { onConflict: "user_id", ignoreDuplicates: true },
-    );
-  const { data, error } = await admin
-    .from("whatsapp_conversations")
-    .select("*")
-    .eq("user_id", userId)
-    .single();
+  // Quase sempre já existe: lê primeiro e só cria se faltar.
+  const read = () =>
+    admin
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+  let { data, error } = await read();
+  if (!error && !data) {
+    await admin
+      .from("whatsapp_conversations")
+      .upsert(
+        { user_id: userId },
+        { onConflict: "user_id", ignoreDuplicates: true },
+      );
+    ({ data, error } = await read());
+  }
   if (error) throw error;
+  if (!data) throw new Error("Conversa não encontrada.");
   const context =
     data.context &&
     typeof data.context === "object" &&

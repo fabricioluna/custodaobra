@@ -16,6 +16,7 @@ vi.mock("server-only", () => ({}));
 // Nada sai para a Meta: guarda o que o bot mandaria.
 const sent: OutgoingMessage[] = [];
 vi.mock("@/lib/whatsapp/client", () => ({
+  markReadWithTyping: async () => {},
   sendMessage: async (_to: string, message: OutgoingMessage) => {
     sent.push(message);
     return `wamid.out.${crypto.randomUUID()}`;
@@ -182,7 +183,9 @@ describe("lançamento pelo WhatsApp", () => {
 
   it('"300 pedreiro" vira lançamento confirmado em 2 interações', async () => {
     extractExpense.mockResolvedValueOnce(read());
+    let started = performance.now();
     await say(anaPhone, "300 pedreiro");
+    const sayMs = performance.now() - started;
 
     // 1ª resposta: resumo + lista de etapas (escolher já confirma).
     const list = last();
@@ -196,7 +199,13 @@ describe("lançamento pelo WhatsApp", () => {
     });
 
     // 2ª interação: escolher a etapa.
+    started = performance.now();
     await tap(anaPhone, optionId("Alvenaria"), true);
+    const tapMs = performance.now() - started;
+    // Tempo do código e do banco (sem a IA e sem a Meta, que são simuladas).
+    console.info(
+      `[tempo] mensagem → resposta: ${sayMs.toFixed(0)} ms; etapa → lançado: ${tapMs.toFixed(0)} ms`,
+    );
     const confirmed = await latestExpense();
     expect(confirmed).toMatchObject({
       id: pending?.id,

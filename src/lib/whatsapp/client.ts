@@ -186,6 +186,26 @@ export async function sendMessage(
 }
 
 /**
+ * Marca a mensagem recebida como lida (dois tiques azuis) e mostra
+ * "digitando…" para a pessoa até a resposta sair (ou por até 25 segundos).
+ * Só dá certo com o id real da Meta; mensagens do simulador são ignoradas.
+ */
+export async function markReadWithTyping(messageId: string): Promise<void> {
+  if (!messageId.startsWith("wamid.")) return;
+  const phoneNumberId = whatsappEnv("WHATSAPP_PHONE_NUMBER_ID");
+  await graphFetch(`${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+      typing_indicator: { type: "text" },
+    }),
+  });
+}
+
+/**
  * Baixa uma mídia recebida (foto, áudio). Primeiro pega a URL temporária,
  * depois o arquivo, as duas vezes com o token.
  */

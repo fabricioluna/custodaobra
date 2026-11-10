@@ -7,7 +7,7 @@ import { LOGIN_PATH } from "@/lib/auth/paths";
 import type { Database, Json } from "@/types/database";
 
 import { parseAction } from "../actions";
-import type { OutgoingMessage } from "../client";
+import { markReadWithTyping, type OutgoingMessage } from "../client";
 import { getConversation } from "../conversation";
 import { whatsappEnv } from "../env";
 import {
@@ -40,9 +40,17 @@ export async function handleIncomingMessage(
   admin: Admin,
   message: IncomingMessage,
 ): Promise<void> {
+  // "Digitando…" já, enquanto o resto acontece. Se falhar, só não aparece.
+  const typing = markReadWithTyping(message.id).catch((error: unknown) =>
+    console.error("[whatsapp] falha no 'digitando'", errorText(error)),
+  );
+
   const variants = phoneVariants(message.from);
   const sender = await findSender(admin, variants);
 
+  // A conversa é lida junto com a gravação da mensagem (uma ida a menos).
+  const conversation = sender ? getConversation(admin, sender.id) : null;
+  conversation?.catch(() => {});
   const { data: logged, error: logError } = await admin
     .from("whatsapp_messages")
     .upsert(
@@ -60,7 +68,7 @@ export async function handleIncomingMessage(
     .select("id");
   if (logError) throw logError;
   const logId = logged?.[0]?.id;
-  if (!logId) return; // repetida
+  if (!logId) return void (await typing); // repetida
 
   const finish = (fields: { error?: string | null } = {}) =>
     admin
@@ -100,11 +108,13 @@ export async function handleIncomingMessage(
       return;
     }
 
-    await handleFromSender(admin, message, sender, logId);
+    await handleFromSender(admin, message, sender, logId, conversation);
     await finish();
   } catch (error) {
     await finish({ error: errorText(error) });
     throw error;
+  } finally {
+    await typing;
   }
 }
 
@@ -185,8 +195,10 @@ async function handleFromSender(
   message: IncomingMessage,
   sender: Sender,
   logId: string,
+  conversationPromise: ReturnType<typeof getConversation> | null,
 ): Promise<void> {
-  const conversation = await getConversation(admin, sender.id);
+  const conversation = await (conversationPromise ??
+    getConversation(admin, sender.id));
   const session = {
     admin,
     userId: sender.id,
