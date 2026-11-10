@@ -15,6 +15,7 @@ export const MAX_LIST_ROWS = 10;
 const MAX_LIST_ROW_TITLE = 24;
 const MAX_LIST_ROW_DESCRIPTION = 72;
 const MAX_TEXT = 4096;
+const GRAPH_TIMEOUT_MS = 10_000;
 
 export type ReplyButton = { id: string; title: string };
 export type ListRow = { id: string; title: string; description?: string };
@@ -125,6 +126,8 @@ async function graphFetch(path: string, init?: RequestInit) {
       ...init?.headers,
     },
     cache: "no-store",
+    // A Meta costuma responder em menos de 1 s; não deixa o after() preso.
+    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
   });
   if (!response.ok) {
     const details: unknown = await response.json().catch(() => null);
@@ -222,6 +225,7 @@ export async function downloadMedia(
       Authorization: `Bearer ${whatsappEnv("WHATSAPP_ACCESS_TOKEN")}`,
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
   if (!file.ok) {
     throw new WhatsAppApiError("Falha ao baixar a mídia.", file.status, null);

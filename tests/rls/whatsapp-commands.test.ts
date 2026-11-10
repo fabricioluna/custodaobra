@@ -15,9 +15,15 @@ vi.mock("server-only", () => ({}));
 
 // Nada sai para a Meta: guarda o que o bot mandaria.
 const sent: OutgoingMessage[] = [];
+// Quantos envios seguidos a "Meta" vai recusar.
+let failingSends = 0;
 vi.mock("@/lib/whatsapp/client", () => ({
   markReadWithTyping: async () => {},
   sendMessage: async (_to: string, message: OutgoingMessage) => {
+    if (failingSends > 0) {
+      failingSends--;
+      throw new Error("WhatsApp API respondeu 500");
+    }
     sent.push(message);
     return `wamid.out.${crypto.randomUUID()}`;
   },
@@ -272,6 +278,86 @@ describe("comandos do WhatsApp e cron", () => {
       .eq("id", recent!.id)
       .single();
     expect(kept?.payload).not.toBeNull();
+  });
+
+  const lastIncoming = async () => {
+    const { data } = await admin
+      .from("whatsapp_messages")
+      .select("error, processed_at")
+      .eq("from_phone", anaPhone)
+      .eq("direction", "in")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    return data;
+  };
+
+  it("IA fora do ar: responde e anota no log", async () => {
+    extractExpense.mockResolvedValueOnce({
+      kind: "failed",
+      reason: "unavailable",
+      usage: null,
+    });
+    await say("300 pedreiro");
+    expect(last()?.body).toContain("Não consegui lançar agora");
+    expect(await lastIncoming()).toMatchObject({ error: "ai_unavailable" });
+  });
+
+  it("erro inesperado: avisa a pessoa e anota no log", async () => {
+    extractExpense.mockRejectedValueOnce(new Error("banco caiu"));
+    await say("300 pedreiro");
+    expect(last()?.body).toContain("Algo deu errado do meu lado");
+    const logged = await lastIncoming();
+    expect(logged?.error).toContain("banco caiu");
+    expect(logged?.processed_at).not.toBeNull();
+  });
+
+  it("Meta recusa a resposta: fica no log e o bot tenta avisar", async () => {
+    failingSends = 1;
+    await say("ajuda");
+    expect(last()?.body).toContain("Algo deu errado do meu lado");
+    const { data: out } = await admin
+      .from("whatsapp_messages")
+      .select("error")
+      .eq("from_phone", anaPhone)
+      .eq("direction", "out")
+      .like("error", "send_failed%")
+      .limit(1);
+    expect(out?.length).toBe(1);
+    expect((await lastIncoming())?.error).toContain("500");
+  });
+
+  it("rate limit: avisa uma vez e para de responder", async () => {
+    const flooder = randomPhone();
+    const old = Array.from({ length: 19 }, () => ({
+      wa_message_id: `wamid.flood.${crypto.randomUUID()}`,
+      direction: "in" as const,
+      from_phone: flooder,
+      type: "text",
+    }));
+    await admin.from("whatsapp_messages").insert(old);
+    try {
+      const flood = (body: string) =>
+        handleIncomingMessage(admin, {
+          id: `wamid.test.${crypto.randomUUID()}`,
+          from: flooder,
+          timestamp: `${Math.floor(Date.now() / 1000)}`,
+          type: "text",
+          text: { body },
+        });
+      // 20ª mensagem do minuto: ainda responde.
+      await flood("oi");
+      expect(last()?.body).toContain("ainda não está ligado");
+      // 21ª: avisa do limite.
+      await flood("oi de novo");
+      expect(last()?.body).toContain("muitas mensagens");
+      // 22ª: silêncio.
+      const before = sent.length;
+      await flood("e agora?");
+      expect(sent.length).toBe(before);
+    } finally {
+      await admin.from("whatsapp_messages").delete().eq("from_phone", flooder);
+    }
   });
 
   it("as funções do cron não abrem para quem está logado", async () => {

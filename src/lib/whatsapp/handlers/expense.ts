@@ -48,6 +48,8 @@ export type BotSession = {
   userId: string;
   conversation: Conversation;
   send: (message: OutgoingMessage) => Promise<void>;
+  /** Anota no log da mensagem por que ela não virou lançamento. */
+  noteError?: (code: string) => void;
 };
 
 // Mensagem de texto ----------------------------------------------------------------
@@ -87,23 +89,33 @@ async function startExpense(
   let project = projects.find((p) => p.id === conversation.active_project_id);
   if (!project && projects.length === 1) project = projects[0];
   if (!project) {
-    await discardPending(session);
-    await saveConversation(admin, userId, {
-      state: "awaiting_project",
-      pendingExpenseId: null,
-      context: { pendingText: text, pendingLogId: logId },
-    });
     const orgCount = new Set(projects.map((p) => p.orgId)).size;
-    return session.send(projectListMessage(projects, orgCount > 1));
+    await Promise.all([
+      discardPending(session),
+      saveConversation(admin, userId, {
+        state: "awaiting_project",
+        pendingExpenseId: null,
+        context: { pendingText: text, pendingLogId: logId },
+      }),
+      session.send(projectListMessage(projects, orgCount > 1)),
+    ]);
+    return;
   }
 
-  if (project.id !== conversation.active_project_id) {
-    await saveConversation(admin, userId, {
-      activeOrgId: project.orgId,
-      activeProjectId: project.id,
-    });
-  }
-  return readExpense(session, project, text, logId);
+  // Guardar a obra ativa não muda o que a leitura faz: vai em paralelo (só
+  // mexe nas colunas da obra; o estado da conversa é gravado depois da IA).
+  await Promise.all([
+    project.id === conversation.active_project_id
+      ? Promise.resolve()
+      : saveConversation(admin, userId, {
+          activeOrgId: project.orgId,
+          activeProjectId: project.id,
+        }).catch((error: unknown) =>
+          // Sem a obra ativa gravada, a próxima mensagem só pergunta de novo.
+          console.error("[whatsapp] falha ao guardar a obra ativa", error),
+        ),
+    readExpense(session, project, text, logId),
+  ]);
 }
 
 /** IA lê a mensagem; o gasto nasce pendente (ou vira rascunho sem valor). */
@@ -122,6 +134,7 @@ async function readExpense(
     loadExtractionContext(admin, project.orgId, project.id, project.timezone),
   ]);
   if (!allowed.ok) {
+    session.noteError?.(`limit_${allowed.reason}`);
     const body =
       allowed.reason === "whatsapp_disabled"
         ? botMessages.whatsappDisabled
@@ -141,6 +154,7 @@ async function readExpense(
       })
     : Promise.resolve();
 
+  if (result.kind === "failed") session.noteError?.(`ai_${result.reason}`);
   if (result.kind !== "expense") {
     await Promise.all([
       usage,
@@ -194,13 +208,20 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
   const { admin, userId, conversation } = session;
   const draft = conversation.context.draft;
   if (draft) {
-    const projects = await listLaunchableProjects(admin, userId);
+    // A permissão e as etapas ao mesmo tempo; as etapas só valem se a obra
+    // continuar entre as que a pessoa pode lançar (e da mesma conta).
+    const [projects, stageRows] = await Promise.all([
+      listLaunchableProjects(admin, userId),
+      stagesOf(admin, draft.projectId),
+    ]);
     const project = projects.find((p) => p.id === draft.projectId);
     if (!project) {
       await resetConversation(admin, userId);
       return session.send({ type: "text", body: botMessages.noProjects });
     }
-    const stages = await stagesOf(admin, project.orgId, project.id);
+    const stages = stageRows
+      .filter((stage) => stage.org_id === project.orgId)
+      .map(({ id, name }) => ({ id, name }));
     const pending = await insertPending(
       session,
       project,
@@ -402,22 +423,26 @@ async function chooseProject(
     return session.send({ type: "text", body: botMessages.noProjects });
   }
   const { pendingText, pendingLogId, pendingCommand } = conversation.context;
-  await saveConversation(admin, userId, {
+  const select = saveConversation(admin, userId, {
     state: "idle",
     activeOrgId: project.orgId,
     activeProjectId: project.id,
     context: {},
   });
-  if (pendingCommand === "summary") {
-    return sendProjectSummary(session, project);
-  }
-  if (pendingText) {
+  if (pendingText && pendingCommand !== "summary") {
+    // A leitura grava o estado da conversa depois: espera a troca da obra.
+    await select;
     return readExpense(session, project, pendingText, pendingLogId ?? null);
   }
-  return session.send({
-    type: "text",
-    body: botMessages.projectSelected(project.name),
-  });
+  await Promise.all([
+    select,
+    pendingCommand === "summary"
+      ? sendProjectSummary(session, project)
+      : session.send({
+          type: "text",
+          body: botMessages.projectSelected(project.name),
+        }),
+  ]);
 }
 
 // Gasto pendente --------------------------------------------------------------------
@@ -486,11 +511,11 @@ async function loadPending(
   };
 }
 
-async function stagesOf(admin: Admin, orgId: string, projectId: string) {
+/** Etapas da obra, com a conta (quem chama confere o org_id). */
+async function stagesOf(admin: Admin, projectId: string) {
   const { data, error } = await admin
     .from("stages")
-    .select("id, name")
-    .eq("org_id", orgId)
+    .select("id, name, org_id")
     .eq("project_id", projectId)
     .order("sort_order");
   if (error) throw error;

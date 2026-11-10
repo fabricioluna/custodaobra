@@ -31,6 +31,8 @@ export const botMessages = {
   undone: (summary: string) => `↩️ Desfeito. Cancelei:\n${summary}`,
   nothingToUndo:
     "Não achei lançamento seu confirmado nos últimos 10 minutos. Para mudar um gasto mais antigo, use o app.",
+  failed:
+    "Algo deu errado do meu lado. Confira no app se o gasto foi lançado e, se não foi, mande de novo daqui a pouco.",
   rateLimited:
     "Recebi muitas mensagens em pouco tempo. Espere um minuto e mande de novo.",
   notUnderstood:

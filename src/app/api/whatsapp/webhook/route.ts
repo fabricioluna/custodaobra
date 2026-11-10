@@ -18,6 +18,12 @@ import {
  * reenvia o que demora a ser confirmado.
  */
 
+/**
+ * Tempo máximo da função, contando o after(): a IA tem 20 s com uma nova
+ * tentativa, e o resto (banco e Meta) leva poucos segundos.
+ */
+export const maxDuration = 60;
+
 export function GET(request: NextRequest) {
   const challenge = verifySubscription(
     request.nextUrl.searchParams,
@@ -54,15 +60,8 @@ export async function POST(request: NextRequest) {
       const admin = createAdminClient();
       // Uma por vez, na ordem em que chegaram.
       for (const message of messages) {
-        try {
-          await handleIncomingMessage(admin, message);
-        } catch (error) {
-          console.error(
-            "[whatsapp] falha ao tratar mensagem",
-            message.id,
-            error,
-          );
-        }
+        // Erros viram resposta à pessoa e ficam no log lá dentro.
+        await handleIncomingMessage(admin, message);
       }
       // Resposta do bot que não chegou: fica anotada no log.
       for (const failure of failures) {
