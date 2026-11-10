@@ -21,6 +21,7 @@ import {
   type ConversationState,
   resetConversation,
   saveConversation,
+  WHATSAPP_SOURCES,
 } from "../conversation";
 import {
   botMessages,
@@ -35,7 +36,7 @@ import {
   summaryMessage,
 } from "../messages";
 import { type LaunchableProject, listLaunchableProjects } from "../projects";
-import { sendProjectSummary } from "./commands";
+import { sendProjectPage, sendProjectSummary } from "./commands";
 
 type Admin = SupabaseClient<Database>;
 
@@ -146,13 +147,12 @@ async function readExpense(
   }
 
   const result = await extractExpense(text, context);
-  const usage = result.usage
-    ? recordUsage(admin, project.orgId, today, {
-        aiCalls: 1,
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-      })
-    : Promise.resolve();
+  // Toda chamada conta no plano, mesmo a que falhou (tokens, se vieram).
+  const usage = recordUsage(admin, project.orgId, today, {
+    aiCalls: 1,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
+  });
 
   if (result.kind === "failed") session.noteError?.(`ai_${result.reason}`);
   if (result.kind !== "expense") {
@@ -222,11 +222,15 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
     const stages = stageRows
       .filter((stage) => stage.org_id === project.orgId)
       .map(({ id, name }) => ({ id, name }));
+    // A etapa lida pode ter sido apagada enquanto a pessoa respondia.
+    const stageId = stages.some((s) => s.id === draft.expense.stageId)
+      ? draft.expense.stageId
+      : null;
     const pending = await insertPending(
       session,
       project,
       stages,
-      { ...draft.expense, amountCents: cents },
+      { ...draft.expense, stageId, amountCents: cents },
       draft.rawInput,
       draft.logId,
     );
@@ -256,6 +260,8 @@ export async function handleAction(
 ): Promise<void> {
   if (action.type === "project")
     return chooseProject(session, action.projectId);
+  if (action.type === "project_page")
+    return sendProjectPage(session, action.page);
 
   const pending = await loadPending(session, action.expenseId);
   if (!pending) {
@@ -325,7 +331,7 @@ export async function handleAction(
         }),
       );
     case "category": {
-      if (!(action.code in CATEGORY_NAMES)) {
+      if (!Object.hasOwn(CATEGORY_NAMES, action.code)) {
         return session.send({ type: "text", body: botMessages.alreadyHandled });
       }
       const categoryId = await categoryIdOf(session.admin, action.code);
@@ -469,24 +475,45 @@ function summaryOf(pending: PendingExpense): string {
   return formatSummary(pending, pending.today);
 }
 
-/** Gasto pendente desta pessoa (ou null se já confirmado, cancelado ou de outro). */
+/**
+ * Gasto pendente desta pessoa (ou null se já confirmado, cancelado ou de
+ * outro). Confere também se ela ainda pode lançar naquela obra: quem perdeu o
+ * acesso depois de mandar a mensagem não confirma nem edita (o pendente é
+ * cancelado).
+ */
 async function loadPending(
   session: BotSession,
   expenseId: string,
 ): Promise<PendingExpense | null> {
   const { admin, userId } = session;
-  const { data, error } = await admin
-    .from("expenses")
-    .select(
-      "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), suppliers(name), projects(name, organizations(timezone), stages(id, name, sort_order))",
-    )
-    .eq("id", expenseId)
-    .eq("created_by", userId)
-    .eq("status", "pending")
-    .is("deleted_at", null)
-    .maybeSingle();
+  const [{ data, error }, projects] = await Promise.all([
+    admin
+      .from("expenses")
+      .select(
+        "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), suppliers(name), projects(name, organizations(timezone), stages(id, name, sort_order))",
+      )
+      .eq("id", expenseId)
+      .eq("created_by", userId)
+      .eq("status", "pending")
+      .is("deleted_at", null)
+      .maybeSingle(),
+    listLaunchableProjects(admin, userId),
+  ]);
   if (error) throw error;
   if (!data) return null;
+  if (
+    !projects.some((p) => p.id === data.project_id && p.orgId === data.org_id)
+  ) {
+    const { error: cancelError } = await admin
+      .from("expenses")
+      .update({ status: "cancelled" })
+      .eq("id", data.id)
+      .eq("org_id", data.org_id)
+      .eq("created_by", userId)
+      .eq("status", "pending");
+    if (cancelError) throw cancelError;
+    return null;
+  }
 
   const stages = [...(data.projects?.stages ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -664,17 +691,36 @@ async function insertPending(
       ai_confidence: Math.round(expense.confidence * 100) / 100,
       created_by: userId,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
   if (error) throw error;
 
-  if (logId) {
-    const { error: logError } = await admin
-      .from("whatsapp_messages")
-      .update({ expense_id: data.id, org_id: project.orgId })
-      .eq("id", logId);
-    if (logError) console.error("[whatsapp] log sem o gasto", logError);
-  }
+  await Promise.all([
+    // Um pendente por vez, mesmo com mensagens chegando juntas: os pendentes
+    // mais antigos desta pessoa nesta conta são cancelados (o mais novo fica).
+    admin
+      .from("expenses")
+      .update({ status: "cancelled" })
+      .eq("org_id", project.orgId)
+      .eq("created_by", userId)
+      .eq("status", "pending")
+      .in("source", WHATSAPP_SOURCES)
+      .lt("created_at", data.created_at)
+      .then(({ error: cancelError }) => {
+        if (cancelError) {
+          console.error("[whatsapp] pendente antigo ficou", cancelError);
+        }
+      }),
+    logId
+      ? admin
+          .from("whatsapp_messages")
+          .update({ expense_id: data.id, org_id: project.orgId })
+          .eq("id", logId)
+          .then(({ error: logError }) => {
+            if (logError) console.error("[whatsapp] log sem o gasto", logError);
+          })
+      : Promise.resolve(),
+  ]);
 
   return {
     id: data.id,

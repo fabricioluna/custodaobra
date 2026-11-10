@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import type { ExtractionResult } from "@/lib/ai/extract-expense";
 import type { OutgoingMessage } from "@/lib/whatsapp/client";
@@ -40,7 +48,12 @@ const today = () =>
     new Date(),
   );
 
-const read = (description: string): ExtractionResult => ({
+type Extracted = Extract<ExtractionResult, { kind: "expense" }>["expense"];
+
+const read = (
+  description: string,
+  fields: Partial<Extracted> = {},
+): ExtractionResult => ({
   kind: "expense",
   usage: { inputTokens: 10, outputTokens: 5 },
   expense: {
@@ -56,6 +69,7 @@ const read = (description: string): ExtractionResult => ({
     unit: null,
     confidence: 0.9,
     missing: [],
+    ...fields,
   },
 });
 
@@ -122,6 +136,18 @@ describe("comandos do WhatsApp e cron", () => {
       .eq("id", ana.id);
   });
 
+  // Os testes mandam muitas mensagens seguidas: as antigas "saem" do último
+  // minuto para o rate limit não atrapalhar (ele tem teste próprio).
+  beforeEach(async () => {
+    if (!anaPhone) return;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    await admin
+      .from("whatsapp_messages")
+      .update({ created_at: fiveMinutesAgo })
+      .eq("from_phone", anaPhone)
+      .gte("created_at", fiveMinutesAgo);
+  });
+
   afterAll(async () => {
     await admin.from("whatsapp_messages").delete().eq("from_phone", anaPhone);
     await deleteTestUsers([ana].filter(Boolean));
@@ -177,6 +203,47 @@ describe("comandos do WhatsApp e cron", () => {
     expect((await expenseByDescription("Servente antigo"))?.status).toBe(
       "confirmed",
     );
+  });
+
+  it("editar no app não reabre o prazo do desfazer", async () => {
+    const expense = await expenseByDescription("Servente antigo");
+    // Confirmado há 11 minutos e editado agora no app (updated_at novo).
+    const confirmedAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+    await admin
+      .from("expenses")
+      .update({ confirmed_at: confirmedAt })
+      .eq("id", expense!.id);
+    const { error: editError } = await ana.client
+      .from("expenses")
+      .update({ has_invoice: true })
+      .eq("id", expense!.id);
+    expect(editError).toBeNull();
+
+    await say("desfazer");
+    expect(last()?.body).toContain("Não achei lançamento");
+    const { data: after } = await admin
+      .from("expenses")
+      .select("status, confirmed_at")
+      .eq("id", expense!.id)
+      .single();
+    expect(after?.status).toBe("confirmed");
+    expect(new Date(after!.confirmed_at!).getTime()).toBe(
+      new Date(confirmedAt).getTime(),
+    );
+  });
+
+  it("auditoria: o bot grava quem lançou", async () => {
+    const expense = await expenseByDescription("Servente antigo");
+    const { data: rows } = await admin
+      .from("audit_log")
+      .select("action, user_id, diff")
+      .eq("entity", "expenses")
+      .eq("entity_id", expense!.id)
+      .order("created_at");
+    expect(rows?.length).toBeGreaterThanOrEqual(2);
+    // Criação e confirmação pelo bot (sem sessão): autor é a Ana.
+    expect(rows?.[0]).toMatchObject({ action: "create", user_id: ana.id });
+    expect(rows?.[1]).toMatchObject({ user_id: ana.id });
   });
 
   it("resumo com duas obras e nenhuma ativa pergunta qual", async () => {
@@ -240,6 +307,17 @@ describe("comandos do WhatsApp e cron", () => {
       .eq("user_id", ana.id)
       .single();
     expect(conversation).toEqual({ state: "idle", pending_expense_id: null });
+    // O cancelamento do cron fica na auditoria sem autor.
+    const { data: audit } = await admin
+      .from("audit_log")
+      .select("user_id, diff")
+      .eq("entity", "expenses")
+      .eq("entity_id", pending!.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    expect(audit?.user_id).toBeNull();
+    expect(audit?.diff).toMatchObject({ status: { to: "cancelled" } });
   });
 
   it("cron: limpa o conteúdo do log antigo e mantém o vínculo", async () => {
@@ -357,6 +435,119 @@ describe("comandos do WhatsApp e cron", () => {
       expect(sent.length).toBe(before);
     } finally {
       await admin.from("whatsapp_messages").delete().eq("from_phone", flooder);
+    }
+  });
+
+  it("mensagens juntas: só o pendente mais novo fica", async () => {
+    extractExpense
+      .mockResolvedValueOnce(read("Junto A"))
+      .mockResolvedValueOnce(read("Junto B"));
+    await Promise.all([say("300 junto a"), say("300 junto b")]);
+    const { data } = await admin
+      .from("expenses")
+      .select("status")
+      .eq("org_id", ana.orgId)
+      .in("description", ["Junto A", "Junto B"]);
+    expect(data?.map((row) => row.status).sort()).toEqual([
+      "cancelled",
+      "pending",
+    ]);
+  });
+
+  it("etapa apagada enquanto o bot pergunta o valor não trava", async () => {
+    const { data: stage } = await admin
+      .from("stages")
+      .select("id")
+      .eq("project_id", secondId)
+      .eq("name", "Pintura")
+      .single();
+    extractExpense.mockResolvedValueOnce(
+      read("Tinta", {
+        amountCents: null,
+        stageId: stage!.id,
+        missing: ["amount"],
+      }),
+    );
+    await say("comprei tinta");
+    expect(last()?.body).toContain("Qual foi o valor de _Tinta_");
+    const { error } = await ana.client
+      .from("stages")
+      .delete()
+      .eq("id", stage!.id);
+    expect(error).toBeNull();
+
+    await say("150");
+    const { data } = await admin
+      .from("expenses")
+      .select("status, stage_id, amount_cents")
+      .eq("org_id", ana.orgId)
+      .eq("description", "Tinta")
+      .single();
+    expect(data).toEqual({
+      status: "pending",
+      stage_id: null,
+      amount_cents: 15000,
+    });
+  });
+
+  it("quem perdeu o acesso depois de mandar não confirma", async () => {
+    const bruno = await createTestUser("wa-cmd-bruno");
+    const brunoPhone = randomPhone();
+    try {
+      await admin
+        .from("profiles")
+        .update({ whatsapp_phone: brunoPhone })
+        .eq("id", bruno.id);
+      await admin
+        .from("organization_members")
+        .insert({ org_id: ana.orgId, user_id: bruno.id, role: "member" });
+      await admin.from("project_members").insert({
+        org_id: ana.orgId,
+        project_id: secondId,
+        user_id: bruno.id,
+        role: "editor",
+      });
+
+      extractExpense.mockResolvedValueOnce(read("Do Bruno"));
+      await handleIncomingMessage(admin, {
+        id: `wamid.test.${crypto.randomUUID()}`,
+        from: brunoPhone,
+        timestamp: `${Math.floor(Date.now() / 1000)}`,
+        type: "text",
+        text: { body: "300 pedreiro" },
+      });
+      const confirmId = rowId("Sem etapa");
+      expect(confirmId).not.toBe("");
+
+      // Vira "só acompanha" antes de tocar.
+      await admin
+        .from("project_members")
+        .update({ role: "viewer" })
+        .eq("project_id", secondId)
+        .eq("user_id", bruno.id);
+      await handleIncomingMessage(admin, {
+        id: `wamid.test.${crypto.randomUUID()}`,
+        from: brunoPhone,
+        timestamp: `${Math.floor(Date.now() / 1000)}`,
+        type: "interactive",
+        interactive: {
+          type: "list_reply",
+          list_reply: { id: confirmId, title: "Sem etapa" },
+        },
+      });
+      expect(last()?.body).toContain("já foi confirmado ou cancelado");
+      const { data } = await admin
+        .from("expenses")
+        .select("status")
+        .eq("description", "Do Bruno")
+        .single();
+      expect(data?.status).toBe("cancelled");
+    } finally {
+      await admin
+        .from("whatsapp_messages")
+        .delete()
+        .eq("from_phone", brunoPhone);
+      await deleteTestUsers([bruno]);
     }
   });
 

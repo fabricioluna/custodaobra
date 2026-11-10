@@ -3,7 +3,7 @@ import "server-only";
 import { todayIn } from "@/lib/dates";
 
 import type { BotCommand } from "../commands";
-import { saveConversation } from "../conversation";
+import { saveConversation, WHATSAPP_SOURCES } from "../conversation";
 import {
   botMessages,
   formatProjectSummary,
@@ -137,9 +137,8 @@ export async function sendProjectSummary(
 
 /**
  * "desfazer": cancela o último lançamento confirmado pela própria pessoa
- * pelo WhatsApp nos últimos 10 minutos, numa obra em que ela ainda lança.
- * A hora da confirmação é o updated_at (confirmar é a última mudança que o
- * bot faz no gasto).
+ * pelo WhatsApp nos últimos 10 minutos (pela hora da confirmação, que o
+ * banco grava em confirmed_at), numa obra em que ela ainda lança.
  */
 async function undo(session: BotSession): Promise<void> {
   const { admin, userId } = session;
@@ -154,9 +153,9 @@ async function undo(session: BotSession): Promise<void> {
       .eq("created_by", userId)
       .eq("status", "confirmed")
       .is("deleted_at", null)
-      .in("source", ["whatsapp_text", "whatsapp_audio", "whatsapp_image"])
-      .gte("updated_at", since)
-      .order("updated_at", { ascending: false })
+      .in("source", WHATSAPP_SOURCES)
+      .gte("confirmed_at", since)
+      .order("confirmed_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
@@ -199,6 +198,35 @@ async function undo(session: BotSession): Promise<void> {
     todayIn(project.timezone),
   );
   return session.send({ type: "text", body: botMessages.undone(summary) });
+}
+
+/**
+ * "Mais obras": a mesma lista na página pedida, com a pergunta que estava
+ * valendo (resumo, gasto à espera da obra ou troca de obra).
+ */
+export async function sendProjectPage(
+  session: BotSession,
+  page: number,
+): Promise<void> {
+  const { admin, userId, conversation } = session;
+  const projects = await listLaunchableProjects(admin, userId);
+  if (!projects.length) {
+    return session.send({ type: "text", body: botMessages.noProjects });
+  }
+  const { pendingCommand, pendingText } = conversation.context;
+  const body =
+    pendingCommand === "summary"
+      ? botMessages.summaryWhichProject
+      : pendingText
+        ? botMessages.chooseProject
+        : botMessages.projectsQuestion;
+  return session.send(
+    projectListMessage(projects, hasManyOrgs(projects), {
+      body,
+      activeId: conversation.active_project_id,
+      page,
+    }),
+  );
 }
 
 function hasManyOrgs(projects: LaunchableProject[]): boolean {

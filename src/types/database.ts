@@ -198,6 +198,7 @@ export type Database = {
           ai_confidence: number | null;
           amount_cents: number;
           category_id: string;
+          confirmed_at: string | null;
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
@@ -225,6 +226,7 @@ export type Database = {
           ai_confidence?: number | null;
           amount_cents: number;
           category_id: string;
+          confirmed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
@@ -252,6 +254,7 @@ export type Database = {
           ai_confidence?: number | null;
           amount_cents?: number;
           category_id?: string;
+          confirmed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;

@@ -25,5 +25,6 @@ export function parseCommand(text: string): BotCommand | null {
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return COMMANDS[normalized] ?? null;
+  // hasOwn: "constructor" e afins não são comandos.
+  return Object.hasOwn(COMMANDS, normalized) ? COMMANDS[normalized]! : null;
 }

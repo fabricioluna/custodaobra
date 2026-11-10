@@ -113,6 +113,9 @@ export async function handleIncomingMessage(
 
     if (code) {
       const result = await linkNumber(admin, message.from, variants, code);
+      // Anotado antes da resposta: se o envio falhar, a tentativa errada
+      // continua contando no limite por hora.
+      note = result.error ?? null;
       await reply(admin, message.from, sender, {
         type: "text",
         body: result.reply,
@@ -152,7 +155,15 @@ export async function handleIncomingMessage(
     await finish();
   } catch (error) {
     console.error("[whatsapp] falha ao tratar mensagem", message.id, error);
-    await reportFailure(admin, message.from, sender, logId, errorText(error));
+    await reportFailure(
+      admin,
+      message.from,
+      sender,
+      logId,
+      // Código de vínculo errado continua marcado (conta no limite por hora);
+      // o erro de envio fica no log da resposta.
+      note === LINK_CODE_INVALID ? note : errorText(error),
+    );
   } finally {
     await typing;
   }

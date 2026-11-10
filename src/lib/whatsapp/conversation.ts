@@ -8,6 +8,10 @@ import type { Database, Json } from "@/types/database";
 type Admin = SupabaseClient<Database>;
 type ConversationRow =
   Database["public"]["Tables"]["whatsapp_conversations"]["Row"];
+/** Origens dos lançamentos que chegam pelo WhatsApp. */
+export const WHATSAPP_SOURCES: Database["public"]["Enums"]["expense_source"][] =
+  ["whatsapp_text", "whatsapp_audio", "whatsapp_image"];
+
 export type ConversationState =
   Database["public"]["Enums"]["whatsapp_conversation_state"];
 

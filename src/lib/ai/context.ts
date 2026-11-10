@@ -32,6 +32,9 @@ export async function loadExtractionContext(
       .select("suppliers(name)")
       .eq("org_id", orgId)
       .not("supplier_id", "is", null)
+      // Só gastos confirmados: um nome mal lido num pendente cancelado não
+      // volta para a IA como "fornecedor recente".
+      .eq("status", "confirmed")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(100),

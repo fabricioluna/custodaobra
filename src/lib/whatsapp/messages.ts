@@ -237,26 +237,44 @@ export function dateListMessage(
   };
 }
 
+/** Com mais de 10 obras, a lista vai em páginas de 9 + "Mais obras". */
+const PROJECTS_PER_PAGE = 9;
+
 export function projectListMessage(
   projects: { id: string; name: string; orgName: string }[],
   showOrg: boolean,
-  options: { body?: string; activeId?: string | null } = {},
+  options: { body?: string; activeId?: string | null; page?: number } = {},
 ): OutgoingMessage {
+  const paged = projects.length > 10;
+  const pages = paged ? Math.ceil(projects.length / PROJECTS_PER_PAGE) : 1;
+  const page = Math.min(Math.max(options.page ?? 0, 0), pages - 1);
+  const slice = paged
+    ? projects.slice(page * PROJECTS_PER_PAGE, (page + 1) * PROJECTS_PER_PAGE)
+    : projects;
+  const rows: ListRow[] = slice.map((project) => {
+    const notes = [
+      project.id === options.activeId ? "Obra ativa" : null,
+      showOrg ? project.orgName : null,
+    ].filter(Boolean);
+    return {
+      id: actionId.project(project.id),
+      title: project.name,
+      ...(notes.length ? { description: notes.join(" · ") } : {}),
+    };
+  });
+  if (paged) {
+    const next = (page + 1) % pages;
+    rows.push({
+      id: actionId.projectPage(next),
+      title: next === 0 ? "Voltar ao início" : "Mais obras",
+      description: `Página ${next + 1} de ${pages}`,
+    });
+  }
   return {
     type: "list",
     body: options.body ?? botMessages.chooseProject,
     buttonLabel: botMessages.chooseProjectButton,
-    rows: projects.slice(0, 10).map((project) => {
-      const notes = [
-        project.id === options.activeId ? "Obra ativa" : null,
-        showOrg ? project.orgName : null,
-      ].filter(Boolean);
-      return {
-        id: actionId.project(project.id),
-        title: project.name,
-        ...(notes.length ? { description: notes.join(" · ") } : {}),
-      };
-    }),
+    rows,
   };
 }
 

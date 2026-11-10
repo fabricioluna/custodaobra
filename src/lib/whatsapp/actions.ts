@@ -30,7 +30,8 @@ export type BotAction =
   | { type: "stage_page"; mode: StageMode; page: number; expenseId: string }
   | { type: "category"; code: string; expenseId: string }
   | { type: "date"; date: string; expenseId: string }
-  | { type: "project"; projectId: string };
+  | { type: "project"; projectId: string }
+  | { type: "project_page"; page: number };
 
 const modeCode = (mode: StageMode) => (mode === "confirm" ? "c" : "e");
 
@@ -47,6 +48,7 @@ export const actionId = {
   category: (code: string, expenseId: string) => `ca:${code}:${expenseId}`,
   date: (date: string, expenseId: string) => `d:${date}:${expenseId}`,
   project: (projectId: string) => `p:${projectId}`,
+  projectPage: (page: number) => `pp:${page}`,
 };
 
 const PATTERNS: [RegExp, (m: RegExpExecArray) => BotAction][] = [
@@ -88,6 +90,7 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => BotAction][] = [
     (m) => ({ type: "date", date: m[1]!, expenseId: m[2]! }),
   ],
   [new RegExp(`^p:(${UUID})$`), (m) => ({ type: "project", projectId: m[1]! })],
+  [/^pp:(\d{1,2})$/, (m) => ({ type: "project_page", page: Number(m[1]) })],
 ];
 
 /** Lê o id que voltou do toque; null se não for nosso (ou adulterado). */
