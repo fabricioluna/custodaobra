@@ -212,7 +212,7 @@ Número desconhecido que escreve para o bot recebe uma mensagem curta com o link
 - Regras de interpretação a cobrir com testes: "300", "1.500", "1,5 mil", "mil e duzentos", "trezentos conto"; vocabulário de obra regional ("milheiro de tijolo", "carrada de areia", "saco de cimento", "diária do servente", "empreita"). Pagamento a pessoa (pedreiro, servente, eletricista) sem menção a material vira Mão de obra.
 - Validação pós-IA: valor maior que zero e menor que R$ 10 milhões; data não pode ser futura além de 1 dia.
 - Fotos (fase 4): ler total, fornecedor, CNPJ, data e itens do cupom ou nota. Se houver QR Code de NFC-e, guardar a chave de acesso em `nfe_access_key`.
-- Áudio (fase 4): transcrever com um serviço de transcrição (a definir) e seguir o fluxo de texto. A transcrição vai para `raw_input`.
+- Áudio (fase 4): transcrever com o Whisper da Groq (`whisper-large-v3-turbo`, por `fetch`, sem SDK; chave `GROQ_API_KEY`) e seguir o fluxo de texto. A transcrição vai para `raw_input`.
 - Toda chamada incrementa `usage_counters` (chamadas e tokens).
 - Fixtures de teste com mensagens realistas em `tests/fixtures/whatsapp-messages.json`.
 
@@ -445,5 +445,6 @@ Cada fase só termina quando todos os critérios de aceite passam e lint, typech
 - **Logo:** pronta em JPEG; falta a versão vetorial (SVG) e o ícone quadrado
 - **Planos:** provisórios, preço zero, 14 dias de teste. `pessoal` (padrão do cadastro): 1 obra, 3 membros, 300 lançamentos por WhatsApp e 600 chamadas de IA por mês. `profissional`: 10 obras, 10 membros, 3000 e 6000.
 - **Organização pessoal:** nasce com o nome da pessoa (Google) ou o começo do e-mail; no primeiro acesso a pessoa confirma ou troca (pelo próprio nome ou o da empresa).
-- **Decisões pendentes:** provedor de cobrança; serviço de transcrição de áudio; valores dos planos
+- **Decisões da fase 4 (confirmadas):** fornecedor lido pela IA só é criado ao confirmar o lançamento (hoje nasce com o pendente e sobra se a pessoa cancela; corrigir no começo da fase 4); transcrição de áudio com o Whisper da Groq (`whisper-large-v3-turbo`, cerca de US$ 0,04 por hora de áudio, não gasta tokens do Claude; conferir o preço e o português na página da Groq ao implementar; a Política de Privacidade precisa citar a Groq); a fase começa pela foto do cupom.
+- **Decisões pendentes:** provedor de cobrança; valores dos planos
 - **Contas necessárias:** Supabase (dev e prod), Vercel, chave da API da Anthropic (cobrada à parte da assinatura do Claude), conta de desenvolvedor Meta com app do WhatsApp Business
