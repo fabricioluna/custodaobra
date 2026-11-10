@@ -22,7 +22,12 @@ import { phoneVariants } from "../phone";
 import { sendAndLog } from "../send";
 import { type IncomingMessage, messageText } from "../webhook";
 import { handleCommand } from "./commands";
-import { type BotSession, handleAction, handleText } from "./expense";
+import {
+  type BotSession,
+  handleAction,
+  handleReceipt,
+  handleText,
+} from "./expense";
 
 type Admin = SupabaseClient<Database>;
 
@@ -287,8 +292,8 @@ function reply(
 
 /**
  * Mensagem de quem já está ligado: toque em botão ou lista (pelo id que o bot
- * mandou), texto (gasto novo ou resposta a uma pergunta) ou outro tipo (foto e
- * áudio chegam na Fase 4).
+ * mandou), foto ou documento (comprovante), texto (gasto novo ou resposta a
+ * uma pergunta) ou outro tipo (áudio chega na parte 3 da Fase 4).
  */
 async function handleFromSender(
   admin: Admin,
@@ -316,6 +321,25 @@ async function handleFromSender(
     );
     if (action) return handleAction(session, action);
     return session.send({ type: "text", body: botMessages.howTo });
+  }
+
+  // Foto do cupom, ou o cupom/nota mandado como documento (PDF ou imagem).
+  const media =
+    message.type === "image"
+      ? message.image
+      : message.type === "document"
+        ? message.document
+        : undefined;
+  if (media) {
+    return handleReceipt(
+      session,
+      {
+        id: media.id,
+        mimeType: media.mime_type ?? "",
+        caption: media.caption?.trim().slice(0, 500) || null,
+      },
+      logId,
+    );
   }
 
   const text = message.type === "text" ? message.text?.body?.trim() : "";

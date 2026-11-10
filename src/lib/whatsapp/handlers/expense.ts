@@ -6,8 +6,16 @@ import { resolveSupplier } from "@/features/suppliers/resolve";
 import { loadExtractionContext } from "@/lib/ai/context";
 import {
   type ExtractedExpense,
+  type ExtractionContext,
   extractExpense,
 } from "@/lib/ai/extract-expense";
+import {
+  maxReceiptBytes,
+  type ReceiptDetails,
+  type ReceiptMimeType,
+  readReceipt,
+  receiptMimeType,
+} from "@/lib/ai/read-receipt";
 import { canUseWhatsappAi } from "@/lib/billing/limits";
 import { recordUsage } from "@/lib/billing/usage";
 import { addDays, isIsoDate, todayIn } from "@/lib/dates";
@@ -15,11 +23,17 @@ import { isValidAmountCents, parseMoneyToCents } from "@/lib/money";
 import type { Database } from "@/types/database";
 
 import type { BotAction } from "../actions";
-import type { OutgoingMessage } from "../client";
+import {
+  downloadMedia,
+  MediaTooLargeError,
+  type OutgoingMessage,
+} from "../client";
 import {
   type Conversation,
+  type ConversationContext,
   type ConversationState,
   keepPendingSupplier,
+  type ReceiptMedia,
   resetConversation,
   saveConversation,
   WHATSAPP_SOURCES,
@@ -37,6 +51,7 @@ import {
   summaryMessage,
 } from "../messages";
 import { type LaunchableProject, listLaunchableProjects } from "../projects";
+import { saveReceipt } from "../receipts";
 import { sendProjectPage, sendProjectSummary } from "./commands";
 
 type Admin = SupabaseClient<Database>;
@@ -73,51 +88,122 @@ export async function handleText(
     }
     // Não é só um número: é um gasto novo.
   }
-  return startExpense(session, text, logId);
+  const project = await projectForNewExpense(session, {
+    pendingText: text,
+    pendingLogId: logId,
+  });
+  if (!project) return;
+  await Promise.all([
+    rememberActiveProject(session, project),
+    readExpense(session, project, text, logId),
+  ]);
 }
 
-async function startExpense(
+// Foto ou PDF de comprovante --------------------------------------------------------
+
+export async function handleReceipt(
   session: BotSession,
-  text: string,
+  media: ReceiptMedia,
   logId: string | null,
 ): Promise<void> {
+  if (!receiptMimeType(media.mimeType)) {
+    session.noteError?.("media_unsupported");
+    return session.send({ type: "text", body: botMessages.receiptUnsupported });
+  }
+  const project = await projectForNewExpense(session, {
+    pendingMedia: media,
+    pendingLogId: logId,
+  });
+  if (!project) return;
+  await Promise.all([
+    rememberActiveProject(session, project),
+    readReceiptMessage(session, project, media, logId),
+  ]);
+}
+
+/**
+ * Obra do gasto novo: a ativa, ou a única. Com várias e nenhuma ativa,
+ * pergunta qual (a mensagem fica guardada em `pending`) e devolve null.
+ */
+async function projectForNewExpense(
+  session: BotSession,
+  pending: ConversationContext,
+): Promise<LaunchableProject | null> {
   const { admin, userId, conversation } = session;
   const projects = await listLaunchableProjects(admin, userId);
   if (!projects.length) {
     await resetConversation(admin, userId);
-    return session.send({ type: "text", body: botMessages.noProjects });
+    await session.send({ type: "text", body: botMessages.noProjects });
+    return null;
   }
 
-  let project = projects.find((p) => p.id === conversation.active_project_id);
-  if (!project && projects.length === 1) project = projects[0];
-  if (!project) {
-    const orgCount = new Set(projects.map((p) => p.orgId)).size;
-    await Promise.all([
-      discardPending(session),
-      saveConversation(admin, userId, {
-        state: "awaiting_project",
-        pendingExpenseId: null,
-        context: { pendingText: text, pendingLogId: logId },
-      }),
-      session.send(projectListMessage(projects, orgCount > 1)),
-    ]);
-    return;
-  }
+  const project =
+    projects.find((p) => p.id === conversation.active_project_id) ??
+    (projects.length === 1 ? projects[0] : undefined);
+  if (project) return project;
 
-  // Guardar a obra ativa não muda o que a leitura faz: vai em paralelo (só
-  // mexe nas colunas da obra; o estado da conversa é gravado depois da IA).
+  const orgCount = new Set(projects.map((p) => p.orgId)).size;
   await Promise.all([
-    project.id === conversation.active_project_id
-      ? Promise.resolve()
-      : saveConversation(admin, userId, {
-          activeOrgId: project.orgId,
-          activeProjectId: project.id,
-        }).catch((error: unknown) =>
-          // Sem a obra ativa gravada, a próxima mensagem só pergunta de novo.
-          console.error("[whatsapp] falha ao guardar a obra ativa", error),
-        ),
-    readExpense(session, project, text, logId),
+    discardPending(session),
+    saveConversation(admin, userId, {
+      state: "awaiting_project",
+      pendingExpenseId: null,
+      context: pending,
+    }),
+    session.send(projectListMessage(projects, orgCount > 1)),
   ]);
+  return null;
+}
+
+/**
+ * Guarda a obra ativa. Não muda o que a leitura faz: vai em paralelo (só
+ * mexe nas colunas da obra; o estado da conversa é gravado depois da IA).
+ */
+function rememberActiveProject(
+  session: BotSession,
+  project: LaunchableProject,
+): Promise<void> {
+  if (project.id === session.conversation.active_project_id) {
+    return Promise.resolve();
+  }
+  return saveConversation(session.admin, session.userId, {
+    activeOrgId: project.orgId,
+    activeProjectId: project.id,
+  }).catch((error: unknown) =>
+    // Sem a obra ativa gravada, a próxima mensagem só pergunta de novo.
+    console.error("[whatsapp] falha ao guardar a obra ativa", error),
+  );
+}
+
+/**
+ * Limite do plano e contexto da obra ao mesmo tempo. Fora do limite, avisa a
+ * pessoa e devolve null.
+ */
+async function aiContextOrRefuse(
+  session: BotSession,
+  project: LaunchableProject,
+  today: string,
+): Promise<ExtractionContext | null> {
+  const [allowed, context] = await Promise.all([
+    canUseWhatsappAi(session.admin, project.orgId, today),
+    loadExtractionContext(
+      session.admin,
+      project.orgId,
+      project.id,
+      project.timezone,
+    ),
+  ]);
+  if (allowed.ok) return context;
+  session.noteError?.(`limit_${allowed.reason}`);
+  const body =
+    allowed.reason === "whatsapp_disabled"
+      ? botMessages.whatsappDisabled
+      : allowed.reason === "max_whatsapp_entries" ||
+          allowed.reason === "max_ai_calls"
+        ? botMessages.limitReached
+        : botMessages.unavailable;
+  await session.send({ type: "text", body });
+  return null;
 }
 
 /** IA lê a mensagem; o gasto nasce pendente (ou vira rascunho sem valor). */
@@ -129,23 +215,8 @@ async function readExpense(
 ): Promise<void> {
   const { admin, userId } = session;
   const today = todayIn(project.timezone);
-
-  // Limite do plano e contexto da obra ao mesmo tempo.
-  const [allowed, context] = await Promise.all([
-    canUseWhatsappAi(admin, project.orgId, today),
-    loadExtractionContext(admin, project.orgId, project.id, project.timezone),
-  ]);
-  if (!allowed.ok) {
-    session.noteError?.(`limit_${allowed.reason}`);
-    const body =
-      allowed.reason === "whatsapp_disabled"
-        ? botMessages.whatsappDisabled
-        : allowed.reason === "max_whatsapp_entries" ||
-            allowed.reason === "max_ai_calls"
-          ? botMessages.limitReached
-          : botMessages.unavailable;
-    return session.send({ type: "text", body });
-  }
+  const context = await aiContextOrRefuse(session, project, today);
+  if (!context) return;
 
   const result = await extractExpense(text, context);
   // Toda chamada conta no plano, mesmo a que falhou (tokens, se vieram).
@@ -198,10 +269,147 @@ async function readExpense(
     project,
     context.stages,
     { ...expense, amountCents: expense.amountCents },
-    text,
-    logId,
+    { rawInput: text, logId, source: "whatsapp_text" },
   );
   return presentPending(session, pending, "new");
+}
+
+/** Arquivo baixado da Meta, já com o tipo conferido. */
+type ReceiptFile = { data: ArrayBuffer; mimeType: ReceiptMimeType };
+
+/**
+ * Baixa o comprovante. Falhou ou é grande demais: avisa a pessoa e devolve
+ * null.
+ */
+async function fetchReceipt(
+  session: BotSession,
+  media: ReceiptMedia,
+): Promise<ReceiptFile | null> {
+  const declared = receiptMimeType(media.mimeType);
+  if (!declared) {
+    session.noteError?.("media_unsupported");
+    await session.send({ type: "text", body: botMessages.receiptUnsupported });
+    return null;
+  }
+  try {
+    const file = await downloadMedia(media.id, maxReceiptBytes(declared));
+    const mimeType = receiptMimeType(file.mimeType) ?? declared;
+    if (file.data.byteLength > maxReceiptBytes(mimeType)) {
+      throw new MediaTooLargeError(file.data.byteLength);
+    }
+    return { data: file.data, mimeType };
+  } catch (error) {
+    const tooLarge = error instanceof MediaTooLargeError;
+    if (!tooLarge) console.error("[whatsapp] falha ao baixar a mídia", error);
+    session.noteError?.(tooLarge ? "media_too_large" : "media_download_failed");
+    await session.send({
+      type: "text",
+      body: tooLarge
+        ? botMessages.receiptTooLarge
+        : botMessages.receiptDownloadFailed,
+    });
+    return null;
+  }
+}
+
+/** IA lê o comprovante; o gasto nasce pendente com a foto e os itens. */
+async function readReceiptMessage(
+  session: BotSession,
+  project: LaunchableProject,
+  media: ReceiptMedia,
+  logId: string | null,
+): Promise<void> {
+  const { admin, userId } = session;
+  const today = todayIn(project.timezone);
+  // Limite e contexto junto com o download: são independentes.
+  const [context, file] = await Promise.all([
+    aiContextOrRefuse(session, project, today),
+    fetchReceipt(session, media),
+  ]);
+  if (!context || !file) return;
+
+  const result = await readReceipt(file, media.caption, context);
+  const usage = recordUsage(admin, project.orgId, today, {
+    aiCalls: 1,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
+  });
+
+  if (result.kind === "failed") session.noteError?.(`ai_${result.reason}`);
+  if (result.kind !== "receipt") {
+    await Promise.all([
+      usage,
+      session.send({
+        type: "text",
+        body:
+          result.kind === "not_receipt"
+            ? botMessages.notAReceipt
+            : result.reason === "unavailable"
+              ? botMessages.unavailable
+              : botMessages.receiptNotUnderstood,
+      }),
+    ]);
+    return;
+  }
+
+  await Promise.all([usage, discardPending(session)]);
+
+  const { expense, details } = result;
+  if (expense.amountCents === null) {
+    // A foto fica na Meta: é baixada de novo quando o valor chegar.
+    await Promise.all([
+      saveConversation(admin, userId, {
+        state: "awaiting_amount",
+        pendingExpenseId: null,
+        context: {
+          draft: {
+            projectId: project.id,
+            expense,
+            rawInput: media.caption,
+            logId,
+            receipt: {
+              media: { ...media, mimeType: file.mimeType },
+              details,
+            },
+          },
+        },
+      }),
+      session.send({
+        type: "text",
+        body: botMessages.askReceiptAmount(expense.description),
+      }),
+    ]);
+    return;
+  }
+
+  const pending = await insertPending(
+    session,
+    project,
+    context.stages,
+    { ...expense, amountCents: expense.amountCents },
+    {
+      rawInput: media.caption,
+      logId,
+      source: "whatsapp_image",
+      receipt: { file, details },
+    },
+  );
+  return presentPending(session, pending, "new");
+}
+
+/** Baixa de novo a foto de um rascunho (sem avisar a pessoa se falhar). */
+async function refetchReceipt(
+  media: ReceiptMedia,
+): Promise<ReceiptFile | null> {
+  const mimeType = receiptMimeType(media.mimeType);
+  if (!mimeType) return null;
+  try {
+    const file = await downloadMedia(media.id, maxReceiptBytes(mimeType));
+    return { data: file.data, mimeType };
+  } catch (error) {
+    console.error("[whatsapp] falha ao baixar a mídia de novo", error);
+    return null;
+  }
 }
 
 /** Resposta à pergunta do valor: completa o rascunho ou corrige o pendente. */
@@ -209,11 +417,13 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
   const { admin, userId, conversation } = session;
   const draft = conversation.context.draft;
   if (draft) {
-    // A permissão e as etapas ao mesmo tempo; as etapas só valem se a obra
-    // continuar entre as que a pessoa pode lançar (e da mesma conta).
-    const [projects, stageRows] = await Promise.all([
+    // A permissão, as etapas e a foto (se veio de comprovante) ao mesmo
+    // tempo; as etapas só valem se a obra continuar entre as que a pessoa
+    // pode lançar (e da mesma conta).
+    const [projects, stageRows, file] = await Promise.all([
       listLaunchableProjects(admin, userId),
       stagesOf(admin, draft.projectId),
+      draft.receipt ? refetchReceipt(draft.receipt.media) : null,
     ]);
     const project = projects.find((p) => p.id === draft.projectId);
     if (!project) {
@@ -227,13 +437,20 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
     const stageId = stages.some((s) => s.id === draft.expense.stageId)
       ? draft.expense.stageId
       : null;
+    if (draft.receipt && !file) session.noteError?.("receipt_refetch_failed");
     const pending = await insertPending(
       session,
       project,
       stages,
       { ...draft.expense, stageId, amountCents: cents },
-      draft.rawInput,
-      draft.logId,
+      {
+        rawInput: draft.rawInput,
+        logId: draft.logId,
+        source: draft.receipt ? "whatsapp_image" : "whatsapp_text",
+        receipt: draft.receipt
+          ? { file, details: draft.receipt.details }
+          : undefined,
+      },
     );
     return presentPending(session, pending, "new");
   }
@@ -404,6 +621,7 @@ async function confirm(
     session.admin,
     pending.orgId,
     pending.supplierName,
+    pending.supplierDocument,
   );
   const ok = await updatePending(session, pending, {
     ...extra,
@@ -436,17 +654,20 @@ async function chooseProject(
   if (!project) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
-  const { pendingText, pendingLogId, pendingCommand } = conversation.context;
+  const { pendingText, pendingMedia, pendingLogId, pendingCommand } =
+    conversation.context;
   const select = saveConversation(admin, userId, {
     state: "idle",
     activeOrgId: project.orgId,
     activeProjectId: project.id,
     context: keepPendingSupplier(conversation.context),
   });
-  if (pendingText && pendingCommand !== "summary") {
+  if (pendingCommand !== "summary" && (pendingText || pendingMedia)) {
     // A leitura grava o estado da conversa depois: espera a troca da obra.
     await select;
-    return readExpense(session, project, pendingText, pendingLogId ?? null);
+    return pendingMedia
+      ? readReceiptMessage(session, project, pendingMedia, pendingLogId ?? null)
+      : readExpense(session, project, pendingText ?? "", pendingLogId ?? null);
   }
   await Promise.all([
     select,
@@ -473,9 +694,12 @@ type PendingExpense = {
   stageId: string | null;
   stageName: string | null;
   supplierName: string | null;
+  /** CNPJ/CPF do fornecedor lido do comprovante (gravado ao confirmar). */
+  supplierDocument: string | null;
   spentOn: string;
   paymentMethod: string | null;
   hasInvoice: boolean;
+  itemCount: number;
   stages: { id: string; name: string }[];
 };
 
@@ -498,7 +722,7 @@ async function loadPending(
     admin
       .from("expenses")
       .select(
-        "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), projects(name, organizations(timezone), stages(id, name, sort_order))",
+        "id, org_id, project_id, stage_id, amount_cents, description, spent_on, payment_method, has_invoice, categories(code), expense_items(count), projects(name, organizations(timezone), stages(id, name, sort_order))",
       )
       .eq("id", expenseId)
       .eq("created_by", userId)
@@ -526,8 +750,8 @@ async function loadPending(
   // O nome lido fica na conversa até a confirmação (o pendente não tem
   // fornecedor gravado).
   const { pendingSupplier } = session.conversation.context;
-  const supplierName =
-    pendingSupplier?.expenseId === data.id ? pendingSupplier.name : null;
+  const supplier =
+    pendingSupplier?.expenseId === data.id ? pendingSupplier : null;
 
   const stages = [...(data.projects?.stages ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -544,10 +768,12 @@ async function loadPending(
     categoryCode: data.categories?.code ?? "outros",
     stageId: data.stage_id,
     stageName: stages.find((s) => s.id === data.stage_id)?.name ?? null,
-    supplierName,
+    supplierName: supplier?.name ?? null,
+    supplierDocument: supplier?.document ?? null,
     spentOn: data.spent_on,
     paymentMethod: data.payment_method,
     hasInvoice: data.has_invoice,
+    itemCount: data.expense_items[0]?.count ?? 0,
     stages,
   };
 }
@@ -641,6 +867,7 @@ function setState(
           pendingSupplier: {
             expenseId: pending.id,
             name: pending.supplierName,
+            document: pending.supplierDocument,
           },
         }
       : {},
@@ -676,16 +903,25 @@ async function categoryIdOf(admin: Admin, code: string): Promise<string> {
   return data.id;
 }
 
+/** De onde veio o pendente. */
+type PendingInput = {
+  rawInput: string | null;
+  logId: string | null;
+  source: "whatsapp_text" | "whatsapp_image";
+  /** Comprovante: a foto (se baixou) e o que foi lido dela. */
+  receipt?: { file: ReceiptFile | null; details: ReceiptDetails };
+};
+
 /** Cria o gasto pendente e devolve os dados para o resumo. */
 async function insertPending(
   session: BotSession,
   project: LaunchableProject,
   stages: { id: string; name: string }[],
   expense: ExtractedExpense & { amountCents: number },
-  rawInput: string,
-  logId: string | null,
+  input: PendingInput,
 ): Promise<PendingExpense> {
   const { admin, userId } = session;
+  const { rawInput, logId, source, receipt } = input;
 
   // Sem fornecedor no pendente: o nome lido fica na conversa (setState) e o
   // cadastro só nasce se a pessoa confirmar.
@@ -706,9 +942,11 @@ async function insertPending(
       spent_on: expense.spentOn,
       payment_method: expense.paymentMethod,
       has_invoice: expense.hasInvoice,
+      invoice_number: receipt?.details.invoiceNumber ?? null,
+      nfe_access_key: receipt?.details.accessKey ?? null,
       status: "pending",
-      source: "whatsapp_text",
-      raw_input: rawInput.slice(0, 2000),
+      source,
+      raw_input: rawInput?.slice(0, 2000) || null,
       ai_confidence: Math.round(expense.confidence * 100) / 100,
       created_by: userId,
     })
@@ -741,6 +979,18 @@ async function insertPending(
             if (logError) console.error("[whatsapp] log sem o gasto", logError);
           })
       : Promise.resolve(),
+    // A foto e os itens não impedem o lançamento: se falharem, ficam no log.
+    receipt
+      ? saveReceipt(admin, {
+          orgId: project.orgId,
+          expenseId: data.id,
+          userId,
+          file: receipt.file,
+          items: receipt.details.items,
+        }).then((ok) => {
+          if (!ok) session.noteError?.("receipt_save_failed");
+        })
+      : Promise.resolve(),
   ]);
 
   return {
@@ -755,9 +1005,11 @@ async function insertPending(
     stageId: expense.stageId,
     stageName: stages.find((s) => s.id === expense.stageId)?.name ?? null,
     supplierName: expense.supplierName,
+    supplierDocument: receipt?.details.supplierDocument ?? null,
     spentOn: expense.spentOn,
     paymentMethod: expense.paymentMethod,
     hasInvoice: expense.hasInvoice,
+    itemCount: receipt?.details.items.length ?? 0,
     stages,
   };
 }

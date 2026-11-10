@@ -20,9 +20,10 @@ import {
 
 /**
  * Tempo máximo da função, contando o after(): a IA tem 20 s com uma nova
- * tentativa, e o resto (banco e Meta) leva poucos segundos.
+ * tentativa no texto e 45 s na foto do cupom (mais até 15 s para baixar a
+ * foto da Meta); o resto (banco e Meta) leva poucos segundos.
  */
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export function GET(request: NextRequest) {
   const challenge = verifySubscription(

@@ -1,0 +1,101 @@
+{
+  "today": "2026-11-10",
+  "stages": [
+    "Projetos e documentação",
+    "Serviços preliminares e terreno",
+    "Fundação",
+    "Estrutura",
+    "Alvenaria",
+    "Cobertura",
+    "Instalações elétricas",
+    "Instalações hidrossanitárias",
+    "Revestimentos e pisos",
+    "Esquadrias (portas e janelas)",
+    "Pintura",
+    "Louças, metais e acabamentos",
+    "Limpeza e entrega"
+  ],
+  "suppliers": [],
+  "receipts": [
+    {
+      "file": "nfce-material.png",
+      "caption": null,
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 37060,
+        "category": "material",
+        "spent_on": "2026-11-06",
+        "payment_method": "pix",
+        "has_invoice": true,
+        "supplier_document": "11222333000181",
+        "access_key": "26261111222333000181650010000123451000123458",
+        "items": 3
+      }
+    },
+    {
+      "file": "nfce-eletrica.png",
+      "caption": null,
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 89220,
+        "category": "material",
+        "stage": "Instalações elétricas",
+        "spent_on": "2026-11-09",
+        "payment_method": "cartao_debito",
+        "has_invoice": true,
+        "supplier_document": "45678912000155",
+        "access_key": "26261145678912000155650020000456781000456782",
+        "items": 4
+      }
+    },
+    {
+      "file": "recibo-pedreiro.png",
+      "caption": null,
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 180000,
+        "category": "mao_de_obra",
+        "stage": "Alvenaria",
+        "spent_on": "2026-11-07",
+        "payment_method": "dinheiro",
+        "has_invoice": false,
+        "items": 0
+      }
+    },
+    {
+      "file": "pix-frete.png",
+      "caption": "frete das telhas",
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 35000,
+        "category": "frete",
+        "spent_on": "2026-11-04",
+        "payment_method": "pix",
+        "has_invoice": false
+      }
+    },
+    {
+      "file": "orcamento.png",
+      "caption": null,
+      "expect": {
+        "is_receipt": false
+      }
+    },
+    {
+      "file": "danfe-telhas.pdf",
+      "caption": null,
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 218800,
+        "category": "material",
+        "stage": "Cobertura",
+        "spent_on": "2026-10-28",
+        "payment_method": "boleto",
+        "has_invoice": true,
+        "supplier_document": "98765432000198",
+        "access_key": "26261098765432000198550010000032101000032102",
+        "items": 2
+      }
+    }
+  ]
+}

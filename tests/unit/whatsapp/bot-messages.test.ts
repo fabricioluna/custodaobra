@@ -111,6 +111,18 @@ describe("resumo do lançamento", () => {
     ).toContain("Sem etapa · Pedreiro · Loja do Zé · ontem · pix · com nota");
   });
 
+  it("cupom com vários itens mostra quantos", () => {
+    expect(
+      formatSummary(
+        { ...base, description: "Cimento e areia", itemCount: 5 },
+        "2026-11-09",
+      ),
+    ).toContain("Cimento e areia · 5 itens · hoje");
+    expect(
+      formatSummary({ ...base, itemCount: 1 }, "2026-11-09"),
+    ).not.toContain("itens");
+  });
+
   it("três botões: Confirmar, Editar, Cancelar", () => {
     const message = summaryMessage("x", EXPENSE);
     expect(

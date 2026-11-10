@@ -38,7 +38,10 @@ vi.mock("@/lib/whatsapp/client", () => ({
 }));
 
 const extractExpense = vi.fn<() => Promise<ExtractionResult>>();
-vi.mock("@/lib/ai/extract-expense", () => ({ extractExpense }));
+vi.mock("@/lib/ai/extract-expense", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/extract-expense")>()),
+  extractExpense,
+}));
 
 const { handleIncomingMessage } =
   await import("@/lib/whatsapp/handlers/incoming");

@@ -25,7 +25,10 @@ vi.mock("@/lib/whatsapp/client", () => ({
 
 // A IA é trocada por respostas prontas (a leitura real tem a própria avaliação).
 const extractExpense = vi.fn<() => Promise<ExtractionResult>>();
-vi.mock("@/lib/ai/extract-expense", () => ({ extractExpense }));
+vi.mock("@/lib/ai/extract-expense", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/extract-expense")>()),
+  extractExpense,
+}));
 
 const { handleIncomingMessage } =
   await import("@/lib/whatsapp/handlers/incoming");

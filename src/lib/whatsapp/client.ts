@@ -208,30 +208,45 @@ export async function markReadWithTyping(messageId: string): Promise<void> {
   });
 }
 
+/** Mídia maior que o limite de quem pediu: não é baixada. */
+export class MediaTooLargeError extends Error {
+  constructor(readonly size: number) {
+    super(`Mídia com ${size} bytes passa do limite.`);
+  }
+}
+
 /**
- * Baixa uma mídia recebida (foto, áudio). Primeiro pega a URL temporária,
- * depois o arquivo, as duas vezes com o token.
+ * Baixa uma mídia recebida (foto, documento, áudio). Primeiro pega a URL
+ * temporária (com o tipo e o tamanho), depois o arquivo, as duas vezes com o
+ * token. Passou de `maxBytes`, para antes de baixar (ou no meio).
  */
 export async function downloadMedia(
   mediaId: string,
+  maxBytes: number,
 ): Promise<{ data: ArrayBuffer; mimeType: string }> {
   const info = (await (await graphFetch(mediaId)).json()) as {
     url?: string;
     mime_type?: string;
+    file_size?: number;
   };
   if (!info.url) throw new Error("Mídia sem URL.");
+  if (typeof info.file_size === "number" && info.file_size > maxBytes) {
+    throw new MediaTooLargeError(info.file_size);
+  }
   const file = await fetch(info.url, {
     headers: {
       Authorization: `Bearer ${whatsappEnv("WHATSAPP_ACCESS_TOKEN")}`,
     },
     cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!file.ok) {
     throw new WhatsAppApiError("Falha ao baixar a mídia.", file.status, null);
   }
+  const data = await file.arrayBuffer();
+  if (data.byteLength > maxBytes) throw new MediaTooLargeError(data.byteLength);
   return {
-    data: await file.arrayBuffer(),
+    data,
     mimeType: info.mime_type ?? file.headers.get("content-type") ?? "",
   };
 }

@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ExtractedExpense } from "@/lib/ai/extract-expense";
+import type { ReceiptDetails } from "@/lib/ai/read-receipt";
 import type { Database, Json } from "@/types/database";
 
 type Admin = SupabaseClient<Database>;
@@ -15,17 +16,28 @@ export const WHATSAPP_SOURCES: Database["public"]["Enums"]["expense_source"][] =
 export type ConversationState =
   Database["public"]["Enums"]["whatsapp_conversation_state"];
 
+/** Foto ou PDF de comprovante recebido (a mídia fica na Meta por 30 dias). */
+export type ReceiptMedia = {
+  id: string;
+  mimeType: string;
+  caption: string | null;
+};
+
 /** Gasto lido pela IA que ainda não tem valor (o banco exige valor). */
 export type ExpenseDraft = {
   projectId: string;
   expense: ExtractedExpense;
-  rawInput: string;
+  rawInput: string | null;
   logId: string | null;
+  /** Veio de um comprovante: a foto é baixada de novo quando o valor chega. */
+  receipt?: { media: ReceiptMedia; details: ReceiptDetails };
 };
 
 export type ConversationContext = {
   /** Mensagem guardada enquanto a pessoa escolhe a obra. */
   pendingText?: string;
+  /** Comprovante guardado enquanto a pessoa escolhe a obra. */
+  pendingMedia?: ReceiptMedia;
   pendingLogId?: string | null;
   /** Comando à espera da escolha da obra (ex.: "resumo" com várias obras). */
   pendingCommand?: "summary";
@@ -34,7 +46,12 @@ export type ConversationContext = {
    * Fornecedor lido pela IA para o gasto pendente. Só vira cadastro em
    * `suppliers` quando a pessoa confirma: se ela cancela, nada sobra.
    */
-  pendingSupplier?: { expenseId: string; name: string };
+  pendingSupplier?: {
+    expenseId: string;
+    name: string;
+    /** CNPJ ou CPF lido do comprovante, já conferido. */
+    document?: string | null;
+  };
 };
 
 /** Mantém o fornecedor do pendente ao trocar o resto do contexto. */

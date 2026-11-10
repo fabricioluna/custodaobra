@@ -220,11 +220,11 @@ export async function sendProjectPage(
   if (!projects.length) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
-  const { pendingCommand, pendingText } = conversation.context;
+  const { pendingCommand, pendingText, pendingMedia } = conversation.context;
   const body =
     pendingCommand === "summary"
       ? botMessages.summaryWhichProject
-      : pendingText
+      : pendingText || pendingMedia
         ? botMessages.chooseProject
         : botMessages.projectsQuestion;
   return session.send(
