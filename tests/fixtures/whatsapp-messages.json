@@ -1,0 +1,220 @@
+{
+  "today": "2026-11-09",
+  "stages": [
+    "Projetos e documentação",
+    "Serviços preliminares e terreno",
+    "Fundação",
+    "Estrutura",
+    "Alvenaria",
+    "Cobertura",
+    "Instalações elétricas",
+    "Instalações hidrossanitárias",
+    "Revestimentos e pisos",
+    "Esquadrias (portas e janelas)",
+    "Pintura",
+    "Louças, metais e acabamentos",
+    "Limpeza e entrega"
+  ],
+  "suppliers": ["Loja do Zé", "Casa do Construtor", "João Pedreiro"],
+  "messages": [
+    {
+      "text": "300 pedreiro",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 30000,
+        "category": "mao_de_obra"
+      }
+    },
+    {
+      "text": "2 sacos de cimento 78 reais na loja do zé",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 7800,
+        "category": "material",
+        "quantity": 2,
+        "supplier": "Loja do Zé"
+      }
+    },
+    {
+      "text": "1.500 eletricista",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 150000,
+        "category": "mao_de_obra",
+        "stage": "Instalações elétricas"
+      }
+    },
+    {
+      "text": "1,5 mil pro encanador",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 150000,
+        "category": "mao_de_obra",
+        "stage": "Instalações hidrossanitárias"
+      }
+    },
+    {
+      "text": "mil e duzentos de areia",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 120000,
+        "category": "material"
+      }
+    },
+    {
+      "text": "trezentos conto diária do servente",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 30000,
+        "category": "mao_de_obra"
+      }
+    },
+    {
+      "text": "milheiro de tijolo 950",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 95000,
+        "category": "material",
+        "stage": "Alvenaria"
+      }
+    },
+    {
+      "text": "carrada de areia 450 pix",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 45000,
+        "category": "material",
+        "payment_method": "pix"
+      }
+    },
+    {
+      "text": "empreita do telhado 8 mil",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 800000,
+        "category": "mao_de_obra",
+        "stage": "Cobertura"
+      }
+    },
+    {
+      "text": "paguei 250 de frete",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 25000,
+        "category": "frete"
+      }
+    },
+    {
+      "text": "aluguel da betoneira 180 dinheiro",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 18000,
+        "category": "aluguel_equipamentos",
+        "payment_method": "dinheiro"
+      }
+    },
+    {
+      "text": "taxa do alvará 420,50 boleto",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 42050,
+        "category": "taxas_documentacao",
+        "payment_method": "boleto"
+      }
+    },
+    {
+      "text": "ITBI 3.200",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 320000,
+        "category": "terreno"
+      }
+    },
+    {
+      "text": "40 telhas a 3,50 cada",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 14000,
+        "category": "material",
+        "quantity": 40,
+        "stage": "Cobertura"
+      }
+    },
+    {
+      "text": "fio 2,5mm 389 com nota",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 38900,
+        "category": "material",
+        "has_invoice": true,
+        "stage": "Instalações elétricas"
+      }
+    },
+    {
+      "text": "ontem paguei 200 ao ajudante",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 20000,
+        "category": "mao_de_obra",
+        "spent_on": "2026-11-08"
+      }
+    },
+    {
+      "text": "sexta comprei 3 latas de tinta 540 no cartão",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 54000,
+        "category": "material",
+        "quantity": 3,
+        "payment_method": "cartao_credito",
+        "spent_on": "2026-11-06",
+        "stage": "Pintura"
+      }
+    },
+    {
+      "text": "2k concretagem da laje",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 200000,
+        "category": "servico_terceirizado",
+        "stage": "Estrutura"
+      }
+    },
+    {
+      "text": "porcelanato 1.890,90",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 189090,
+        "category": "material",
+        "stage": "Revestimentos e pisos"
+      }
+    },
+    {
+      "text": "cinquentinha de prego",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 5000,
+        "category": "material"
+      }
+    },
+    {
+      "text": "R$ 12.000 pro mestre de obras",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": 1200000,
+        "category": "mao_de_obra"
+      }
+    },
+    {
+      "text": "comprei cimento",
+      "expect": {
+        "intent": "expense",
+        "amount_cents": null,
+        "category": "material"
+      }
+    },
+    { "text": "oi", "expect": { "intent": "other" } },
+    { "text": "quanto gastei esse mês?", "expect": { "intent": "other" } },
+    { "text": "obrigado!", "expect": { "intent": "other" } }
+  ]
+}

@@ -198,6 +198,7 @@ export type Database = {
           ai_confidence: number | null;
           amount_cents: number;
           category_id: string;
+          confirmed_at: string | null;
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
@@ -225,6 +226,7 @@ export type Database = {
           ai_confidence?: number | null;
           amount_cents: number;
           category_id: string;
+          confirmed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
@@ -252,6 +254,7 @@ export type Database = {
           ai_confidence?: number | null;
           amount_cents?: number;
           category_id?: string;
+          confirmed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
@@ -992,6 +995,224 @@ export type Database = {
           },
         ];
       };
+      usage_counters: {
+        Row: {
+          ai_calls: number;
+          ai_input_tokens: number;
+          ai_output_tokens: number;
+          created_at: string;
+          month: string;
+          org_id: string;
+          updated_at: string;
+          whatsapp_entries: number;
+        };
+        Insert: {
+          ai_calls?: number;
+          ai_input_tokens?: number;
+          ai_output_tokens?: number;
+          created_at?: string;
+          month: string;
+          org_id: string;
+          updated_at?: string;
+          whatsapp_entries?: number;
+        };
+        Update: {
+          ai_calls?: number;
+          ai_input_tokens?: number;
+          ai_output_tokens?: number;
+          created_at?: string;
+          month?: string;
+          org_id?: string;
+          updated_at?: string;
+          whatsapp_entries?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "usage_counters_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_conversations: {
+        Row: {
+          active_org_id: string | null;
+          active_project_id: string | null;
+          context: Json;
+          created_at: string;
+          pending_expense_id: string | null;
+          state: Database["public"]["Enums"]["whatsapp_conversation_state"];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          active_org_id?: string | null;
+          active_project_id?: string | null;
+          context?: Json;
+          created_at?: string;
+          pending_expense_id?: string | null;
+          state?: Database["public"]["Enums"]["whatsapp_conversation_state"];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          active_org_id?: string | null;
+          active_project_id?: string | null;
+          context?: Json;
+          created_at?: string;
+          pending_expense_id?: string | null;
+          state?: Database["public"]["Enums"]["whatsapp_conversation_state"];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_active_org_id_fkey";
+            columns: ["active_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_active_project_id_fkey";
+            columns: ["active_project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_active_project_id_fkey";
+            columns: ["active_project_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id"];
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_pending_expense_id_fkey";
+            columns: ["pending_expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_link_codes: {
+        Row: {
+          code_hash: string;
+          created_at: string;
+          expires_at: string;
+          id: string;
+          updated_at: string;
+          used_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          code_hash: string;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          updated_at?: string;
+          used_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          code_hash?: string;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          updated_at?: string;
+          used_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_link_codes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_messages: {
+        Row: {
+          created_at: string;
+          direction: Database["public"]["Enums"]["whatsapp_direction"];
+          error: string | null;
+          expense_id: string | null;
+          from_phone: string;
+          id: string;
+          org_id: string | null;
+          payload: Json | null;
+          processed_at: string | null;
+          type: string;
+          updated_at: string;
+          user_id: string | null;
+          wa_message_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          direction: Database["public"]["Enums"]["whatsapp_direction"];
+          error?: string | null;
+          expense_id?: string | null;
+          from_phone: string;
+          id?: string;
+          org_id?: string | null;
+          payload?: Json | null;
+          processed_at?: string | null;
+          type: string;
+          updated_at?: string;
+          user_id?: string | null;
+          wa_message_id: string;
+        };
+        Update: {
+          created_at?: string;
+          direction?: Database["public"]["Enums"]["whatsapp_direction"];
+          error?: string | null;
+          expense_id?: string | null;
+          from_phone?: string;
+          id?: string;
+          org_id?: string | null;
+          payload?: Json | null;
+          processed_at?: string | null;
+          type?: string;
+          updated_at?: string;
+          user_id?: string | null;
+          wa_message_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_expense_id_fkey";
+            columns: ["expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_messages_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_messages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       v_project_category_summary: {
@@ -1106,6 +1327,10 @@ export type Database = {
           project_id: string;
         }[];
       };
+      expire_pending_expenses: {
+        Args: { p_older_than?: string };
+        Returns: number;
+      };
       get_invitation: {
         Args: { p_token: string };
         Returns: {
@@ -1116,6 +1341,25 @@ export type Database = {
           project_role: Database["public"]["Enums"]["project_role"];
           status: string;
         }[];
+      };
+      increment_usage: {
+        Args: {
+          p_ai_calls?: number;
+          p_ai_input_tokens?: number;
+          p_ai_output_tokens?: number;
+          p_month: string;
+          p_org_id: string;
+          p_whatsapp_entries?: number;
+        };
+        Returns: undefined;
+      };
+      link_whatsapp: {
+        Args: {
+          p_code_hash: string;
+          p_phone: string;
+          p_phone_variants: string[];
+        };
+        Returns: string;
       };
       org_team: {
         Args: { p_org_id: string };
@@ -1138,6 +1382,8 @@ export type Database = {
         };
         Returns: string;
       };
+      purge_whatsapp_log: { Args: { p_older_than?: string }; Returns: number };
+      unlink_whatsapp: { Args: never; Returns: undefined };
       update_stage_plan: {
         Args: { p_items: Json; p_project_id: string };
         Returns: number;
@@ -1167,6 +1413,13 @@ export type Database = {
       project_status: "planejamento" | "em_andamento" | "pausada" | "concluida";
       subscription_status: "trialing" | "active" | "past_due" | "cancelled";
       supplier_kind: "loja" | "profissional" | "empresa" | "outro";
+      whatsapp_conversation_state:
+        | "idle"
+        | "awaiting_confirmation"
+        | "awaiting_stage"
+        | "awaiting_amount"
+        | "awaiting_project";
+      whatsapp_direction: "in" | "out";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1319,6 +1572,14 @@ export const Constants = {
       project_status: ["planejamento", "em_andamento", "pausada", "concluida"],
       subscription_status: ["trialing", "active", "past_due", "cancelled"],
       supplier_kind: ["loja", "profissional", "empresa", "outro"],
+      whatsapp_conversation_state: [
+        "idle",
+        "awaiting_confirmation",
+        "awaiting_stage",
+        "awaiting_amount",
+        "awaiting_project",
+      ],
+      whatsapp_direction: ["in", "out"],
     },
   },
 } as const;
