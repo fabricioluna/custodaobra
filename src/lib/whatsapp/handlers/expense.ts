@@ -51,9 +51,15 @@ import {
   stageListMessage,
   summaryMessage,
 } from "../messages";
-import { type LaunchableProject, listLaunchableProjects } from "../projects";
+import {
+  type BotProject,
+  type LaunchableProject,
+  listBotProjects,
+  listLaunchableProjects,
+} from "../projects";
 import { saveReceipt } from "../receipts";
 import { sendProjectPage, sendProjectSummary } from "./commands";
+import { answerQuestion } from "./question";
 
 type Admin = SupabaseClient<Database>;
 
@@ -104,7 +110,12 @@ export async function handleText(
   if (!project) return;
   await Promise.all([
     rememberActiveProject(session, project),
-    readExpense(session, project, text, logId, source),
+    project.canLaunch
+      ? readExpense(session, project, text, logId, source)
+      : // Quem só acompanha não lança: toda mensagem é pergunta.
+        answerQuestion(session, project, text, {
+          heard: source === "whatsapp_audio" ? heardPrefix(text) : "",
+        }),
   ]);
 }
 
@@ -119,10 +130,11 @@ export async function handleReceipt(
     session.noteError?.("media_unsupported");
     return session.send({ type: "text", body: botMessages.receiptUnsupported });
   }
-  const project = await projectForNewExpense(session, {
-    pendingMedia: media,
-    pendingLogId: logId,
-  });
+  const project = await projectForNewExpense(
+    session,
+    { pendingMedia: media, pendingLogId: logId },
+    { launchOnly: true },
+  );
   if (!project) return;
   await Promise.all([
     rememberActiveProject(session, project),
@@ -131,18 +143,27 @@ export async function handleReceipt(
 }
 
 /**
- * Obra do gasto novo: a ativa, ou a única. Com várias e nenhuma ativa,
- * pergunta qual (a mensagem fica guardada em `pending`) e devolve null.
+ * Obra do gasto novo (ou da pergunta): a ativa, ou a única. Com várias e
+ * nenhuma ativa, pergunta qual (a mensagem fica guardada em `pending`) e
+ * devolve null. Quem só acompanha recebe as obras que vê (canLaunch = false):
+ * texto vira pergunta; comprovante (`launchOnly`) recebe um aviso.
  */
 async function projectForNewExpense(
   session: BotSession,
   pending: ConversationContext,
-): Promise<LaunchableProject | null> {
+  options: { launchOnly?: boolean } = {},
+): Promise<BotProject | null> {
   const { admin, userId, conversation } = session;
-  const projects = await listLaunchableProjects(admin, userId);
+  const projects = await listBotProjects(admin, userId);
   if (!projects.length) {
     await resetConversation(admin, userId);
     await session.send({ type: "text", body: botMessages.noProjects });
+    return null;
+  }
+  // A lista é toda de obras em que lança ou toda de obras que só acompanha.
+  const viewer = !projects[0]?.canLaunch;
+  if (viewer && options.launchOnly) {
+    await session.send({ type: "text", body: botMessages.viewerCannotLaunch });
     return null;
   }
 
@@ -159,7 +180,13 @@ async function projectForNewExpense(
       pendingExpenseId: null,
       context: pending,
     }),
-    session.send(projectListMessage(projects, orgCount > 1)),
+    session.send(
+      projectListMessage(
+        projects,
+        orgCount > 1,
+        viewer ? { body: botMessages.questionWhichProject } : {},
+      ),
+    ),
   ]);
   return null;
 }
@@ -258,6 +285,17 @@ async function readExpense(
     outputTokens: result.usage?.outputTokens ?? 0,
   });
 
+  if (result.kind === "question") {
+    // Pergunta sobre os gastos: o plano já foi checado e o contexto, lido.
+    await Promise.all([
+      usage,
+      answerQuestion(session, { ...project, canLaunch: true }, text, {
+        context,
+        heard,
+      }),
+    ]);
+    return;
+  }
   if (result.kind === "failed") session.noteError?.(`ai_${result.reason}`);
   if (result.kind !== "expense") {
     await Promise.all([
@@ -692,7 +730,7 @@ async function chooseProject(
   projectId: string,
 ): Promise<void> {
   const { admin, userId, conversation } = session;
-  const projects = await listLaunchableProjects(admin, userId);
+  const projects = await listBotProjects(admin, userId);
   const project = projects.find((p) => p.id === projectId);
   if (!project) {
     return session.send({ type: "text", body: botMessages.noProjects });
@@ -713,6 +751,14 @@ async function chooseProject(
   if (pendingCommand !== "summary" && (pendingText || pendingMedia)) {
     // A leitura grava o estado da conversa depois: espera a troca da obra.
     await select;
+    if (!project.canLaunch) {
+      // Quem só acompanha: o texto guardado é uma pergunta.
+      return pendingText && !pendingMedia
+        ? answerQuestion(session, project, pendingText, {
+            heard: pendingAudio ? heardPrefix(pendingText) : "",
+          })
+        : session.send({ type: "text", body: botMessages.viewerCannotLaunch });
+    }
     return pendingMedia
       ? readReceiptMessage(session, project, pendingMedia, pendingLogId ?? null)
       : readExpense(
@@ -729,7 +775,9 @@ async function chooseProject(
       ? sendProjectSummary(session, project)
       : session.send({
           type: "text",
-          body: botMessages.projectSelected(project.name),
+          body: project.canLaunch
+            ? botMessages.projectSelected(project.name)
+            : botMessages.viewerProjectSelected(project.name),
         }),
   ]);
 }

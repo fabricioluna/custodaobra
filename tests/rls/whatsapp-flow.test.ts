@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { QuestionResult } from "@/lib/ai/answer-question";
 import type { ExtractionResult } from "@/lib/ai/extract-expense";
 import type { OutgoingMessage } from "@/lib/whatsapp/client";
 import type { IncomingMessage } from "@/lib/whatsapp/webhook";
@@ -29,6 +30,10 @@ vi.mock("@/lib/ai/extract-expense", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ai/extract-expense")>()),
   extractExpense,
 }));
+
+// Perguntas (quem só acompanha): a escolha das consultas também é simulada.
+const chooseQueries = vi.fn<() => Promise<QuestionResult>>();
+vi.mock("@/lib/ai/answer-question", () => ({ chooseQueries }));
 
 const { handleIncomingMessage } =
   await import("@/lib/whatsapp/handlers/incoming");
@@ -367,9 +372,17 @@ describe("lançamento pelo WhatsApp", () => {
 
   it("quem só acompanha a obra não lança", async () => {
     const calls = extractExpense.mock.calls.length;
+    chooseQueries.mockResolvedValueOnce({ kind: "off_topic", usage });
     await say(brunoPhone, "300 pedreiro");
-    expect(last()?.body).toContain("não tem uma obra em que possa lançar");
+    // Para quem só acompanha, toda mensagem é pergunta: nada é lançado.
+    expect(last()?.body).toContain("Você só acompanha esta obra");
     expect(extractExpense.mock.calls.length).toBe(calls);
+    const { count } = await admin
+      .from("expenses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", ana.orgId)
+      .eq("created_by", bruno.id);
+    expect(count).toBe(0);
   });
 
   it("com duas obras, pergunta qual e segue com a mensagem", async () => {

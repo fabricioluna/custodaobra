@@ -220,3 +220,27 @@ export async function canUseWhatsappAi(
   if (!entries.ok) return entries;
   return checkAiCalls(subscription.plans, usage.ai_calls);
 }
+
+/**
+ * Pode fazer uma pergunta pelo WhatsApp ("quanto gastei com cimento?")?
+ * Pergunta não é lançamento: exige o WhatsApp no plano e chamadas de IA
+ * sobrando no mês, mas não conta nem esbarra no limite de lançamentos.
+ */
+export async function canAskWhatsappQuestion(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<LimitResult> {
+  const [subscription, usage] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+  ]);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+  if (!subscription.plans.whatsapp_enabled) {
+    return { ok: false, reason: "whatsapp_disabled" };
+  }
+  return checkAiCalls(subscription.plans, usage.ai_calls);
+}

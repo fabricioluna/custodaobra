@@ -23,10 +23,33 @@ export const botMessages = {
 
   howTo:
     "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nOu mande a foto (ou o PDF) do cupom ou da nota, ou um áudio falando o gasto.\n\nMande *ajuda* para ver os comandos.",
-  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nE respondo perguntas sobre os gastos, como _quanto gastei com cimento em outubro?_ ou _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+  viewerHelp: `Você acompanha obras no *${APP_NAME}*. Pode me perguntar sobre os gastos, por exemplo:\n• _quanto gastei esse mês?_\n• _quanto já foi na alvenaria?_\n• _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *ajuda*: esta mensagem`,
   projectsQuestion: "Para qual obra vão os próximos gastos?",
+  viewerProjectsQuestion: "Sobre qual obra são as próximas perguntas?",
   onlyProject: (name: string) =>
     `Sua obra é *${name}*. Os gastos vão para ela.`,
+  viewerOnlyProject: (name: string) =>
+    `Você acompanha a obra *${name}*. As perguntas são sobre ela.`,
+  viewerProjectSelected: (name: string) =>
+    `Obra ativa: *${name}*. As próximas perguntas são sobre ela.`,
+  viewerCannotLaunch:
+    "Você só acompanha esta obra, então não lança gastos. Mas pode me perguntar sobre eles, por exemplo: _quanto gastei esse mês?_",
+  questionWhichProject: "Sobre qual obra é a pergunta?",
+  questionHowTo:
+    "Sobre a obra, eu respondo perguntas sobre os gastos, o orçamento e as contas. Exemplos:\n• _quanto gastei com cimento em outubro?_\n• _onde gastei mais?_\n• _quanto falta do orçamento da alvenaria?_\n• _tem conta atrasada?_\n\nPara lançar um gasto, mande o valor e o que foi, por exemplo: _300 pedreiro_",
+  viewerQuestionHowTo:
+    "Você só acompanha esta obra, então não lança gastos por aqui. Mas eu respondo perguntas sobre os gastos, o orçamento e as contas. Exemplos:\n• _quanto gastei com cimento em outubro?_\n• _onde gastei mais?_\n• _quanto falta do orçamento da alvenaria?_\n• _tem conta atrasada?_",
+  questionNotUnderstood:
+    "Não consegui entender a pergunta. Tente de outro jeito, por exemplo: _quanto gastei com cimento esse mês?_",
+  questionUnavailable:
+    "Não consegui responder agora. Tente de novo em alguns minutos ou veja no app.",
+  questionFailed:
+    "Algo deu errado ao buscar a resposta. Tente de novo daqui a pouco ou veja no app.",
+  questionLimitReached:
+    "O limite de perguntas pelo WhatsApp do seu plano neste mês acabou. Você ainda vê tudo no app.",
+  questionWhatsappDisabled:
+    "O plano desta conta não inclui o WhatsApp. Você vê tudo no app.",
   summaryWhichProject: "De qual obra você quer o resumo?",
   undone: (summary: string) => `↩️ Desfeito. Cancelei:\n${summary}`,
   nothingToUndo:
@@ -103,7 +126,7 @@ export const CATEGORY_NAMES: Record<string, string> = {
   outros: "Outros",
 };
 
-const PAYMENT_NAMES: Record<string, string> = {
+export const PAYMENT_NAMES: Record<string, string> = {
   pix: "pix",
   dinheiro: "dinheiro",
   cartao_credito: "cartão de crédito",

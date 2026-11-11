@@ -9,7 +9,7 @@ import { anthropic, extractionModel } from "./client";
 import {
   EXTRACT_EXPENSE_PROMPT_VERSION,
   EXTRACT_EXPENSE_SYSTEM,
-} from "./prompts/extract-expense.v1";
+} from "./prompts/extract-expense.v2";
 import {
   type AiFailureReason,
   type AiUsage,
@@ -56,7 +56,7 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
  * no código.
  */
 export const aiExpenseSchema = z.object({
-  intent: z.enum(["expense", "other"]),
+  intent: z.enum(["expense", "question", "other"]),
   amount_brl: z.number().nullable(),
   quantity: z.number().nullable(),
   unit: z.string().nullable(),
@@ -101,6 +101,8 @@ export type ExtractionUsage = AiUsage;
 
 export type ExtractionResult =
   | { kind: "expense"; expense: ExtractedExpense; usage: ExtractionUsage }
+  /** Pergunta sobre os gastos da obra: segue para as funções de consulta. */
+  | { kind: "question"; usage: ExtractionUsage }
   | { kind: "not_expense"; usage: ExtractionUsage }
   /** A IA não respondeu ou respondeu fora do formato: perguntar à pessoa. */
   | { kind: "failed"; reason: FailureReason; usage: ExtractionUsage | null };
@@ -232,6 +234,9 @@ export async function extractExpense(
   });
   if (!result.ok) {
     return { kind: "failed", reason: result.reason, usage: result.usage };
+  }
+  if (result.data.intent === "question") {
+    return { kind: "question", usage: result.usage };
   }
   const expense = interpretAiExpense(result.data, text, context);
   return expense

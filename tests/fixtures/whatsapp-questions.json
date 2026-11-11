@@ -1,0 +1,155 @@
+{
+  "today": "2026-11-09",
+  "stages": [
+    "Projetos e documentação",
+    "Serviços preliminares e terreno",
+    "Fundação",
+    "Estrutura",
+    "Alvenaria",
+    "Cobertura",
+    "Instalações elétricas",
+    "Instalações hidrossanitárias",
+    "Revestimentos e pisos",
+    "Esquadrias (portas e janelas)",
+    "Pintura",
+    "Louças, metais e acabamentos",
+    "Limpeza e entrega"
+  ],
+  "suppliers": ["Loja do Zé", "Casa do Construtor", "João Pedreiro"],
+  "questions": [
+    {
+      "text": "quanto gastei esse mês?",
+      "calls": [
+        { "name": "total_spent", "from": "2026-11-01", "to": "2026-11-09" }
+      ]
+    },
+    {
+      "text": "quanto gastei com cimento em outubro?",
+      "calls": [
+        {
+          "name": "total_spent",
+          "search": "cimento",
+          "from": "2026-10-01",
+          "to": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "text": "quanto gastei ontem?",
+      "calls": [
+        { "name": "total_spent", "from": "2026-11-08", "to": "2026-11-08" }
+      ]
+    },
+    {
+      "text": "quanto já foi de mão de obra?",
+      "calls": [
+        {
+          "name": "total_spent",
+          "category": "mao_de_obra",
+          "from": null,
+          "to": null
+        }
+      ]
+    },
+    {
+      "text": "quanto paguei pro pedreiro até agora?",
+      "calls": [{ "name": "total_spent", "search": "pedreiro" }]
+    },
+    {
+      "text": "quanto comprei na loja do zé?",
+      "calls": [{ "name": "total_spent", "supplier": "Loja do Zé" }]
+    },
+    {
+      "text": "quanto foi no pix mês passado?",
+      "calls": [
+        {
+          "name": "total_spent",
+          "payment_method": "pix",
+          "from": "2026-10-01",
+          "to": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "text": "quanto gastei com o terreno?",
+      "calls": [{ "name": "total_spent", "category": "terreno" }]
+    },
+    {
+      "text": "quanto já gastei na alvenaria?",
+      "calls": [
+        { "name": ["total_spent", "budget_status"], "stage": "Alvenaria" }
+      ]
+    },
+    {
+      "text": "onde gastei mais?",
+      "calls": [{ "name": "spending_breakdown", "group_by": "stage" }]
+    },
+    {
+      "text": "quanto gastei em cada mês?",
+      "calls": [{ "name": "spending_breakdown", "group_by": "month" }]
+    },
+    {
+      "text": "de qual loja eu mais comprei?",
+      "calls": [{ "name": "spending_breakdown", "group_by": "supplier" }]
+    },
+    {
+      "text": "quanto foi de material e quanto de mão de obra?",
+      "calls": [{ "name": "spending_breakdown", "group_by": "category" }],
+      "alternatives": [
+        [
+          { "name": "total_spent", "category": "material" },
+          { "name": "total_spent", "category": "mao_de_obra" }
+        ]
+      ]
+    },
+    {
+      "text": "quais foram os últimos gastos?",
+      "calls": [{ "name": "recent_expenses", "limit": 5 }]
+    },
+    {
+      "text": "o que lancei hoje?",
+      "calls": [
+        { "name": "recent_expenses", "from": "2026-11-09", "to": "2026-11-09" }
+      ]
+    },
+    {
+      "text": "me mostra as 3 últimas compras de areia",
+      "calls": [{ "name": "recent_expenses", "search": "areia", "limit": 3 }]
+    },
+    {
+      "text": "quanto falta do orçamento?",
+      "calls": [{ "name": "budget_status", "stage": null }]
+    },
+    {
+      "text": "estourou o orçamento do telhado?",
+      "calls": [{ "name": "budget_status", "stage": "Cobertura" }]
+    },
+    {
+      "text": "tem conta atrasada?",
+      "calls": [{ "name": "payables", "status": "overdue" }]
+    },
+    {
+      "text": "o que vence essa semana?",
+      "calls": [
+        {
+          "name": "payables",
+          "status": ["upcoming", "open"],
+          "to": "2026-11-15"
+        }
+      ]
+    },
+    {
+      "text": "quanto ainda tenho para pagar?",
+      "calls": [{ "name": "payables", "status": "open" }]
+    },
+    {
+      "text": "gastei mais com cimento ou com areia?",
+      "calls": [
+        { "name": "total_spent", "search": "cimento" },
+        { "name": "total_spent", "search": "areia" }
+      ]
+    },
+    { "text": "como faço para assentar tijolo?", "calls": [] },
+    { "text": "qual o preço do cimento hoje?", "calls": [] }
+  ]
+}

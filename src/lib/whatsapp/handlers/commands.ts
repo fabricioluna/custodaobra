@@ -14,7 +14,12 @@ import {
   formatSummary,
   projectListMessage,
 } from "../messages";
-import { type LaunchableProject, listLaunchableProjects } from "../projects";
+import {
+  type BotProject,
+  type LaunchableProject,
+  listBotProjects,
+  listLaunchableProjects,
+} from "../projects";
 import type { BotSession } from "./expense";
 
 /** Janela do "desfazer" (CLAUDE.md, seção 6). */
@@ -31,7 +36,7 @@ export async function handleCommand(
 ): Promise<void> {
   switch (command) {
     case "help":
-      return session.send({ type: "text", body: botMessages.help });
+      return help(session);
     case "projects":
       return listProjects(session);
     case "summary":
@@ -41,15 +46,29 @@ export async function handleCommand(
   }
 }
 
-/** "obras": lista para trocar a obra ativa (ou avisa qual é a única). */
+/** "ajuda": quem só acompanha recebe a versão das perguntas. */
+async function help(session: BotSession): Promise<void> {
+  const projects = await listBotProjects(session.admin, session.userId);
+  const viewer = projects.length > 0 && !projects[0]?.canLaunch;
+  return session.send({
+    type: "text",
+    body: viewer ? botMessages.viewerHelp : botMessages.help,
+  });
+}
+
+/**
+ * "obras": lista para trocar a obra ativa (ou avisa qual é a única). Quem só
+ * acompanha troca a obra das perguntas.
+ */
 async function listProjects(session: BotSession): Promise<void> {
   const { admin, userId, conversation } = session;
-  const projects = await listLaunchableProjects(admin, userId);
+  const projects = await listBotProjects(admin, userId);
   if (!projects.length) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
+  const viewer = !projects[0]?.canLaunch;
   if (projects.length === 1) {
-    const [only] = projects as [LaunchableProject];
+    const [only] = projects as [BotProject];
     await Promise.all([
       only.id === conversation.active_project_id
         ? Promise.resolve()
@@ -57,13 +76,20 @@ async function listProjects(session: BotSession): Promise<void> {
             activeOrgId: only.orgId,
             activeProjectId: only.id,
           }),
-      session.send({ type: "text", body: botMessages.onlyProject(only.name) }),
+      session.send({
+        type: "text",
+        body: viewer
+          ? botMessages.viewerOnlyProject(only.name)
+          : botMessages.onlyProject(only.name),
+      }),
     ]);
     return;
   }
   return session.send(
     projectListMessage(projects, hasManyOrgs(projects), {
-      body: botMessages.projectsQuestion,
+      body: viewer
+        ? botMessages.viewerProjectsQuestion
+        : botMessages.projectsQuestion,
       activeId: conversation.active_project_id,
     }),
   );
@@ -72,7 +98,7 @@ async function listProjects(session: BotSession): Promise<void> {
 /** "resumo": da obra ativa; sem obra ativa e com várias, pergunta qual. */
 async function summary(session: BotSession): Promise<void> {
   const { admin, userId, conversation } = session;
-  const projects = await listLaunchableProjects(admin, userId);
+  const projects = await listBotProjects(admin, userId);
   if (!projects.length) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
@@ -216,17 +242,22 @@ export async function sendProjectPage(
   page: number,
 ): Promise<void> {
   const { admin, userId, conversation } = session;
-  const projects = await listLaunchableProjects(admin, userId);
+  const projects = await listBotProjects(admin, userId);
   if (!projects.length) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
+  const viewer = !projects[0]?.canLaunch;
   const { pendingCommand, pendingText, pendingMedia } = conversation.context;
   const body =
     pendingCommand === "summary"
       ? botMessages.summaryWhichProject
       : pendingText || pendingMedia
-        ? botMessages.chooseProject
-        : botMessages.projectsQuestion;
+        ? viewer
+          ? botMessages.questionWhichProject
+          : botMessages.chooseProject
+        : viewer
+          ? botMessages.viewerProjectsQuestion
+          : botMessages.projectsQuestion;
   return session.send(
     projectListMessage(projects, hasManyOrgs(projects), {
       body,

@@ -14,7 +14,7 @@ const { extractExpense } = await import("@/lib/ai/extract-expense");
  * comparada com o esperado. Campos ausentes em "expect" não são conferidos.
  */
 type Expect = {
-  intent: "expense" | "other";
+  intent: "expense" | "question" | "other";
   amount_cents?: number | null;
   category?: string;
   stage?: string | null;
@@ -50,6 +50,10 @@ describe.skipIf(!process.env.ANTHROPIC_API_KEY)(
 
       if (want.intent === "other") {
         expect(result.kind).toBe("not_expense");
+        return;
+      }
+      if (want.intent === "question") {
+        expect(result.kind).toBe("question");
         return;
       }
       if (result.kind !== "expense")

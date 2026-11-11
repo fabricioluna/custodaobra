@@ -214,7 +214,17 @@
       }
     },
     { "text": "oi", "expect": { "intent": "other" } },
-    { "text": "quanto gastei esse mês?", "expect": { "intent": "other" } },
+    { "text": "quanto gastei esse mês?", "expect": { "intent": "question" } },
+    { "text": "tem conta atrasada?", "expect": { "intent": "question" } },
+    {
+      "text": "quanto já foi de cimento na alvenaria?",
+      "expect": { "intent": "question" }
+    },
+    {
+      "text": "300 do pedreiro?",
+      "expect": { "intent": "expense", "amount_cents": 30000 }
+    },
+    { "text": "como faço reboco?", "expect": { "intent": "other" } },
     { "text": "obrigado!", "expect": { "intent": "other" } }
   ]
 }
