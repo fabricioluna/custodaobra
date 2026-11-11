@@ -11,7 +11,7 @@ import {
 
 vi.mock("server-only", () => ({}));
 
-// Nada sai para a Meta: guarda para quem o bot mandaria e o quÃª.
+// Nada sai para a Meta: guarda para quem o bot mandaria e o quê.
 const sent: { to: string; message: OutgoingMessage }[] = [];
 vi.mock("@/lib/whatsapp/client", () => ({
   sendMessage: async (to: string, message: OutgoingMessage) => {
@@ -33,13 +33,13 @@ const addDays = (iso: string, days: number) => {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 };
-/** Segunda-feira mais recente (hoje, se hoje Ã© segunda), em Recife. */
+/** Segunda-feira mais recente (hoje, se hoje é segunda), em Recife. */
 const lastMonday = () => {
   const today = recifeToday();
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
   return addDays(today, -((weekday + 6) % 7));
 };
-/** Um dia que nÃ£o Ã© segunda (sÃ³ alertas), no mÃªs de hoje quase sempre. */
+/** Um dia que não é segunda (só alertas), no mês de hoje quase sempre. */
 const notMonday = () => {
   const today = recifeToday();
   const day = lastMonday() === today ? addDays(today, 1) : today;
@@ -52,8 +52,8 @@ const bodies = (to: string) =>
 
 /**
  * Avisos pelo cron, contra o banco de verdade (envio simulado): alerta de
- * orÃ§amento sÃ³ quando o nÃ­vel da etapa sobe, sÃ³ para dono/admin com o aviso
- * ligado; resumo semanal Ã s segundas, uma vez; tudo contado no plano.
+ * orçamento só quando o nível da etapa sobe, só para dono/admin com o aviso
+ * ligado; resumo semanal às segundas, uma vez; tudo contado no plano.
  */
 describe("avisos do WhatsApp (cron)", () => {
   const admin = adminClient();
@@ -129,7 +129,7 @@ describe("avisos do WhatsApp (cron)", () => {
       .from("profiles")
       .update({ whatsapp_phone: carlaPhone })
       .eq("id", carla.id);
-    // Carla sÃ³ acompanha a obra: nÃ£o recebe avisos.
+    // Carla só acompanha a obra: não recebe avisos.
     await admin
       .from("organization_members")
       .insert({ org_id: ana.orgId, user_id: carla.id, role: "member" });
@@ -149,7 +149,7 @@ describe("avisos do WhatsApp (cron)", () => {
     await deleteTestUsers([carla, ana].filter(Boolean));
   });
 
-  it("avisa quando a etapa passa de 80% e nÃ£o repete", async () => {
+  it("avisa quando a etapa passa de 80% e não repete", async () => {
     const before = await templateUsage();
     await spend(85_000);
     const day = notMonday();
@@ -157,7 +157,7 @@ describe("avisos do WhatsApp (cron)", () => {
     expect(summary.alertsSent).toBe(1);
     expect(summary.reportsSent).toBe(0);
     expect(bodies(anaPhone).at(-1)).toContain(
-      "a etapa Alvenaria jÃ¡ chegou a 85% do previsto (R$ 850,00 de R$ 1.000,00",
+      "a etapa Alvenaria já chegou a 85% do previsto (R$ 850,00 de R$ 1.000,00",
     );
     expect(bodies(carlaPhone)).toEqual([]);
     expect(await templateUsage()).toBe(before + 1);
@@ -169,7 +169,7 @@ describe("avisos do WhatsApp (cron)", () => {
       .single();
     expect(stored?.level).toBe("warn");
 
-    // De novo, sem mudanÃ§a: nada.
+    // De novo, sem mudança: nada.
     const again = await run(day);
     expect(again.alertsSent).toBe(0);
   });
@@ -179,11 +179,11 @@ describe("avisos do WhatsApp (cron)", () => {
     const day = notMonday();
     const summary = await run(day);
     expect(summary.alertsSent).toBe(1);
-    expect(bodies(anaPhone).at(-1)).toContain("jÃ¡ chegou a 105% do previsto");
+    expect(bodies(anaPhone).at(-1)).toContain("já chegou a 105% do previsto");
   });
 
-  it("com o aviso desligado no perfil, nÃ£o manda", async () => {
-    // Previsto maior: a etapa volta para baixo de 80% e o aviso Ã© esquecido.
+  it("com o aviso desligado no perfil, não manda", async () => {
+    // Previsto maior: a etapa volta para baixo de 80% e o aviso é esquecido.
     await ana.client
       .from("stages")
       .update({ budget_cents: 1_000_000 })
@@ -197,7 +197,7 @@ describe("avisos do WhatsApp (cron)", () => {
       .maybeSingle();
     expect(forgotten).toBeNull();
 
-    // A pessoa desliga o aviso (pelo prÃ³prio cliente, como no app).
+    // A pessoa desliga o aviso (pelo próprio cliente, como no app).
     const { error } = await ana.client
       .from("profiles")
       .update({ whatsapp_budget_alerts: false })
@@ -218,7 +218,7 @@ describe("avisos do WhatsApp (cron)", () => {
       .eq("id", ana.id);
   });
 
-  it("resumo da semana na segunda, uma vez sÃ³", async () => {
+  it("resumo da semana na segunda, uma vez só", async () => {
     const monday = lastMonday();
     await spend(30_000, addDays(monday, -3));
     const at = new Date(`${monday}T15:00:00Z`);
@@ -235,12 +235,12 @@ describe("avisos do WhatsApp (cron)", () => {
     );
     expect(bodies(carlaPhone)).toEqual([]);
 
-    // O cron rodou de novo no mesmo dia: nÃ£o repete.
+    // O cron rodou de novo no mesmo dia: não repete.
     const again = await run(at);
     expect(again.reportsSent).toBe(0);
   });
 
-  it("ninguÃ©m de fora edita as preferÃªncias de outra pessoa", async () => {
+  it("ninguém de fora edita as preferências de outra pessoa", async () => {
     const { data } = await carla.client
       .from("profiles")
       .update({ whatsapp_weekly_report: false })
@@ -255,7 +255,7 @@ describe("avisos do WhatsApp (cron)", () => {
     expect(row?.whatsapp_weekly_report).toBe(true);
   });
 
-  it("budget_alerts nÃ£o Ã© visÃ­vel pelo app", async () => {
+  it("budget_alerts não é visível pelo app", async () => {
     const { data } = await ana.client.from("budget_alerts").select("stage_id");
     expect(data ?? []).toEqual([]);
   });

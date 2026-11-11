@@ -2,7 +2,7 @@ import { APP_NAME } from "@/config/app";
 import { addDays, formatDate, formatRelativeDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 
-import { actionId, type StageMode } from "./actions";
+import { actionId, type EditField, type StageMode } from "./actions";
 import type { ListRow, OutgoingMessage } from "./client";
 
 /**
@@ -113,6 +113,18 @@ export const botMessages = {
   categoryButton: "Escolher categoria",
   dateQuestion: "Em que dia foi o gasto?",
   dateButton: "Escolher dia",
+  paymentQuestion: "Como foi pago?",
+  paymentButton: "Escolher",
+  invoiceQuestion:
+    "Tem nota fiscal ou cupom fiscal? (Recibo, orçamento e comprovante de pix contam como sem nota.)",
+  moveQuestion:
+    "Para qual obra vai este lançamento? A etapa fica em branco para você escolher de novo.",
+  askDescription: (current: string) =>
+    `Qual é a descrição certa? Hoje está: _${current}_`,
+  askSupplier: (current: string | null) =>
+    current
+      ? `Qual é o fornecedor? Hoje está: _${current}_. Mande o nome ou *sem* para tirar.`
+      : "Qual é o fornecedor (loja, empresa ou pessoa)? Mande o nome ou *sem* para deixar em branco.",
 } as const;
 
 export const CATEGORY_NAMES: Record<string, string> = {
@@ -134,6 +146,17 @@ export const PAYMENT_NAMES: Record<string, string> = {
   boleto: "boleto",
   transferencia: "transferência",
   outro: "outro pagamento",
+};
+
+/** Formas de pagamento como opção de lista (título com até 24 letras). */
+const PAYMENT_LABELS: Record<string, string> = {
+  pix: "Pix",
+  dinheiro: "Dinheiro",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  boleto: "Boleto",
+  transferencia: "Transferência",
+  outro: "Outro",
 };
 
 export type ExpenseSummary = {
@@ -202,9 +225,14 @@ export function summaryMessage(
   };
 }
 
-/** Lista de até 10 opções: as etapas cabem em páginas de 7 + "Mais etapas". */
-const STAGES_PER_PAGE = 7;
+/** Máximo de opções numa lista do WhatsApp. */
+const MAX_ROWS = 10;
 
+/**
+ * Lista de etapas. Ao fim vão "Sem etapa", "Editar" (só na primeira pergunta,
+ * para corrigir antes de confirmar) e "Cancelar"; as etapas usam o resto das
+ * 10 opções e, se não cabem, vão em páginas com "Mais etapas".
+ */
 export function stageListMessage(input: {
   body: string;
   mode: StageMode;
@@ -213,13 +241,19 @@ export function stageListMessage(input: {
   expenseId: string;
 }): OutgoingMessage {
   const { stages, mode, expenseId } = input;
-  // Até 8 etapas cabem numa página só (com "Sem etapa" e "Cancelar").
-  const paged = stages.length > 8;
-  const pages = paged ? Math.ceil(stages.length / STAGES_PER_PAGE) : 1;
+  const extras: ListRow[] = [
+    { id: actionId.stage(mode, null, expenseId), title: "Sem etapa" },
+    ...(mode === "confirm"
+      ? [{ id: actionId.edit(expenseId), title: "Editar lançamento" }]
+      : []),
+    { id: actionId.cancel(expenseId), title: "Cancelar lançamento" },
+  ];
+  const capacity = MAX_ROWS - extras.length;
+  const paged = stages.length > capacity;
+  const perPage = paged ? capacity - 1 : capacity;
+  const pages = paged ? Math.ceil(stages.length / perPage) : 1;
   const page = Math.min(Math.max(input.page, 0), pages - 1);
-  const slice = paged
-    ? stages.slice(page * STAGES_PER_PAGE, (page + 1) * STAGES_PER_PAGE)
-    : stages;
+  const slice = stages.slice(page * perPage, (page + 1) * perPage);
 
   const rows: ListRow[] = slice.map((stage) => ({
     id: actionId.stage(mode, stage.id, expenseId),
@@ -234,11 +268,7 @@ export function stageListMessage(input: {
       description: `Página ${next + 1} de ${pages}`,
     });
   }
-  rows.push({ id: actionId.stage(mode, null, expenseId), title: "Sem etapa" });
-  rows.push({
-    id: actionId.cancel(expenseId),
-    title: "Cancelar lançamento",
-  });
+  rows.push(...extras);
 
   return {
     type: "list",
@@ -248,17 +278,75 @@ export function stageListMessage(input: {
   };
 }
 
-export function editMenuMessage(expenseId: string): OutgoingMessage {
+/** Menu do "Editar". "Obra" só aparece se há outra obra da conta. */
+export function editMenuMessage(
+  expenseId: string,
+  options: { canMove?: boolean } = {},
+): OutgoingMessage {
+  const row = (field: EditField, title: string): ListRow => ({
+    id: actionId.editField(field, expenseId),
+    title,
+  });
   return {
     type: "list",
     body: botMessages.editPrompt,
     buttonLabel: botMessages.editButton,
     rows: [
-      { id: actionId.editField("amount", expenseId), title: "Valor" },
-      { id: actionId.editField("stage", expenseId), title: "Etapa" },
-      { id: actionId.editField("category", expenseId), title: "Categoria" },
-      { id: actionId.editField("date", expenseId), title: "Data" },
+      row("amount", "Valor"),
+      row("stage", "Etapa"),
+      row("category", "Categoria"),
+      row("date", "Data"),
+      row("description", "Descrição"),
+      row("supplier", "Fornecedor"),
+      row("payment", "Forma de pagamento"),
+      row("invoice", "Nota fiscal"),
+      ...(options.canMove ? [row("project", "Obra")] : []),
     ],
+  };
+}
+
+/** Formas de pagamento, com "Não informar". */
+export function paymentListMessage(expenseId: string): OutgoingMessage {
+  return {
+    type: "list",
+    body: botMessages.paymentQuestion,
+    buttonLabel: botMessages.paymentButton,
+    rows: [
+      ...Object.entries(PAYMENT_LABELS).map(([code, title]) => ({
+        id: actionId.payment(code, expenseId),
+        title,
+      })),
+      { id: actionId.payment(null, expenseId), title: "Não informar" },
+    ],
+  };
+}
+
+/** Com ou sem nota (cupom fiscal ou nota fiscal conta como "com nota"). */
+export function invoiceButtonsMessage(expenseId: string): OutgoingMessage {
+  return {
+    type: "buttons",
+    body: botMessages.invoiceQuestion,
+    buttons: [
+      { id: actionId.invoice(true, expenseId), title: "Com nota" },
+      { id: actionId.invoice(false, expenseId), title: "Sem nota" },
+    ],
+  };
+}
+
+/** Outras obras da mesma conta, para mudar o lançamento de obra. */
+export function moveListMessage(
+  projects: { id: string; name: string }[],
+  expenseId: string,
+): OutgoingMessage {
+  return {
+    type: "list",
+    body: botMessages.moveQuestion,
+    buttonLabel: botMessages.chooseProjectButton,
+    rows: projects.slice(0, MAX_ROWS).map((project) => ({
+      id: actionId.move(project.id, expenseId),
+      title: project.name,
+      ...(project.name.length > 24 ? { description: project.name } : {}),
+    })),
   };
 }
 

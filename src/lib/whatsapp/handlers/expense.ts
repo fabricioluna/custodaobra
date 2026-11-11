@@ -27,7 +27,7 @@ import { addDays, isIsoDate, todayIn } from "@/lib/dates";
 import { isValidAmountCents, parseMoneyToCents } from "@/lib/money";
 import type { Database } from "@/types/database";
 
-import type { BotAction } from "../actions";
+import type { BotAction, EditField } from "../actions";
 import {
   downloadMedia,
   MediaTooLargeError,
@@ -38,6 +38,7 @@ import {
   type ConversationContext,
   type ConversationState,
   keepPendingSupplier,
+  type TextEditField,
   type ReceiptMedia,
   resetConversation,
   saveConversation,
@@ -51,7 +52,11 @@ import {
   editMenuMessage,
   formatSummary,
   heardPrefix,
+  invoiceButtonsMessage,
+  moveListMessage,
   parseAmountReply,
+  PAYMENT_NAMES,
+  paymentListMessage,
   projectListMessage,
   stageListMessage,
   summaryMessage,
@@ -93,6 +98,14 @@ export async function handleText(
   source: TextSource = "whatsapp_text",
 ): Promise<void> {
   const { conversation } = session;
+  const { editing } = conversation.context;
+  if (editing && editing.expenseId === conversation.pending_expense_id) {
+    return applyTextEdit(
+      session,
+      editing,
+      source === "whatsapp_audio" ? text.replace(/[.!?…]+$/u, "") : text,
+    );
+  }
   if (conversation.state === "awaiting_amount") {
     // A transcrição termina com ponto ("300.").
     const amount = parseAmountReply(
@@ -626,7 +639,11 @@ export async function handleAction(
     case "edit":
       await Promise.all([
         setState(session, "awaiting_confirmation", pending),
-        session.send(editMenuMessage(pending.id)),
+        session.send(
+          editMenuMessage(pending.id, {
+            canMove: (pending.moveTargets?.length ?? 0) > 0,
+          }),
+        ),
       ]);
       return;
     case "edit_field":
@@ -680,6 +697,31 @@ export async function handleAction(
         { categoryCode: action.code },
       );
     }
+    case "payment": {
+      if (
+        action.method !== null &&
+        !Object.hasOwn(PAYMENT_NAMES, action.method)
+      ) {
+        return session.send({ type: "text", body: botMessages.alreadyHandled });
+      }
+      return updateAndPresent(
+        session,
+        pending,
+        {
+          payment_method: action.method as ExpenseUpdate["payment_method"],
+        },
+        { paymentMethod: action.method },
+      );
+    }
+    case "invoice":
+      return updateAndPresent(
+        session,
+        pending,
+        { has_invoice: action.hasInvoice },
+        { hasInvoice: action.hasInvoice },
+      );
+    case "move":
+      return moveToProject(session, pending, action.projectId);
     case "date": {
       if (!isIsoDate(action.date) || action.date > addDays(pending.today, 1)) {
         return session.send({ type: "text", body: botMessages.alreadyHandled });
@@ -697,13 +739,15 @@ export async function handleAction(
 async function editField(
   session: BotSession,
   pending: PendingExpense,
-  field: "amount" | "stage" | "category" | "date",
+  field: EditField,
 ): Promise<void> {
+  const byText = field === "description" || field === "supplier";
   await Promise.all([
     setState(
       session,
       field === "amount" ? "awaiting_amount" : "awaiting_confirmation",
       pending,
+      byText ? { editing: { expenseId: pending.id, field } } : {},
     ),
     session.send(editFieldMessage(pending, field)),
   ]);
@@ -711,9 +755,25 @@ async function editField(
 
 function editFieldMessage(
   pending: PendingExpense,
-  field: "amount" | "stage" | "category" | "date",
+  field: EditField,
 ): OutgoingMessage {
   switch (field) {
+    case "description":
+      return {
+        type: "text",
+        body: botMessages.askDescription(pending.description),
+      };
+    case "supplier":
+      return {
+        type: "text",
+        body: botMessages.askSupplier(pending.supplierName),
+      };
+    case "payment":
+      return paymentListMessage(pending.id);
+    case "invoice":
+      return invoiceButtonsMessage(pending.id);
+    case "project":
+      return moveListMessage(pending.moveTargets ?? [], pending.id);
     case "amount":
       return { type: "text", body: botMessages.askAmount(pending.description) };
     case "stage":
@@ -870,6 +930,8 @@ type PendingExpense = {
   hasInvoice: boolean;
   itemCount: number;
   stages: { id: string; name: string }[];
+  /** Outras obras da mesma conta em que a pessoa lança (Editar > Obra). */
+  moveTargets?: { id: string; name: string }[];
 };
 
 function summaryOf(pending: PendingExpense): string {
@@ -944,6 +1006,9 @@ async function loadPending(
     hasInvoice: data.has_invoice,
     itemCount: data.expense_items[0]?.count ?? 0,
     stages,
+    moveTargets: projects
+      .filter((p) => p.orgId === data.org_id && p.id !== data.project_id)
+      .map(({ id, name }) => ({ id, name })),
   };
 }
 
@@ -1029,20 +1094,107 @@ function setState(
   session: BotSession,
   state: ConversationState,
   pending: PendingExpense,
+  extra: ConversationContext = {},
 ) {
   return saveConversation(session.admin, session.userId, {
     state,
     pendingExpenseId: pending.id,
-    context: pending.supplierName
-      ? {
-          pendingSupplier: {
-            expenseId: pending.id,
-            name: pending.supplierName,
-            document: pending.supplierDocument,
-          },
-        }
-      : {},
+    context: {
+      ...(pending.supplierName
+        ? {
+            pendingSupplier: {
+              expenseId: pending.id,
+              name: pending.supplierName,
+              document: pending.supplierDocument,
+            },
+          }
+        : {}),
+      ...extra,
+    },
   });
+}
+
+/** Tamanho máximo da descrição (o mesmo da leitura pela IA). */
+const MAX_DESCRIPTION = 200;
+const MAX_SUPPLIER = 120;
+const NO_SUPPLIER = /^(sem|nenhum|nenhuma|nao|não|-)$/iu;
+
+/**
+ * Texto esperado por "Editar > Descrição" ou "Fornecedor". A descrição é
+ * gravada no pendente; o fornecedor fica na conversa e só vira cadastro na
+ * confirmação (como o lido pela IA), sem o CNPJ do comprovante, que era do
+ * nome anterior.
+ */
+async function applyTextEdit(
+  session: BotSession,
+  editing: { expenseId: string; field: TextEditField },
+  text: string,
+): Promise<void> {
+  const pending = await loadPending(session, editing.expenseId);
+  if (!pending) {
+    await resetConversation(session.admin, session.userId);
+    return session.send({ type: "text", body: botMessages.alreadyHandled });
+  }
+  const value = text.replace(/\s+/g, " ").trim();
+  if (editing.field === "description") {
+    if (!value) {
+      return session.send({
+        type: "text",
+        body: botMessages.askDescription(pending.description),
+      });
+    }
+    const description = value.slice(0, MAX_DESCRIPTION);
+    return updateAndPresent(session, pending, { description }, { description });
+  }
+  const supplierName = NO_SUPPLIER.test(value)
+    ? null
+    : value.slice(0, MAX_SUPPLIER) || null;
+  return presentPending(
+    session,
+    { ...pending, supplierName, supplierDocument: null },
+    "updated",
+  );
+}
+
+/**
+ * "Editar > Obra": leva o pendente para outra obra da mesma conta (o
+ * comprovante, se houver, continua no caminho da conta). A etapa fica em
+ * branco e a lista de etapas da obra nova é mostrada.
+ */
+async function moveToProject(
+  session: BotSession,
+  pending: PendingExpense,
+  projectId: string,
+): Promise<void> {
+  const target = pending.moveTargets?.find((p) => p.id === projectId);
+  if (!target) {
+    return session.send({ type: "text", body: botMessages.alreadyHandled });
+  }
+  const stageRows = await stagesOf(session.admin, target.id);
+  const stages = stageRows
+    .filter((stage) => stage.org_id === pending.orgId)
+    .map(({ id, name }) => ({ id, name }));
+  const ok = await updatePending(session, pending, {
+    project_id: target.id,
+    stage_id: null,
+  });
+  if (!ok) {
+    await resetConversation(session.admin, session.userId);
+    return session.send({ type: "text", body: botMessages.alreadyHandled });
+  }
+  return presentPending(
+    session,
+    {
+      ...pending,
+      projectId: target.id,
+      projectName: target.name,
+      stageId: null,
+      stageName: null,
+      stages,
+      moveTargets: undefined,
+    },
+    "new",
+  );
 }
 
 /** Cancela o pendente anterior da conversa, se houver. */

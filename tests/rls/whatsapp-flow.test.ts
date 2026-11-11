@@ -370,6 +370,67 @@ describe("lançamento pelo WhatsApp", () => {
     expect(await supplierNamed("Depósito Fantasma")).toHaveLength(0);
   });
 
+  it("Editar na lista de etapas: descrição, fornecedor, pagamento e nota", async () => {
+    await resetRateWindow();
+    extractExpense.mockResolvedValueOnce(
+      read({
+        categoryCode: "material",
+        supplierName: "Loja do Zé",
+        hasInvoice: true,
+      }),
+    );
+    await say(anaPhone, "78 de cimento na loja do zé com nota");
+    // A lista de etapas já traz "Editar lançamento".
+    await tap(anaPhone, optionId("Editar lançamento"), true);
+    expect(last()?.type).toBe("list");
+
+    await tap(anaPhone, optionId("Descrição"), true);
+    expect(last()?.body).toContain("Qual é a descrição certa?");
+    await say(anaPhone, "Cimento CP-II (2 sacos)");
+    expect(last()?.body).toContain("Cimento CP-II (2 sacos)");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Fornecedor"), true);
+    await say(anaPhone, "Depósito Central");
+    expect(last()?.body).toContain("Depósito Central");
+    expect(last()?.body).not.toContain("Loja do Zé");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Forma de pagamento"), true);
+    await tap(anaPhone, optionId("Pix"), true);
+    expect(last()?.body).toContain("pix");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Nota fiscal"), true);
+    await tap(anaPhone, optionId("Sem nota"));
+    expect(last()?.body).toContain("sem nota");
+
+    // Com uma obra só na conta, "Obra" não aparece no menu.
+    await tap(anaPhone, optionId("Editar"));
+    expect(optionId("Obra")).toBe("");
+
+    await tap(anaPhone, optionId("Valor"), true);
+    await say(anaPhone, "foi 82 reais");
+    await tap(anaPhone, optionId("Confirmar"));
+    expect(last()?.body).toContain("Lançado");
+
+    const { data } = await admin
+      .from("expenses")
+      .select(
+        "status, description, payment_method, has_invoice, amount_cents, suppliers(name)",
+      )
+      .eq("id", (await latestExpense())!.id)
+      .single();
+    expect(data).toMatchObject({
+      status: "confirmed",
+      description: "Cimento CP-II (2 sacos)",
+      payment_method: "pix",
+      has_invoice: false,
+      amount_cents: 8200,
+      suppliers: { name: "Depósito Central" },
+    });
+  }, 120_000);
+
   it("quem só acompanha a obra não lança", async () => {
     const calls = extractExpense.mock.calls.length;
     chooseQueries.mockResolvedValueOnce({ kind: "off_topic", usage });

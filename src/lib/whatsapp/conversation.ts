@@ -56,7 +56,15 @@ export type ConversationContext = {
     /** CNPJ ou CPF lido do comprovante, já conferido. */
     document?: string | null;
   };
+  /**
+   * Campo do pendente esperando um texto da pessoa ("Editar > Descrição" ou
+   * "Fornecedor"): a próxima mensagem de texto vira o valor novo.
+   */
+  editing?: { expenseId: string; field: TextEditField };
 };
+
+/** Campos do pendente editados por texto livre. */
+export type TextEditField = "description" | "supplier";
 
 /** Mantém o fornecedor do pendente ao trocar o resto do contexto. */
 export function keepPendingSupplier(

@@ -7,7 +7,17 @@
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const DATE = "\\d{4}-\\d{2}-\\d{2}";
 
-export const EDIT_FIELDS = ["amount", "stage", "category", "date"] as const;
+export const EDIT_FIELDS = [
+  "amount",
+  "stage",
+  "category",
+  "date",
+  "description",
+  "supplier",
+  "payment",
+  "invoice",
+  "project",
+] as const;
 export type EditField = (typeof EDIT_FIELDS)[number];
 
 /**
@@ -30,6 +40,9 @@ export type BotAction =
   | { type: "stage_page"; mode: StageMode; page: number; expenseId: string }
   | { type: "category"; code: string; expenseId: string }
   | { type: "date"; date: string; expenseId: string }
+  | { type: "payment"; method: string | null; expenseId: string }
+  | { type: "invoice"; hasInvoice: boolean; expenseId: string }
+  | { type: "move"; projectId: string; expenseId: string }
   | { type: "project"; projectId: string }
   | { type: "project_page"; page: number };
 
@@ -47,6 +60,12 @@ export const actionId = {
     `sp:${modeCode(mode)}:${page}:${expenseId}`,
   category: (code: string, expenseId: string) => `ca:${code}:${expenseId}`,
   date: (date: string, expenseId: string) => `d:${date}:${expenseId}`,
+  payment: (method: string | null, expenseId: string) =>
+    `pm:${method ?? "none"}:${expenseId}`,
+  invoice: (hasInvoice: boolean, expenseId: string) =>
+    `nf:${hasInvoice ? 1 : 0}:${expenseId}`,
+  move: (projectId: string, expenseId: string) =>
+    `mv:${projectId}:${expenseId}`,
   project: (projectId: string) => `p:${projectId}`,
   projectPage: (page: number) => `pp:${page}`,
 };
@@ -88,6 +107,22 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => BotAction][] = [
   [
     new RegExp(`^d:(${DATE}):(${UUID})$`),
     (m) => ({ type: "date", date: m[1]!, expenseId: m[2]! }),
+  ],
+  [
+    new RegExp(`^pm:([a-z_]{1,40}):(${UUID})$`),
+    (m) => ({
+      type: "payment",
+      method: m[1] === "none" ? null : m[1]!,
+      expenseId: m[2]!,
+    }),
+  ],
+  [
+    new RegExp(`^nf:([01]):(${UUID})$`),
+    (m) => ({ type: "invoice", hasInvoice: m[1] === "1", expenseId: m[2]! }),
+  ],
+  [
+    new RegExp(`^mv:(${UUID}):(${UUID})$`),
+    (m) => ({ type: "move", projectId: m[1]!, expenseId: m[2]! }),
   ],
   [new RegExp(`^p:(${UUID})$`), (m) => ({ type: "project", projectId: m[1]! })],
   [/^pp:(\d{1,2})$/, (m) => ({ type: "project_page", page: Number(m[1]) })],
