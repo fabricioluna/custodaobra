@@ -15,19 +15,23 @@ export type LaunchableProject = {
   createdAt: string;
 };
 
+/** Obra que a pessoa vê, dizendo se ela também pode lançar gastos nela. */
+export type BotProject = LaunchableProject & { canLaunch: boolean };
+
 /**
- * Obras (não arquivadas) em que a pessoa pode lançar gastos, em todas as
- * contas de que participa: dono e admin lançam em todas as obras da conta;
- * membro só nas obras em que é "editor". Quem só acompanha (viewer) não lança.
- * Mesma regra do RLS, aplicada à mão porque o webhook roda sem sessão.
+ * Obras (não arquivadas) que a pessoa vê, em todas as contas de que
+ * participa: dono e admin veem e lançam em todas as obras da conta; membro só
+ * nas obras em que está em project_members, lançando só como "editor" (quem
+ * só acompanha, "viewer", só vê). Mesma regra do RLS, aplicada à mão porque o
+ * webhook roda sem sessão.
  */
-export async function listLaunchableProjects(
+export async function listVisibleProjects(
   admin: Admin,
   userId: string,
-): Promise<LaunchableProject[]> {
+): Promise<BotProject[]> {
   // Duas consultas em paralelo: as contas (com as obras de cada uma) e as
-  // obras em que a pessoa é "editor".
-  const [memberships, editorOf] = await Promise.all([
+  // obras em que a pessoa foi convidada.
+  const [memberships, memberOf] = await Promise.all([
     admin
       .from("organization_members")
       .select(
@@ -36,14 +40,13 @@ export async function listLaunchableProjects(
       .eq("user_id", userId),
     admin
       .from("project_members")
-      .select("project_id")
-      .eq("user_id", userId)
-      .eq("role", "editor"),
+      .select("project_id, role")
+      .eq("user_id", userId),
   ]);
   if (memberships.error) throw memberships.error;
-  if (editorOf.error) throw editorOf.error;
+  if (memberOf.error) throw memberOf.error;
 
-  const editable = new Set(editorOf.data.map((row) => row.project_id));
+  const roles = new Map(memberOf.data.map((row) => [row.project_id, row.role]));
   return memberships.data
     .flatMap((membership) => {
       const org = membership.organizations;
@@ -51,7 +54,7 @@ export async function listLaunchableProjects(
       const manager =
         membership.role === "owner" || membership.role === "admin";
       return org.projects
-        .filter((p) => !p.archived_at && (manager || editable.has(p.id)))
+        .filter((p) => !p.archived_at && (manager || roles.has(p.id)))
         .map((p) => ({
           id: p.id,
           name: p.name,
@@ -59,7 +62,32 @@ export async function listLaunchableProjects(
           orgName: org.name,
           timezone: org.timezone,
           createdAt: p.created_at,
+          canLaunch: manager || roles.get(p.id) === "editor",
         }));
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Obras em que a pessoa pode lançar gastos. */
+export async function listLaunchableProjects(
+  admin: Admin,
+  userId: string,
+): Promise<BotProject[]> {
+  const projects = await listVisibleProjects(admin, userId);
+  return projects.filter((p) => p.canLaunch);
+}
+
+/**
+ * Obras com que o bot trabalha: as que a pessoa lança. Quem só acompanha
+ * (viewer em todas as obras) usa o bot para perguntas: recebe as obras que vê,
+ * todas com canLaunch = false. Quem lança em alguma obra não pergunta pelo
+ * bot sobre as obras em que só acompanha (uma lista só, sem misturar).
+ */
+export async function listBotProjects(
+  admin: Admin,
+  userId: string,
+): Promise<BotProject[]> {
+  const projects = await listVisibleProjects(admin, userId);
+  const launchable = projects.filter((p) => p.canLaunch);
+  return launchable.length ? launchable : projects;
 }

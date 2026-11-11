@@ -2,7 +2,7 @@ import { APP_NAME } from "@/config/app";
 import { addDays, formatDate, formatRelativeDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 
-import { actionId, type StageMode } from "./actions";
+import { actionId, type EditField, type StageMode } from "./actions";
 import type { ListRow, OutgoingMessage } from "./client";
 
 /**
@@ -22,11 +22,34 @@ export const botMessages = {
     "Muitas tentativas com código errado. Espere uma hora, gere um código novo no app e tente de novo.",
 
   howTo:
-    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nMande *ajuda* para ver os comandos.",
-  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_.\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nOu mande a foto (ou o PDF) do cupom ou da nota, ou um áudio falando o gasto.\n\nMande *ajuda* para ver os comandos.",
+  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nE respondo perguntas sobre os gastos, como _quanto gastei com cimento em outubro?_ ou _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+  viewerHelp: `Você acompanha obras no *${APP_NAME}*. Pode me perguntar sobre os gastos, por exemplo:\n• _quanto gastei esse mês?_\n• _quanto já foi na alvenaria?_\n• _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *ajuda*: esta mensagem`,
   projectsQuestion: "Para qual obra vão os próximos gastos?",
+  viewerProjectsQuestion: "Sobre qual obra são as próximas perguntas?",
   onlyProject: (name: string) =>
     `Sua obra é *${name}*. Os gastos vão para ela.`,
+  viewerOnlyProject: (name: string) =>
+    `Você acompanha a obra *${name}*. As perguntas são sobre ela.`,
+  viewerProjectSelected: (name: string) =>
+    `Obra ativa: *${name}*. As próximas perguntas são sobre ela.`,
+  viewerCannotLaunch:
+    "Você só acompanha esta obra, então não lança gastos. Mas pode me perguntar sobre eles, por exemplo: _quanto gastei esse mês?_",
+  questionWhichProject: "Sobre qual obra é a pergunta?",
+  questionHowTo:
+    "Sobre a obra, eu respondo perguntas sobre os gastos, o orçamento e as contas. Exemplos:\n• _quanto gastei com cimento em outubro?_\n• _onde gastei mais?_\n• _quanto falta do orçamento da alvenaria?_\n• _tem conta atrasada?_\n\nPara lançar um gasto, mande o valor e o que foi, por exemplo: _300 pedreiro_",
+  viewerQuestionHowTo:
+    "Você só acompanha esta obra, então não lança gastos por aqui. Mas eu respondo perguntas sobre os gastos, o orçamento e as contas. Exemplos:\n• _quanto gastei com cimento em outubro?_\n• _onde gastei mais?_\n• _quanto falta do orçamento da alvenaria?_\n• _tem conta atrasada?_",
+  questionNotUnderstood:
+    "Não consegui entender a pergunta. Tente de outro jeito, por exemplo: _quanto gastei com cimento esse mês?_",
+  questionUnavailable:
+    "Não consegui responder agora. Tente de novo em alguns minutos ou veja no app.",
+  questionFailed:
+    "Algo deu errado ao buscar a resposta. Tente de novo daqui a pouco ou veja no app.",
+  questionLimitReached:
+    "O limite de perguntas pelo WhatsApp do seu plano neste mês acabou. Você ainda vê tudo no app.",
+  questionWhatsappDisabled:
+    "O plano desta conta não inclui o WhatsApp. Você vê tudo no app.",
   summaryWhichProject: "De qual obra você quer o resumo?",
   undone: (summary: string) => `↩️ Desfeito. Cancelei:\n${summary}`,
   nothingToUndo:
@@ -38,7 +61,29 @@ export const botMessages = {
   notUnderstood:
     "Não consegui entender esse gasto. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
   onlyText:
-    "Por enquanto eu entendo só mensagens de texto. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
+    "Por enquanto eu entendo texto, áudio e foto (ou PDF) de cupom. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
+  audioUnsupported:
+    "Esse tipo de áudio eu não consigo ouvir. Grave uma mensagem de voz pelo WhatsApp ou escreva o gasto, por exemplo: _300 pedreiro_",
+  audioTooLarge:
+    "Esse áudio é longo demais. Grave uma mensagem curta só com o gasto, por exemplo: _trezentos reais pro pedreiro_",
+  audioDownloadFailed:
+    "Não consegui abrir esse áudio. Mande de novo daqui a pouco ou escreva o gasto.",
+  audioEmpty:
+    "Não ouvi nada nesse áudio. Grave de novo falando o valor e o que foi, por exemplo: _trezentos reais pro pedreiro_",
+  audioUnavailable:
+    "Não consegui ouvir áudio agora. Escreva o gasto, por exemplo: _300 pedreiro_, ou tente de novo em alguns minutos.",
+  receiptUnsupported:
+    "Esse tipo de arquivo eu não consigo ler. Mande uma foto (JPG ou PNG) ou o PDF do cupom ou da nota.",
+  receiptTooLarge:
+    "Esse arquivo é grande demais. Mande uma foto do cupom (até 5 MB) ou o PDF (até 10 MB).",
+  receiptDownloadFailed:
+    "Não consegui abrir esse arquivo. Mande de novo daqui a pouco.",
+  notAReceipt:
+    "Não achei um cupom, nota ou recibo nessa imagem. Mande a foto do comprovante de perto ou escreva o gasto, por exemplo: _300 pedreiro_",
+  receiptNotUnderstood:
+    "Não consegui ler esse comprovante. Tente uma foto mais de perto e com boa luz, ou escreva o gasto. Exemplo: _300 pedreiro_",
+  askReceiptAmount: (description: string) =>
+    `Não consegui ler o total de _${description}_. Qual foi o valor? Mande só o número. Exemplo: 300 ou 1.250,50`,
   askAmount: (description: string) =>
     `Qual foi o valor de _${description}_? Mande só o número. Exemplo: 300 ou 1.250,50`,
   askAmountAgain:
@@ -68,6 +113,33 @@ export const botMessages = {
   categoryButton: "Escolher categoria",
   dateQuestion: "Em que dia foi o gasto?",
   dateButton: "Escolher dia",
+  paymentQuestion: "Como foi pago?",
+  splitProposal: (total: string, parts: number) =>
+    `Os itens desta nota são de etapas diferentes. Dá para lançar os ${total} em ${parts} gastos, um por etapa:`,
+  splitHint:
+    "Cada gasto leva os seus itens e a foto da nota. O desconto do cupom é repartido entre eles.",
+  splitSameStage:
+    "Todos os itens estão na mesma etapa. Para dividir, mude a etapa de algum item:",
+  splitWhichItem: "Qual item muda de etapa?",
+  splitItemButton: "Escolher item",
+  splitItemStage: (item: string) => `Em qual etapa vai _${item}_?`,
+  splitNeedsItems:
+    "Esta nota não tem itens lidos para dividir. Dá para dividir no app.",
+  splitDone: (count: number, lines: string) =>
+    `✅ Lançados ${count} gastos:\n${lines}`,
+  splitFailed:
+    "Não consegui dividir a nota agora. Nada foi lançado: tente de novo ou use Não dividir.",
+  paymentButton: "Escolher",
+  invoiceQuestion:
+    "Tem nota fiscal ou cupom fiscal? (Recibo, orçamento e comprovante de pix contam como sem nota.)",
+  moveQuestion:
+    "Para qual obra vai este lançamento? A etapa fica em branco para você escolher de novo.",
+  askDescription: (current: string) =>
+    `Qual é a descrição certa? Hoje está: _${current}_`,
+  askSupplier: (current: string | null) =>
+    current
+      ? `Qual é o fornecedor? Hoje está: _${current}_. Mande o nome ou *sem* para tirar.`
+      : "Qual é o fornecedor (loja, empresa ou pessoa)? Mande o nome ou *sem* para deixar em branco.",
 } as const;
 
 export const CATEGORY_NAMES: Record<string, string> = {
@@ -81,7 +153,7 @@ export const CATEGORY_NAMES: Record<string, string> = {
   outros: "Outros",
 };
 
-const PAYMENT_NAMES: Record<string, string> = {
+export const PAYMENT_NAMES: Record<string, string> = {
   pix: "pix",
   dinheiro: "dinheiro",
   cartao_credito: "cartão de crédito",
@@ -89,6 +161,17 @@ const PAYMENT_NAMES: Record<string, string> = {
   boleto: "boleto",
   transferencia: "transferência",
   outro: "outro pagamento",
+};
+
+/** Formas de pagamento como opção de lista (título com até 24 letras). */
+const PAYMENT_LABELS: Record<string, string> = {
+  pix: "Pix",
+  dinheiro: "Dinheiro",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  boleto: "Boleto",
+  transferencia: "Transferência",
+  outro: "Outro",
 };
 
 export type ExpenseSummary = {
@@ -101,6 +184,8 @@ export type ExpenseSummary = {
   paymentMethod: string | null;
   hasInvoice: boolean;
   projectName: string;
+  /** Itens lidos do cupom (aparece quando há mais de um). */
+  itemCount?: number;
 };
 
 /**
@@ -113,12 +198,39 @@ export function formatSummary(expense: ExpenseSummary, today: string): string {
     CATEGORY_NAMES[expense.categoryCode] ?? "Outros",
     expense.stageName ?? "Sem etapa",
     expense.description,
+    expense.itemCount && expense.itemCount > 1
+      ? `${expense.itemCount} itens`
+      : null,
     expense.supplierName,
     formatRelativeDate(expense.spentOn, today),
     expense.paymentMethod ? PAYMENT_NAMES[expense.paymentMethod] : null,
     expense.hasInvoice ? "com nota" : "sem nota",
   ].filter(Boolean);
   return `${parts.join(" · ")}\nObra: ${expense.projectName}`;
+}
+
+/** Linha de um gasto da divisão: "• *R$ 78,00* · Alvenaria · Cimento e Areia". */
+export function formatSummaryLine(input: {
+  amountCents: number;
+  stageName: string;
+  description: string;
+}): string {
+  return `• *${formatCents(input.amountCents)}* · ${input.stageName} · ${input.description}`;
+}
+
+/** Tamanho máximo do trecho ouvido repetido na resposta. */
+const HEARD_MAX_LENGTH = 200;
+
+/**
+ * O que o bot entendeu de um áudio, antes da resposta, para a pessoa
+ * conferir a transcrição (nada da IA vale sem ela ver).
+ */
+export function heardPrefix(transcript: string): string {
+  const text =
+    transcript.length > HEARD_MAX_LENGTH
+      ? `${transcript.slice(0, HEARD_MAX_LENGTH - 1).trimEnd()}…`
+      : transcript;
+  return `🎤 _"${text.replaceAll("_", " ")}"_\n\n`;
 }
 
 /** Resumo com Confirmar, Editar e Cancelar. */
@@ -137,9 +249,14 @@ export function summaryMessage(
   };
 }
 
-/** Lista de até 10 opções: as etapas cabem em páginas de 7 + "Mais etapas". */
-const STAGES_PER_PAGE = 7;
+/** Máximo de opções numa lista do WhatsApp. */
+const MAX_ROWS = 10;
 
+/**
+ * Lista de etapas. Ao fim vão "Sem etapa", "Editar" (só na primeira pergunta,
+ * para corrigir antes de confirmar) e "Cancelar"; as etapas usam o resto das
+ * 10 opções e, se não cabem, vão em páginas com "Mais etapas".
+ */
 export function stageListMessage(input: {
   body: string;
   mode: StageMode;
@@ -148,13 +265,19 @@ export function stageListMessage(input: {
   expenseId: string;
 }): OutgoingMessage {
   const { stages, mode, expenseId } = input;
-  // Até 8 etapas cabem numa página só (com "Sem etapa" e "Cancelar").
-  const paged = stages.length > 8;
-  const pages = paged ? Math.ceil(stages.length / STAGES_PER_PAGE) : 1;
+  const extras: ListRow[] = [
+    { id: actionId.stage(mode, null, expenseId), title: "Sem etapa" },
+    ...(mode === "confirm"
+      ? [{ id: actionId.edit(expenseId), title: "Editar lançamento" }]
+      : []),
+    { id: actionId.cancel(expenseId), title: "Cancelar lançamento" },
+  ];
+  const capacity = MAX_ROWS - extras.length;
+  const paged = stages.length > capacity;
+  const perPage = paged ? capacity - 1 : capacity;
+  const pages = paged ? Math.ceil(stages.length / perPage) : 1;
   const page = Math.min(Math.max(input.page, 0), pages - 1);
-  const slice = paged
-    ? stages.slice(page * STAGES_PER_PAGE, (page + 1) * STAGES_PER_PAGE)
-    : stages;
+  const slice = stages.slice(page * perPage, (page + 1) * perPage);
 
   const rows: ListRow[] = slice.map((stage) => ({
     id: actionId.stage(mode, stage.id, expenseId),
@@ -169,11 +292,7 @@ export function stageListMessage(input: {
       description: `Página ${next + 1} de ${pages}`,
     });
   }
-  rows.push({ id: actionId.stage(mode, null, expenseId), title: "Sem etapa" });
-  rows.push({
-    id: actionId.cancel(expenseId),
-    title: "Cancelar lançamento",
-  });
+  rows.push(...extras);
 
   return {
     type: "list",
@@ -183,17 +302,197 @@ export function stageListMessage(input: {
   };
 }
 
-export function editMenuMessage(expenseId: string): OutgoingMessage {
+/** Menu do "Editar". "Obra" só aparece se há outra obra da conta. */
+export function editMenuMessage(
+  expenseId: string,
+  options: { canMove?: boolean; canSplit?: boolean } = {},
+): OutgoingMessage {
+  const row = (field: EditField, title: string): ListRow => ({
+    id: actionId.editField(field, expenseId),
+    title,
+  });
   return {
     type: "list",
     body: botMessages.editPrompt,
     buttonLabel: botMessages.editButton,
     rows: [
-      { id: actionId.editField("amount", expenseId), title: "Valor" },
-      { id: actionId.editField("stage", expenseId), title: "Etapa" },
-      { id: actionId.editField("category", expenseId), title: "Categoria" },
-      { id: actionId.editField("date", expenseId), title: "Data" },
+      row("amount", "Valor"),
+      row("stage", "Etapa"),
+      row("category", "Categoria"),
+      row("date", "Data"),
+      row("description", "Descrição"),
+      row("supplier", "Fornecedor"),
+      row("payment", "Forma de pagamento"),
+      row("invoice", "Nota fiscal"),
+      ...(options.canMove ? [row("project", "Obra")] : []),
+      ...(options.canSplit ? [row("split", "Dividir por etapa")] : []),
     ],
+  };
+}
+
+/**
+ * Proposta de dividir a nota por etapa, com a lista de partes. Com uma etapa
+ * só, não dá para dividir: oferece ajustar a etapa dos itens.
+ */
+export function splitProposalMessage(input: {
+  expenseId: string;
+  totalCents: number;
+  lines: string[];
+  groupCount: number;
+  /** Resumo do lançamento antes da proposta (primeira apresentação). */
+  summary?: string;
+}): OutgoingMessage {
+  const head = input.summary ? `${input.summary}\n\n` : "";
+  if (input.groupCount < 2) {
+    return {
+      type: "buttons",
+      body: `${head}${botMessages.splitSameStage}\n${input.lines.join("\n")}`,
+      buttons: [
+        {
+          id: actionId.splitAdjust(0, input.expenseId),
+          title: "Ajustar divisão",
+        },
+        { id: actionId.splitNo(input.expenseId), title: "Não dividir" },
+      ],
+    };
+  }
+  return {
+    type: "buttons",
+    body: `${head}${botMessages.splitProposal(formatCents(input.totalCents), input.groupCount)}\n${input.lines.join("\n")}\n\n${botMessages.splitHint}`,
+    buttons: [
+      { id: actionId.splitDo(input.expenseId), title: "Dividir e lançar" },
+      {
+        id: actionId.splitAdjust(0, input.expenseId),
+        title: "Ajustar divisão",
+      },
+      { id: actionId.splitNo(input.expenseId), title: "Não dividir" },
+    ],
+  };
+}
+
+/** Itens do cupom para escolher qual muda de etapa (páginas de 8). */
+const SPLIT_ITEMS_PER_PAGE = 8;
+
+export function splitItemsListMessage(input: {
+  expenseId: string;
+  items: { id: string; description: string; stageName: string }[];
+  page: number;
+}): OutgoingMessage {
+  const pages = Math.max(
+    1,
+    Math.ceil(input.items.length / SPLIT_ITEMS_PER_PAGE),
+  );
+  const page = Math.min(Math.max(input.page, 0), pages - 1);
+  const slice = input.items.slice(
+    page * SPLIT_ITEMS_PER_PAGE,
+    (page + 1) * SPLIT_ITEMS_PER_PAGE,
+  );
+  const rows: ListRow[] = slice.map((item) => ({
+    id: actionId.splitItem(item.id, 0, input.expenseId),
+    title: item.description,
+    description: item.stageName,
+  }));
+  if (pages > 1) {
+    const next = (page + 1) % pages;
+    rows.push({
+      id: actionId.splitAdjust(next, input.expenseId),
+      title: next === 0 ? "Voltar ao início" : "Mais itens",
+      description: `Página ${next + 1} de ${pages}`,
+    });
+  }
+  rows.push({ id: actionId.splitNo(input.expenseId), title: "Não dividir" });
+  return {
+    type: "list",
+    body: botMessages.splitWhichItem,
+    buttonLabel: botMessages.splitItemButton,
+    rows,
+  };
+}
+
+/** Etapas para um item do cupom (páginas de 8, com "Sem etapa"). */
+const SPLIT_STAGES_PER_PAGE = 8;
+
+export function splitStageListMessage(input: {
+  expenseId: string;
+  itemId: string;
+  itemDescription: string;
+  stages: { id: string; name: string }[];
+  page: number;
+}): OutgoingMessage {
+  const { stages, itemId, expenseId } = input;
+  const paged = stages.length > SPLIT_STAGES_PER_PAGE + 1;
+  const perPage = paged ? SPLIT_STAGES_PER_PAGE : stages.length;
+  const pages = paged ? Math.ceil(stages.length / perPage) : 1;
+  const page = Math.min(Math.max(input.page, 0), pages - 1);
+  const rows: ListRow[] = stages
+    .slice(page * perPage, (page + 1) * perPage)
+    .map((stage) => ({
+      id: actionId.splitStage(stage.id, itemId, expenseId),
+      title: stage.name,
+      ...(stage.name.length > 24 ? { description: stage.name } : {}),
+    }));
+  if (paged) {
+    const next = (page + 1) % pages;
+    rows.push({
+      id: actionId.splitItem(itemId, next, expenseId),
+      title: next === 0 ? "Voltar ao início" : "Mais etapas",
+      description: `Página ${next + 1} de ${pages}`,
+    });
+  }
+  rows.push({
+    id: actionId.splitStage(null, itemId, expenseId),
+    title: "Sem etapa",
+  });
+  return {
+    type: "list",
+    body: botMessages.splitItemStage(input.itemDescription),
+    buttonLabel: botMessages.stageButton,
+    rows,
+  };
+}
+
+/** Formas de pagamento, com "Não informar". */
+export function paymentListMessage(expenseId: string): OutgoingMessage {
+  return {
+    type: "list",
+    body: botMessages.paymentQuestion,
+    buttonLabel: botMessages.paymentButton,
+    rows: [
+      ...Object.entries(PAYMENT_LABELS).map(([code, title]) => ({
+        id: actionId.payment(code, expenseId),
+        title,
+      })),
+      { id: actionId.payment(null, expenseId), title: "Não informar" },
+    ],
+  };
+}
+
+/** Com ou sem nota (cupom fiscal ou nota fiscal conta como "com nota"). */
+export function invoiceButtonsMessage(expenseId: string): OutgoingMessage {
+  return {
+    type: "buttons",
+    body: botMessages.invoiceQuestion,
+    buttons: [
+      { id: actionId.invoice(true, expenseId), title: "Com nota" },
+      { id: actionId.invoice(false, expenseId), title: "Sem nota" },
+    ],
+  };
+}
+
+/** Outras obras da mesma conta, para mudar o lançamento de obra. */
+export function moveListMessage(
+  projects: { id: string; name: string }[],
+  expenseId: string,
+): OutgoingMessage {
+  return {
+    type: "list",
+    body: botMessages.moveQuestion,
+    buttonLabel: botMessages.chooseProjectButton,
+    rows: projects.slice(0, MAX_ROWS).map((project) => ({
+      id: actionId.move(project.id, expenseId),
+      title: project.name,
+      ...(project.name.length > 24 ? { description: project.name } : {}),
+    })),
   };
 }
 
@@ -337,12 +636,21 @@ export function formatProjectSummary(summary: ProjectSummary): string {
   return lines.join("\n");
 }
 
-/** "300", "R$ 1.250,50", "300 reais": só o valor, para a pergunta do valor. */
+/**
+ * "300", "R$ 1.250,50", "300 reais", "foi 350 reais.": só o valor, para a
+ * pergunta do valor. Aceita as palavras de quem responde falando ("foi",
+ * "deu", "o valor é") para a resposta não virar um gasto novo.
+ */
 export function parseAmountReply(text: string): string | null {
   const cleaned = text
     .trim()
+    .replace(/[.!?…]+$/u, "")
+    .replace(
+      /^(?:(?:o\s+)?valor\s+)?(?:foi|é|e|eh|deu|ficou|custou|paguei|são|sao)\s+/iu,
+      "",
+    )
     .replace(/^r\$\s*/i, "")
-    .replace(/\s*(reais|real|conto|contos)\.?$/i, "")
+    .replace(/\s*(reais|real|conto|contos)$/i, "")
     .trim();
   return /^\d[\d.,]*$/.test(cleaned) ? cleaned : null;
 }

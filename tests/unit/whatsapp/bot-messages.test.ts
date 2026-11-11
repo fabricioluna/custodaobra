@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import { actionId, parseAction } from "@/lib/whatsapp/actions";
 import {
   dateListMessage,
+  editMenuMessage,
   formatSummary,
+  invoiceButtonsMessage,
   parseAmountReply,
+  paymentListMessage,
   stageListMessage,
   summaryMessage,
 } from "@/lib/whatsapp/messages";
@@ -111,6 +114,18 @@ describe("resumo do lançamento", () => {
     ).toContain("Sem etapa · Pedreiro · Loja do Zé · ontem · pix · com nota");
   });
 
+  it("cupom com vários itens mostra quantos", () => {
+    expect(
+      formatSummary(
+        { ...base, description: "Cimento e areia", itemCount: 5 },
+        "2026-11-09",
+      ),
+    ).toContain("Cimento e areia · 5 itens · hoje");
+    expect(
+      formatSummary({ ...base, itemCount: 1 }, "2026-11-09"),
+    ).not.toContain("itens");
+  });
+
   it("três botões: Confirmar, Editar, Cancelar", () => {
     const message = summaryMessage("x", EXPENSE);
     expect(
@@ -128,47 +143,122 @@ describe("lista de etapas", () => {
   const rowsOf = (message: ReturnType<typeof stageListMessage>) =>
     message.type === "list" ? message.rows : [];
 
-  it("até 8 etapas numa página só, com Sem etapa e Cancelar", () => {
+  it("na primeira pergunta, até 7 etapas numa página, com Sem etapa, Editar e Cancelar", () => {
     const rows = rowsOf(
       stageListMessage({
         body: "x",
         mode: "confirm",
+        stages: stages(7),
+        page: 0,
+        expenseId: EXPENSE,
+      }),
+    );
+    expect(rows).toHaveLength(10);
+    expect(rows.slice(-3).map((r) => r.title)).toEqual([
+      "Sem etapa",
+      "Editar lançamento",
+      "Cancelar lançamento",
+    ]);
+    expect(parseAction(rows.at(-2)?.id)).toEqual({
+      type: "edit",
+      expenseId: EXPENSE,
+    });
+  });
+
+  it("ao editar a etapa, até 8 numa página, sem a opção Editar", () => {
+    const rows = rowsOf(
+      stageListMessage({
+        body: "x",
+        mode: "edit",
         stages: stages(8),
         page: 0,
         expenseId: EXPENSE,
       }),
     );
     expect(rows).toHaveLength(10);
-    expect(rows.at(-2)?.title).toBe("Sem etapa");
-    expect(rows.at(-1)?.title).toBe("Cancelar lançamento");
+    expect(rows.map((r) => r.title)).not.toContain("Editar lançamento");
   });
 
-  it("13 etapas (o padrão) em páginas de 7, sem passar de 10 opções", () => {
-    const first = rowsOf(
-      stageListMessage({
-        body: "x",
-        mode: "confirm",
-        stages: stages(13),
-        page: 0,
-        expenseId: EXPENSE,
-      }),
-    );
+  it("13 etapas (o padrão) em páginas de 6, sem passar de 10 opções", () => {
+    const page = (n: number) =>
+      rowsOf(
+        stageListMessage({
+          body: "x",
+          mode: "confirm",
+          stages: stages(13),
+          page: n,
+          expenseId: EXPENSE,
+        }),
+      );
+    const first = page(0);
     expect(first).toHaveLength(10);
-    expect(first[7]?.title).toBe("Mais etapas");
-    expect(parseAction(first[7]?.id)).toMatchObject({ page: 1 });
+    expect(first[6]?.title).toBe("Mais etapas");
+    expect(parseAction(first[6]?.id)).toMatchObject({ page: 1 });
 
-    const second = rowsOf(
-      stageListMessage({
-        body: "x",
-        mode: "confirm",
-        stages: stages(13),
-        page: 1,
-        expenseId: EXPENSE,
-      }),
-    );
-    expect(second.map((r) => r.title)).toContain("Etapa 13");
-    expect(second.find((r) => r.title === "Voltar ao início")).toBeTruthy();
-    expect(second.length).toBeLessThanOrEqual(10);
+    const last = page(2);
+    expect(last.map((r) => r.title)).toContain("Etapa 13");
+    expect(last.find((r) => r.title === "Voltar ao início")).toBeTruthy();
+    for (const n of [0, 1, 2]) expect(page(n).length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("menus do Editar", () => {
+  it("menu com os campos novos e Obra só quando há outra obra", () => {
+    const titles = (canMove: boolean) => {
+      const message = editMenuMessage(EXPENSE, { canMove });
+      return message.type === "list" ? message.rows.map((r) => r.title) : [];
+    };
+    expect(titles(false)).toEqual([
+      "Valor",
+      "Etapa",
+      "Categoria",
+      "Data",
+      "Descrição",
+      "Fornecedor",
+      "Forma de pagamento",
+      "Nota fiscal",
+    ]);
+    expect(titles(true).at(-1)).toBe("Obra");
+  });
+
+  it("ids das opções novas vão e voltam", () => {
+    const PROJECT = "22222222-3333-4444-8555-666666666666";
+    expect(parseAction(actionId.payment("pix", EXPENSE))).toEqual({
+      type: "payment",
+      method: "pix",
+      expenseId: EXPENSE,
+    });
+    expect(parseAction(actionId.payment(null, EXPENSE))).toMatchObject({
+      method: null,
+    });
+    expect(parseAction(actionId.invoice(false, EXPENSE))).toEqual({
+      type: "invoice",
+      hasInvoice: false,
+      expenseId: EXPENSE,
+    });
+    expect(parseAction(actionId.move(PROJECT, EXPENSE))).toEqual({
+      type: "move",
+      projectId: PROJECT,
+      expenseId: EXPENSE,
+    });
+    expect(parseAction(actionId.editField("supplier", EXPENSE))).toEqual({
+      type: "edit_field",
+      field: "supplier",
+      expenseId: EXPENSE,
+    });
+  });
+
+  it("formas de pagamento cabem na lista", () => {
+    const message = paymentListMessage(EXPENSE);
+    const rows = message.type === "list" ? message.rows : [];
+    expect(rows.length).toBeLessThanOrEqual(10);
+    expect(rows.every((r) => r.title.length <= 24)).toBe(true);
+    expect(rows.at(-1)?.title).toBe("Não informar");
+  });
+
+  it("nota com dois botões", () => {
+    const message = invoiceButtonsMessage(EXPENSE);
+    expect(message.type === "buttons" ? message.buttons.length : 0).toBe(2);
   });
 });
 
@@ -191,6 +281,11 @@ describe("parseAmountReply", () => {
     ["R$ 1.250,50", "1.250,50"],
     ["300 reais", "300"],
     [" 450 ", "450"],
+    // Resposta falada (transcrição) ou escrita com palavras em volta.
+    ["Foi 350 reais.", "350"],
+    ["deu 1.200", "1.200"],
+    ["O valor é R$ 89,90", "89,90"],
+    ["paguei 300 conto", "300"],
   ])("%j → %j", (text, expected) => {
     expect(parseAmountReply(text)).toBe(expected);
   });
@@ -198,5 +293,6 @@ describe("parseAmountReply", () => {
   it("texto que não é só valor fica de fora (vira gasto novo)", () => {
     expect(parseAmountReply("500 eletricista")).toBeNull();
     expect(parseAmountReply("oi")).toBeNull();
+    expect(parseAmountReply("paguei 300 de areia")).toBeNull();
   });
 });

@@ -19,10 +19,14 @@ import {
  */
 
 /**
- * Tempo máximo da função, contando o after(): a IA tem 20 s com uma nova
- * tentativa, e o resto (banco e Meta) leva poucos segundos.
+ * Tempo máximo da função, contando o after(). O caminho mais longo é uma
+ * pergunta falada: achar e baixar o áudio na Meta (até 25 s), transcrever
+ * (20 s), ler a mensagem (20 s com uma nova tentativa: 40 s) e escolher as
+ * consultas (20 s, sem nova tentativa), cerca de 105 s; a foto do cupom
+ * leva até 60 s. O resto (banco e Meta) leva poucos segundos. Folga para a
+ * resposta de erro sempre sair.
  */
-export const maxDuration = 60;
+export const maxDuration = 150;
 
 export function GET(request: NextRequest) {
   const challenge = verifySubscription(

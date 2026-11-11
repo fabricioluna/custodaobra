@@ -14,6 +14,13 @@ export function extractionModel(): string {
   return process.env.ANTHROPIC_MODEL_EXTRACTION || DEFAULT_EXTRACTION_MODEL;
 }
 
+/** Leitura de fotos e PDFs de cupom: também o Haiku por padrão. */
+export const DEFAULT_VISION_MODEL = "claude-haiku-5-5";
+
+export function visionModel(): string {
+  return process.env.ANTHROPIC_MODEL_VISION || DEFAULT_VISION_MODEL;
+}
+
 let client: Anthropic | null = null;
 
 export function anthropic(): Anthropic {

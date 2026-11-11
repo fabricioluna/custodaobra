@@ -35,8 +35,24 @@ export const whatsappCopy = {
     "Ainda não chegou. Confira se a mensagem foi enviada e toque de novo.",
   newCode: "Gerar outro código",
 
+  notifications: {
+    title: "Avisos pelo WhatsApp",
+    description:
+      "O bot também avisa por conta própria, para quem é dono ou administrador da conta.",
+    budgetAlerts: "Aviso de orçamento",
+    budgetAlertsHint:
+      "Quando uma etapa passa de 80% ou de 100% do previsto (contando as contas a pagar).",
+    weeklyReport: "Resumo da semana",
+    weeklyReportHint:
+      "Toda segunda de manhã: quanto foi gasto na semana e as contas que vencem.",
+    save: "Salvar avisos",
+    saving: "Salvando...",
+    saved: "Avisos salvos.",
+  },
+
   errors: {
     failed: "Não foi possível gerar o código. Tente de novo.",
     unlinkFailed: "Não foi possível desconectar. Tente de novo.",
+    notificationsFailed: "Não foi possível salvar os avisos. Tente de novo.",
   },
 } as const;

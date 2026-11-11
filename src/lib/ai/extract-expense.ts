@@ -1,7 +1,5 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 import { addDays, isIsoDate } from "@/lib/dates";
@@ -11,7 +9,12 @@ import { anthropic, extractionModel } from "./client";
 import {
   EXTRACT_EXPENSE_PROMPT_VERSION,
   EXTRACT_EXPENSE_SYSTEM,
-} from "./prompts/extract-expense.v1";
+} from "./prompts/extract-expense.v2";
+import {
+  type AiFailureReason,
+  type AiUsage,
+  parseStructured,
+} from "./structured";
 
 export { EXTRACT_EXPENSE_PROMPT_VERSION };
 
@@ -53,7 +56,7 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
  * no código.
  */
 export const aiExpenseSchema = z.object({
-  intent: z.enum(["expense", "other"]),
+  intent: z.enum(["expense", "question", "other"]),
   amount_brl: z.number().nullable(),
   quantity: z.number().nullable(),
   unit: z.string().nullable(),
@@ -94,16 +97,17 @@ export type ExtractedExpense = {
   missing: ("amount" | "stage")[];
 };
 
-export type ExtractionUsage = { inputTokens: number; outputTokens: number };
+export type ExtractionUsage = AiUsage;
 
 export type ExtractionResult =
   | { kind: "expense"; expense: ExtractedExpense; usage: ExtractionUsage }
+  /** Pergunta sobre os gastos da obra: segue para as funções de consulta. */
+  | { kind: "question"; usage: ExtractionUsage }
   | { kind: "not_expense"; usage: ExtractionUsage }
   /** A IA não respondeu ou respondeu fora do formato: perguntar à pessoa. */
   | { kind: "failed"; reason: FailureReason; usage: ExtractionUsage | null };
 
-export type FailureReason =
-  "unavailable" | "invalid_output" | "refused" | "truncated";
+export type FailureReason = AiFailureReason;
 
 const WEEKDAYS = [
   "domingo",
@@ -115,7 +119,7 @@ const WEEKDAYS = [
   "sábado",
 ];
 
-function weekdayOf(isoDate: string): string {
+export function weekdayOf(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   return (
     WEEKDAYS[new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1)).getUTCDay()] ?? ""
@@ -219,46 +223,23 @@ export async function extractExpense(
   text: string,
   context: ExtractionContext,
 ): Promise<ExtractionResult> {
-  let response;
-  try {
-    response = await anthropic().messages.parse({
-      model: extractionModel(),
-      // Espaço para o raciocínio (o Haiku pensa por padrão) e a resposta.
-      max_tokens: 2048,
-      system: EXTRACT_EXPENSE_SYSTEM,
-      messages: [{ role: "user", content: buildUserMessage(text, context) }],
-      output_config: {
-        effort: "low",
-        format: zodOutputFormat(aiExpenseSchema),
-      },
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      console.error("[ia] falha na extração", error.status, error.message);
-      return { kind: "failed", reason: "unavailable", usage: null };
-    }
-    // Saída que não bate com o esquema também cai aqui.
-    console.error("[ia] saída inválida", error);
-    return { kind: "failed", reason: "invalid_output", usage: null };
+  const result = await parseStructured(anthropic(), {
+    model: extractionModel(),
+    // Espaço para o raciocínio (o Haiku pensa por padrão) e a resposta.
+    maxTokens: 2048,
+    system: EXTRACT_EXPENSE_SYSTEM,
+    content: buildUserMessage(text, context),
+    schema: aiExpenseSchema,
+    label: "extração",
+  });
+  if (!result.ok) {
+    return { kind: "failed", reason: result.reason, usage: result.usage };
   }
-
-  const usage = {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
-  if (response.stop_reason === "refusal") {
-    return { kind: "failed", reason: "refused", usage };
+  if (result.data.intent === "question") {
+    return { kind: "question", usage: result.usage };
   }
-  if (response.stop_reason === "max_tokens") {
-    return { kind: "failed", reason: "truncated", usage };
-  }
-
-  const parsed = aiExpenseSchema.safeParse(response.parsed_output);
-  if (!parsed.success) {
-    return { kind: "failed", reason: "invalid_output", usage };
-  }
-  const expense = interpretAiExpense(parsed.data, text, context);
+  const expense = interpretAiExpense(result.data, text, context);
   return expense
-    ? { kind: "expense", expense, usage }
-    : { kind: "not_expense", usage };
+    ? { kind: "expense", expense, usage: result.usage }
+    : { kind: "not_expense", usage: result.usage };
 }

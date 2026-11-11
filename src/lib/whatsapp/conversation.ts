@@ -3,7 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ExtractedExpense } from "@/lib/ai/extract-expense";
+import type { ReceiptDetails } from "@/lib/ai/read-receipt";
 import type { Database, Json } from "@/types/database";
+
+import type { SplitItem } from "./split";
 
 type Admin = SupabaseClient<Database>;
 type ConversationRow =
@@ -15,22 +18,69 @@ export const WHATSAPP_SOURCES: Database["public"]["Enums"]["expense_source"][] =
 export type ConversationState =
   Database["public"]["Enums"]["whatsapp_conversation_state"];
 
+/** Foto ou PDF de comprovante recebido (a mídia fica na Meta por 30 dias). */
+export type ReceiptMedia = {
+  id: string;
+  mimeType: string;
+  caption: string | null;
+};
+
 /** Gasto lido pela IA que ainda não tem valor (o banco exige valor). */
 export type ExpenseDraft = {
   projectId: string;
   expense: ExtractedExpense;
-  rawInput: string;
+  rawInput: string | null;
   logId: string | null;
+  /** Veio de um áudio (o texto é a transcrição). */
+  audio?: boolean;
+  /** Veio de um comprovante: a foto é baixada de novo quando o valor chega. */
+  receipt?: { media: ReceiptMedia; details: ReceiptDetails };
 };
 
 export type ConversationContext = {
   /** Mensagem guardada enquanto a pessoa escolhe a obra. */
   pendingText?: string;
+  /** `pendingText` é a transcrição de um áudio. */
+  pendingAudio?: boolean;
+  /** Comprovante guardado enquanto a pessoa escolhe a obra. */
+  pendingMedia?: ReceiptMedia;
   pendingLogId?: string | null;
   /** Comando à espera da escolha da obra (ex.: "resumo" com várias obras). */
   pendingCommand?: "summary";
   draft?: ExpenseDraft;
+  /**
+   * Fornecedor lido pela IA para o gasto pendente. Só vira cadastro em
+   * `suppliers` quando a pessoa confirma: se ela cancela, nada sobra.
+   */
+  pendingSupplier?: {
+    expenseId: string;
+    name: string;
+    /** CNPJ ou CPF lido do comprovante, já conferido. */
+    document?: string | null;
+  };
+  /**
+   * Campo do pendente esperando um texto da pessoa ("Editar > Descrição" ou
+   * "Fornecedor"): a próxima mensagem de texto vira o valor novo.
+   */
+  editing?: { expenseId: string; field: TextEditField };
+  /**
+   * Itens do cupom do pendente com a etapa de cada um (sugerida pela IA ou
+   * ajustada pela pessoa), para dividir a nota por etapa.
+   */
+  split?: { expenseId: string; items: SplitItem[] };
 };
+
+/** Campos do pendente editados por texto livre. */
+export type TextEditField = "description" | "supplier";
+
+/** Mantém o fornecedor do pendente ao trocar o resto do contexto. */
+export function keepPendingSupplier(
+  context: ConversationContext,
+): ConversationContext {
+  return context.pendingSupplier
+    ? { pendingSupplier: context.pendingSupplier }
+    : {};
+}
 
 export type Conversation = Omit<ConversationRow, "context"> & {
   context: ConversationContext;

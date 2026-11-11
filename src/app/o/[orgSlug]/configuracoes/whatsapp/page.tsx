@@ -9,9 +9,11 @@ import { requireOrg } from "@/features/organizations/queries";
 import {
   createLinkCode,
   refreshWhatsapp,
+  saveNotificationSettings,
   unlinkWhatsapp,
 } from "@/features/whatsapp/actions";
 import { ConnectWhatsapp } from "@/features/whatsapp/components/connect-whatsapp";
+import { NotificationSettings } from "@/features/whatsapp/components/notification-settings";
 import { whatsappCopy as copy } from "@/features/whatsapp/copy";
 import { botNumber, getMyWhatsapp } from "@/features/whatsapp/queries";
 import { formatDate, todayIn } from "@/lib/dates";
@@ -25,7 +27,7 @@ export default async function WhatsappSettingsPage({
 }: PageProps<"/o/[orgSlug]/configuracoes/whatsapp">) {
   const { orgSlug } = await params;
   const org = await requireOrg(orgSlug);
-  const { phone, linkedAt } = await getMyWhatsapp();
+  const { phone, linkedAt, budgetAlerts, weeklyReport } = await getMyWhatsapp();
   const bot = botNumber();
   const botLabel = bot ? formatPhone(bot) : null;
 
@@ -54,6 +56,11 @@ export default async function WhatsappSettingsPage({
               botLabel={botLabel}
               label={copy.changeNumber}
               variant="outline"
+            />
+            <NotificationSettings
+              action={saveNotificationSettings}
+              budgetAlerts={budgetAlerts}
+              weeklyReport={weeklyReport}
             />
             <ActionButton
               action={unlinkWhatsapp}

@@ -98,6 +98,72 @@ export type Database = {
         };
         Relationships: [];
       };
+      budget_alerts: {
+        Row: {
+          created_at: string;
+          level: string;
+          notified_at: string;
+          org_id: string;
+          project_id: string;
+          stage_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          level: string;
+          notified_at?: string;
+          org_id: string;
+          project_id: string;
+          stage_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          level?: string;
+          notified_at?: string;
+          org_id?: string;
+          project_id?: string;
+          stage_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "budget_alerts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "budget_alerts_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "budget_alerts_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id"];
+          },
+          {
+            foreignKeyName: "budget_alerts_stage_id_fkey";
+            columns: ["stage_id"];
+            isOneToOne: true;
+            referencedRelation: "stages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "budget_alerts_stage_id_fkey";
+            columns: ["stage_id"];
+            isOneToOne: true;
+            referencedRelation: "v_stage_summary";
+            referencedColumns: ["stage_id"];
+          },
+        ];
+      };
       categories: {
         Row: {
           code: string;
@@ -615,6 +681,7 @@ export type Database = {
           max_ai_calls_month: number;
           max_members: number;
           max_projects: number;
+          max_template_messages_month: number;
           max_whatsapp_entries_month: number;
           name: string;
           price_cents_month: number;
@@ -630,6 +697,7 @@ export type Database = {
           max_ai_calls_month: number;
           max_members: number;
           max_projects: number;
+          max_template_messages_month?: number;
           max_whatsapp_entries_month: number;
           name: string;
           price_cents_month?: number;
@@ -645,6 +713,7 @@ export type Database = {
           max_ai_calls_month?: number;
           max_members?: number;
           max_projects?: number;
+          max_template_messages_month?: number;
           max_whatsapp_entries_month?: number;
           name?: string;
           price_cents_month?: number;
@@ -662,8 +731,10 @@ export type Database = {
           id: string;
           onboarded_at: string | null;
           updated_at: string;
+          whatsapp_budget_alerts: boolean;
           whatsapp_linked_at: string | null;
           whatsapp_phone: string | null;
+          whatsapp_weekly_report: boolean;
         };
         Insert: {
           created_at?: string;
@@ -672,8 +743,10 @@ export type Database = {
           id: string;
           onboarded_at?: string | null;
           updated_at?: string;
+          whatsapp_budget_alerts?: boolean;
           whatsapp_linked_at?: string | null;
           whatsapp_phone?: string | null;
+          whatsapp_weekly_report?: boolean;
         };
         Update: {
           created_at?: string;
@@ -682,8 +755,10 @@ export type Database = {
           id?: string;
           onboarded_at?: string | null;
           updated_at?: string;
+          whatsapp_budget_alerts?: boolean;
           whatsapp_linked_at?: string | null;
           whatsapp_phone?: string | null;
+          whatsapp_weekly_report?: boolean;
         };
         Relationships: [
           {
@@ -1000,9 +1075,11 @@ export type Database = {
           ai_calls: number;
           ai_input_tokens: number;
           ai_output_tokens: number;
+          audio_seconds: number;
           created_at: string;
           month: string;
           org_id: string;
+          template_messages: number;
           updated_at: string;
           whatsapp_entries: number;
         };
@@ -1010,9 +1087,11 @@ export type Database = {
           ai_calls?: number;
           ai_input_tokens?: number;
           ai_output_tokens?: number;
+          audio_seconds?: number;
           created_at?: string;
           month: string;
           org_id: string;
+          template_messages?: number;
           updated_at?: string;
           whatsapp_entries?: number;
         };
@@ -1020,9 +1099,11 @@ export type Database = {
           ai_calls?: number;
           ai_input_tokens?: number;
           ai_output_tokens?: number;
+          audio_seconds?: number;
           created_at?: string;
           month?: string;
           org_id?: string;
+          template_messages?: number;
           updated_at?: string;
           whatsapp_entries?: number;
         };
@@ -1347,8 +1428,10 @@ export type Database = {
           p_ai_calls?: number;
           p_ai_input_tokens?: number;
           p_ai_output_tokens?: number;
+          p_audio_seconds?: number;
           p_month: string;
           p_org_id: string;
+          p_template_messages?: number;
           p_whatsapp_entries?: number;
         };
         Returns: undefined;

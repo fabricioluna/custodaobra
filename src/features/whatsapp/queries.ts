@@ -7,17 +7,23 @@ import { createClient } from "@/lib/supabase/server";
 export async function getMyWhatsapp(): Promise<{
   phone: string | null;
   linkedAt: string | null;
+  budgetAlerts: boolean;
+  weeklyReport: boolean;
 }> {
   const userId = await requireUserId();
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("whatsapp_phone, whatsapp_linked_at")
+    .select(
+      "whatsapp_phone, whatsapp_linked_at, whatsapp_budget_alerts, whatsapp_weekly_report",
+    )
     .eq("id", userId)
     .maybeSingle();
   return {
     phone: data?.whatsapp_phone ?? null,
     linkedAt: data?.whatsapp_linked_at ?? null,
+    budgetAlerts: data?.whatsapp_budget_alerts ?? true,
+    weeklyReport: data?.whatsapp_weekly_report ?? true,
   };
 }
 

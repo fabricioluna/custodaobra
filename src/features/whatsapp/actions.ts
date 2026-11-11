@@ -79,6 +79,34 @@ export async function unlinkWhatsapp(): Promise<FormState<never>> {
   return { status: "success" };
 }
 
+/**
+ * Liga ou desliga os avisos que o bot manda por conta própria (alerta de
+ * orçamento e resumo semanal). Só o próprio perfil (RLS e permissão por
+ * coluna no banco).
+ */
+export async function saveNotificationSettings(
+  _state: FormState<never>,
+  formData: FormData,
+): Promise<FormState<never>> {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      whatsapp_budget_alerts: formData.get("budgetAlerts") === "on",
+      whatsapp_weekly_report: formData.get("weeklyReport") === "on",
+    })
+    .eq("id", userId);
+  if (error) {
+    return {
+      status: "error",
+      message: whatsappCopy.errors.notificationsFailed,
+    };
+  }
+  refresh();
+  return { status: "success", message: whatsappCopy.notifications.saved };
+}
+
 /** "Já enviei": recarrega a tela para ver se o número já foi ligado. */
 export async function refreshWhatsapp(): Promise<void> {
   await requireUserId();

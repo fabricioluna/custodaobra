@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { QuestionResult } from "@/lib/ai/answer-question";
 import type { ExtractionResult } from "@/lib/ai/extract-expense";
 import type { OutgoingMessage } from "@/lib/whatsapp/client";
 import type { IncomingMessage } from "@/lib/whatsapp/webhook";
@@ -25,7 +26,14 @@ vi.mock("@/lib/whatsapp/client", () => ({
 
 // A IA é trocada por respostas prontas (a leitura real tem a própria avaliação).
 const extractExpense = vi.fn<() => Promise<ExtractionResult>>();
-vi.mock("@/lib/ai/extract-expense", () => ({ extractExpense }));
+vi.mock("@/lib/ai/extract-expense", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/extract-expense")>()),
+  extractExpense,
+}));
+
+// Perguntas (quem só acompanha): a escolha das consultas também é simulada.
+const chooseQueries = vi.fn<() => Promise<QuestionResult>>();
+vi.mock("@/lib/ai/answer-question", () => ({ chooseQueries }));
 
 const { handleIncomingMessage } =
   await import("@/lib/whatsapp/handlers/incoming");
@@ -299,14 +307,147 @@ describe("lançamento pelo WhatsApp", () => {
     expect((await usageOf()).whatsapp_entries).toBe(before.whatsapp_entries);
   });
 
+  const supplierNamed = async (name: string) => {
+    const { data } = await admin
+      .from("suppliers")
+      .select("id")
+      .eq("org_id", ana.orgId)
+      .eq("name", name);
+    return data ?? [];
+  };
+
+  /**
+   * O bot aceita 20 mensagens por minuto por número: os testes da Ana somam
+   * mais que isso. Tira do log as mensagens já tratadas para abrir a janela.
+   */
+  const resetRateWindow = () =>
+    admin.from("whatsapp_messages").delete().eq("from_phone", anaPhone);
+
+  it("fornecedor lido só é cadastrado ao confirmar", async () => {
+    await resetRateWindow();
+    extractExpense.mockResolvedValueOnce(
+      read({ categoryCode: "material", supplierName: "Loja do Zé" }),
+    );
+    await say(anaPhone, "2 sacos de cimento 78 na loja do zé");
+    expect(last()?.body).toContain("Loja do Zé");
+    const pending = await latestExpense();
+    const { data: row } = await admin
+      .from("expenses")
+      .select("supplier_id")
+      .eq("id", pending?.id ?? "")
+      .single();
+    expect(row?.supplier_id).toBeNull();
+    expect(await supplierNamed("Loja do Zé")).toHaveLength(0);
+
+    // Escolher a etapa confirma: o fornecedor nasce agora, ligado ao gasto.
+    await tap(anaPhone, optionId("Fundação"), true);
+    const supplier = await supplierNamed("Loja do Zé");
+    expect(supplier).toHaveLength(1);
+    const { data: confirmed } = await admin
+      .from("expenses")
+      .select("status, supplier_id")
+      .eq("id", pending?.id ?? "")
+      .single();
+    expect(confirmed).toEqual({
+      status: "confirmed",
+      supplier_id: supplier[0]?.id,
+    });
+    expect(last()?.body).toContain("Loja do Zé");
+  });
+
+  it("fornecedor de um gasto cancelado não fica cadastrado", async () => {
+    const cobertura = stages.find((s) => s.name === "Cobertura")?.id ?? null;
+    extractExpense.mockResolvedValueOnce(
+      read({ stageId: cobertura, supplierName: "Depósito Fantasma" }),
+    );
+    await say(anaPhone, "500 telha no depósito fantasma");
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Data"), true);
+    await tap(anaPhone, optionId("Hoje"), true);
+    expect(last()?.body).toContain("Depósito Fantasma");
+    await tap(anaPhone, optionId("Cancelar"));
+    expect((await latestExpense())?.status).toBe("cancelled");
+    expect(await supplierNamed("Depósito Fantasma")).toHaveLength(0);
+  });
+
+  it("Editar na lista de etapas: descrição, fornecedor, pagamento e nota", async () => {
+    await resetRateWindow();
+    extractExpense.mockResolvedValueOnce(
+      read({
+        categoryCode: "material",
+        supplierName: "Loja do Zé",
+        hasInvoice: true,
+      }),
+    );
+    await say(anaPhone, "78 de cimento na loja do zé com nota");
+    // A lista de etapas já traz "Editar lançamento".
+    await tap(anaPhone, optionId("Editar lançamento"), true);
+    expect(last()?.type).toBe("list");
+
+    await tap(anaPhone, optionId("Descrição"), true);
+    expect(last()?.body).toContain("Qual é a descrição certa?");
+    await say(anaPhone, "Cimento CP-II (2 sacos)");
+    expect(last()?.body).toContain("Cimento CP-II (2 sacos)");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Fornecedor"), true);
+    await say(anaPhone, "Depósito Central");
+    expect(last()?.body).toContain("Depósito Central");
+    expect(last()?.body).not.toContain("Loja do Zé");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Forma de pagamento"), true);
+    await tap(anaPhone, optionId("Pix"), true);
+    expect(last()?.body).toContain("pix");
+
+    await tap(anaPhone, optionId("Editar"));
+    await tap(anaPhone, optionId("Nota fiscal"), true);
+    await tap(anaPhone, optionId("Sem nota"));
+    expect(last()?.body).toContain("sem nota");
+
+    // Com uma obra só na conta, "Obra" não aparece no menu.
+    await tap(anaPhone, optionId("Editar"));
+    expect(optionId("Obra")).toBe("");
+
+    await tap(anaPhone, optionId("Valor"), true);
+    await say(anaPhone, "foi 82 reais");
+    await tap(anaPhone, optionId("Confirmar"));
+    expect(last()?.body).toContain("Lançado");
+
+    const { data } = await admin
+      .from("expenses")
+      .select(
+        "status, description, payment_method, has_invoice, amount_cents, suppliers(name)",
+      )
+      .eq("id", (await latestExpense())!.id)
+      .single();
+    expect(data).toMatchObject({
+      status: "confirmed",
+      description: "Cimento CP-II (2 sacos)",
+      payment_method: "pix",
+      has_invoice: false,
+      amount_cents: 8200,
+      suppliers: { name: "Depósito Central" },
+    });
+  }, 120_000);
+
   it("quem só acompanha a obra não lança", async () => {
     const calls = extractExpense.mock.calls.length;
+    chooseQueries.mockResolvedValueOnce({ kind: "off_topic", usage });
     await say(brunoPhone, "300 pedreiro");
-    expect(last()?.body).toContain("não tem uma obra em que possa lançar");
+    // Para quem só acompanha, toda mensagem é pergunta: nada é lançado.
+    expect(last()?.body).toContain("Você só acompanha esta obra");
     expect(extractExpense.mock.calls.length).toBe(calls);
+    const { count } = await admin
+      .from("expenses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", ana.orgId)
+      .eq("created_by", bruno.id);
+    expect(count).toBe(0);
   });
 
   it("com duas obras, pergunta qual e segue com a mensagem", async () => {
+    await resetRateWindow();
     const { data: second } = await ana.client
       .from("projects")
       .insert({ org_id: ana.orgId, name: "Reforma", created_by: ana.id })

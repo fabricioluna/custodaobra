@@ -22,7 +22,8 @@ export type LimitReason =
   | "max_members"
   | "whatsapp_disabled"
   | "max_whatsapp_entries"
-  | "max_ai_calls";
+  | "max_ai_calls"
+  | "max_template_messages";
 
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
 
@@ -110,6 +111,26 @@ export function checkAiCalls(
   return { ok: true };
 }
 
+/**
+ * Regra pura: dá para mandar mais `count` mensagens por modelo (avisos que o
+ * bot manda sem a pessoa ter escrito, cobradas pela Meta) este mês?
+ */
+export function checkTemplateMessages(
+  plan: Pick<Plan, "whatsapp_enabled" | "max_template_messages_month">,
+  usedThisMonth: number,
+  count = 1,
+): LimitResult {
+  if (!plan.whatsapp_enabled) return { ok: false, reason: "whatsapp_disabled" };
+  if (usedThisMonth + count > plan.max_template_messages_month) {
+    return {
+      ok: false,
+      reason: "max_template_messages",
+      limit: plan.max_template_messages_month,
+    };
+  }
+  return { ok: true };
+}
+
 /** Primeiro dia do mês (AAAA-MM-01) de uma data AAAA-MM-DD. */
 export function monthOf(isoDate: string): string {
   return `${isoDate.slice(0, 7)}-01`;
@@ -186,23 +207,83 @@ export async function canInviteMember(
 async function getUsage(supabase: Client, orgId: string, month: string) {
   const { data, error } = await supabase
     .from("usage_counters")
-    .select("whatsapp_entries, ai_calls")
+    .select("whatsapp_entries, ai_calls, template_messages")
     .eq("org_id", orgId)
     .eq("month", month)
     .maybeSingle();
   if (error) throw new Error("Não foi possível ler o uso do plano.");
-  return data ?? { whatsapp_entries: 0, ai_calls: 0 };
+  return data ?? { whatsapp_entries: 0, ai_calls: 0, template_messages: 0 };
 }
 
 /**
- * Pode lançar mais um gasto pelo WhatsApp e chamar a IA para lê-lo? Usado
- * pelo webhook (cliente service_role, sem sessão). `today` é a data no fuso
- * da organização: o mês do plano vira no fuso dela.
+ * O que o plano ainda permite pelo WhatsApp neste mês, numa leitura só:
+ * - `ai`: chamar a IA (WhatsApp no plano e chamadas de IA sobrando). Vale
+ *   para ler qualquer mensagem, inclusive perguntas.
+ * - `entries`: lançar mais um gasto (limite de lançamentos pelo WhatsApp).
+ * Usado pelo webhook (cliente service_role, sem sessão). `today` é a data no
+ * fuso da organização: o mês do plano vira no fuso dela.
+ */
+export async function whatsappAllowance(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<{ ai: LimitResult; entries: LimitResult }> {
+  const [subscription, usage] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+  ]);
+  const blocked = (result: LimitResult) => ({ ai: result, entries: result });
+  if (!subscription?.plans) {
+    return blocked({ ok: false, reason: "no_subscription" });
+  }
+  if (!isSubscriptionUsable(subscription)) {
+    return blocked({ ok: false, reason: "subscription_inactive" });
+  }
+  if (!subscription.plans.whatsapp_enabled) {
+    return blocked({ ok: false, reason: "whatsapp_disabled" });
+  }
+  return {
+    ai: checkAiCalls(subscription.plans, usage.ai_calls),
+    entries: checkWhatsappEntries(subscription.plans, usage.whatsapp_entries),
+  };
+}
+
+/**
+ * Pode lançar mais um gasto pelo WhatsApp e chamar a IA para lê-lo? (Foto
+ * de comprovante: é sempre um gasto.)
  */
 export async function canUseWhatsappAi(
   supabase: Client,
   orgId: string,
   today: string,
+): Promise<LimitResult> {
+  const { ai, entries } = await whatsappAllowance(supabase, orgId, today);
+  return entries.ok ? ai : entries;
+}
+
+/**
+ * Pode chamar a IA para ler uma mensagem que ainda não se sabe se é gasto
+ * (texto, áudio) ou que é pergunta ("quanto gastei com cimento?")? Pergunta
+ * não é lançamento: não conta nem esbarra no limite de lançamentos, que é
+ * conferido depois, quando a mensagem é mesmo um gasto.
+ */
+export async function canAskWhatsappQuestion(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<LimitResult> {
+  return (await whatsappAllowance(supabase, orgId, today)).ai;
+}
+
+/**
+ * Pode mandar mais `count` avisos por modelo (alerta de orçamento, resumo
+ * semanal) para pessoas desta conta? Usado pelo cron (service_role).
+ */
+export async function canSendTemplates(
+  supabase: Client,
+  orgId: string,
+  today: string,
+  count = 1,
 ): Promise<LimitResult> {
   const [subscription, usage] = await Promise.all([
     getOrgPlan(supabase, orgId),
@@ -212,11 +293,9 @@ export async function canUseWhatsappAi(
   if (!isSubscriptionUsable(subscription)) {
     return { ok: false, reason: "subscription_inactive" };
   }
-
-  const entries = checkWhatsappEntries(
+  return checkTemplateMessages(
     subscription.plans,
-    usage.whatsapp_entries,
+    usage.template_messages,
+    count,
   );
-  if (!entries.ok) return entries;
-  return checkAiCalls(subscription.plans, usage.ai_calls);
 }
