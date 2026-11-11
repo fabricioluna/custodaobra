@@ -44,19 +44,25 @@ export async function chooseQueries(
 ): Promise<QuestionResult> {
   let response: Anthropic.Message;
   try {
-    response = await anthropic().messages.create({
-      model: extractionModel(),
-      // Espaço para o raciocínio (o Haiku pensa por padrão) e as chamadas.
-      max_tokens: 2048,
-      system: ANSWER_QUESTION_SYSTEM,
-      tools: QUERY_TOOLS,
-      // Forçar ferramenta não vale nos modelos novos; "fora" também é resposta.
-      tool_choice: { type: "auto" },
-      output_config: { effort: "low" },
-      messages: [
-        { role: "user", content: buildQuestionMessage(text, context) },
-      ],
-    });
+    response = await anthropic().messages.create(
+      {
+        model: extractionModel(),
+        // Espaço para o raciocínio (o Haiku pensa por padrão) e as chamadas.
+        max_tokens: 2048,
+        system: ANSWER_QUESTION_SYSTEM,
+        tools: QUERY_TOOLS,
+        // Forçar ferramenta não vale nos modelos novos; "fora" também é resposta.
+        tool_choice: { type: "auto" },
+        output_config: { effort: "low" },
+        messages: [
+          { role: "user", content: buildQuestionMessage(text, context) },
+        ],
+      },
+      // Vem depois da leitura da mensagem (outra chamada à IA): sem nova
+      // tentativa, para a pessoa não esperar demais nem passar do tempo da
+      // função.
+      { timeout: 20_000, maxRetries: 0 },
+    );
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       console.error("[ia] falha (pergunta)", error.status, error.message);

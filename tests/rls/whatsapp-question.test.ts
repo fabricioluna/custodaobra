@@ -464,4 +464,67 @@ describe("perguntas pelo WhatsApp", () => {
     await say(carlaPhone, "obras");
     expect(lastBody()).toContain("Você acompanha a obra *Casa do sítio*");
   });
+  it("com os lançamentos do mês esgotados, perguntas continuam", async () => {
+    const { data: plan } = await admin
+      .from("subscriptions")
+      .select("plans(max_whatsapp_entries_month)")
+      .eq("org_id", ana.orgId)
+      .single();
+    const month = `${today().slice(0, 7)}-01`;
+    const { data: current } = await admin
+      .from("usage_counters")
+      .select("whatsapp_entries")
+      .eq("org_id", ana.orgId)
+      .eq("month", month)
+      .single();
+    await admin
+      .from("usage_counters")
+      .update({
+        whatsapp_entries: plan!.plans!.max_whatsapp_entries_month,
+      })
+      .eq("org_id", ana.orgId)
+      .eq("month", month);
+    try {
+      extractExpense.mockResolvedValueOnce(question);
+      chooseQueries.mockResolvedValueOnce(
+        queries({ name: "total_spent", filters: noFilters }),
+      );
+      await say(anaPhone, "quanto já gastei?");
+      expect(lastBody()).toContain("Construção:");
+
+      // Um gasto, não: o limite de lançamentos vale.
+      extractExpense.mockResolvedValueOnce({
+        kind: "expense",
+        usage,
+        expense: {
+          amountCents: 5_000,
+          description: "Prego",
+          stageId: null,
+          categoryCode: "material",
+          supplierName: null,
+          spentOn: today(),
+          paymentMethod: null,
+          hasInvoice: false,
+          quantity: null,
+          unit: null,
+          confidence: 0.9,
+          missing: [],
+        },
+      });
+      await say(anaPhone, "50 de prego");
+      expect(lastBody()).toContain("O limite de lançamentos");
+      const { count } = await admin
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", ana.orgId)
+        .eq("description", "Prego");
+      expect(count).toBe(0);
+    } finally {
+      await admin
+        .from("usage_counters")
+        .update({ whatsapp_entries: current?.whatsapp_entries ?? 0 })
+        .eq("org_id", ana.orgId)
+        .eq("month", month);
+    }
+  });
 });

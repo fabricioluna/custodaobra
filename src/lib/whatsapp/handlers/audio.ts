@@ -42,11 +42,15 @@ export async function handleAudio(
   const orgId = session.conversation.active_org_id ?? defaultOrgId;
   if (!orgId)
     return session.send({ type: "text", body: botMessages.noProjects });
-  const today = todayIn();
 
-  // Limite e download ao mesmo tempo: são independentes.
-  const [allowed, download] = await Promise.all([
-    checkAiAllowed(session, orgId, today),
+  // Limite (no mês do fuso da conta) e download ao mesmo tempo: são
+  // independentes.
+  const limit = orgTimezone(session, orgId).then(async (timezone) => {
+    const today = todayIn(timezone);
+    return { today, allowed: await checkAiAllowed(session, orgId, today) };
+  });
+  const [{ today, allowed }, download] = await Promise.all([
+    limit,
     downloadMedia(media.id, MAX_AUDIO_BYTES).then(
       (file) => ({ ok: true as const, file }),
       (error: unknown) => ({ ok: false as const, error }),
@@ -95,4 +99,17 @@ export async function handleAudio(
       ? handleCommand(session, command)
       : handleText(session, result.text, logId, "whatsapp_audio"),
   ]);
+}
+
+/** Fuso da conta (o mês do plano vira nele); sem achar, o padrão do app. */
+async function orgTimezone(
+  session: BotSession,
+  orgId: string,
+): Promise<string | undefined> {
+  const { data } = await session.admin
+    .from("organizations")
+    .select("timezone")
+    .eq("id", orgId)
+    .maybeSingle();
+  return data?.timezone ?? undefined;
 }

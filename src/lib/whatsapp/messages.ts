@@ -402,12 +402,21 @@ export function formatProjectSummary(summary: ProjectSummary): string {
   return lines.join("\n");
 }
 
-/** "300", "R$ 1.250,50", "300 reais": só o valor, para a pergunta do valor. */
+/**
+ * "300", "R$ 1.250,50", "300 reais", "foi 350 reais.": só o valor, para a
+ * pergunta do valor. Aceita as palavras de quem responde falando ("foi",
+ * "deu", "o valor é") para a resposta não virar um gasto novo.
+ */
 export function parseAmountReply(text: string): string | null {
   const cleaned = text
     .trim()
+    .replace(/[.!?…]+$/u, "")
+    .replace(
+      /^(?:(?:o\s+)?valor\s+)?(?:foi|é|e|eh|deu|ficou|custou|paguei|são|sao)\s+/iu,
+      "",
+    )
     .replace(/^r\$\s*/i, "")
-    .replace(/\s*(reais|real|conto|contos)\.?$/i, "")
+    .replace(/\s*(reais|real|conto|contos)$/i, "")
     .trim();
   return /^\d[\d.,]*$/.test(cleaned) ? cleaned : null;
 }

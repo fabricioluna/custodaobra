@@ -203,6 +203,11 @@ describe("parseAmountReply", () => {
     ["R$ 1.250,50", "1.250,50"],
     ["300 reais", "300"],
     [" 450 ", "450"],
+    // Resposta falada (transcrição) ou escrita com palavras em volta.
+    ["Foi 350 reais.", "350"],
+    ["deu 1.200", "1.200"],
+    ["O valor é R$ 89,90", "89,90"],
+    ["paguei 300 conto", "300"],
   ])("%j → %j", (text, expected) => {
     expect(parseAmountReply(text)).toBe(expected);
   });
@@ -210,5 +215,6 @@ describe("parseAmountReply", () => {
   it("texto que não é só valor fica de fora (vira gasto novo)", () => {
     expect(parseAmountReply("500 eletricista")).toBeNull();
     expect(parseAmountReply("oi")).toBeNull();
+    expect(parseAmountReply("paguei 300 de areia")).toBeNull();
   });
 });

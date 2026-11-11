@@ -246,18 +246,25 @@ function formatBudget(
   }
 
   const lines = ["*Orçamento da obra*"];
+  // Mesma regra da aba Etapas (summarizePlans): o previsto só se compara com
+  // o gasto das etapas que têm previsto; o resto aparece à parte.
   const planned = answer.stages.filter((s) => s.budgetCents !== null);
-  const spent = answer.stages.reduce((t, s) => t + s.spentCents, 0);
-  const committed = answer.stages.reduce((t, s) => t + s.committedCents, 0);
+  const unplanned = answer.stages.filter((s) => s.budgetCents === null);
+  const total = (
+    stages: typeof answer.stages,
+    key: "spentCents" | "committedCents",
+  ) => stages.reduce((t, s) => t + s[key], 0);
   if (!planned.length) {
     lines.push(
-      `Gasto nas etapas: *${formatCents(spent)}*`,
+      `Gasto nas etapas: *${formatCents(total(unplanned, "spentCents"))}*`,
       "O previsto ainda não foi definido. Dá para definir no app, na aba Etapas.",
     );
     return lines.join("\n");
   }
 
   const budget = planned.reduce((t, s) => t + (s.budgetCents ?? 0), 0);
+  const spent = total(planned, "spentCents");
+  const committed = total(planned, "committedCents");
   lines.push(
     `Previsto: ${formatCents(budget)}`,
     `Gasto: *${formatCents(spent)}* (${percentOf(spent, budget)}%)`,
@@ -269,6 +276,10 @@ function formatBudget(
       ? `Sobra: ${formatCents(left)}`
       : `Passou do previsto: ${formatCents(-left)}`,
   );
+  const unplannedSpent = total(unplanned, "spentCents");
+  if (unplannedSpent > 0) {
+    lines.push(`Gasto em etapas sem previsto: ${formatCents(unplannedSpent)}`);
+  }
 
   const alerts = planned
     .map((stage) => ({ stage, status: stageStatus(stage) }))

@@ -289,30 +289,38 @@ async function payables(
   call: Extract<QueryCall, { name: "payables" }>,
   today: string,
 ): Promise<QueryAnswer> {
-  let query = admin
-    .from("payables")
-    .select("description, amount_cents, due_date, suppliers(name)", {
-      count: "exact",
-    })
-    .eq("org_id", project.orgId)
-    .eq("project_id", project.id)
-    .eq("status", call.status === "paid" ? "paid" : "open");
-  if (call.status === "overdue") query = query.lt("due_date", today);
-  if (call.status === "upcoming") query = query.gte("due_date", today);
-  if (call.from) query = query.gte("due_date", call.from);
-  if (call.to) query = query.lte("due_date", call.to);
-  // Pagas: as mais recentes primeiro; em aberto: as que vencem antes.
-  const { data, error, count } = await query
-    .order("due_date", { ascending: call.status !== "paid" })
-    .order("id")
-    .range(0, PAGE_SIZE - 1);
-  if (error) throw error;
-  const items = data.map((row) => ({
-    description: row.description,
-    amountCents: row.amount_cents,
-    dueDate: row.due_date,
-    supplierName: row.suppliers?.name ?? null,
-  }));
+  const page = async (offset: number) => {
+    let query = admin
+      .from("payables")
+      .select("description, amount_cents, due_date, suppliers(name)")
+      .eq("org_id", project.orgId)
+      .eq("project_id", project.id)
+      .eq("status", call.status === "paid" ? "paid" : "open");
+    if (call.status === "overdue") query = query.lt("due_date", today);
+    if (call.status === "upcoming") query = query.gte("due_date", today);
+    if (call.from) query = query.gte("due_date", call.from);
+    if (call.to) query = query.lte("due_date", call.to);
+    // Pagas: as mais recentes primeiro; em aberto: as que vencem antes.
+    const { data, error } = await query
+      .order("due_date", { ascending: call.status !== "paid" })
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    return data.map((row) => ({
+      description: row.description,
+      amountCents: row.amount_cents,
+      dueDate: row.due_date,
+      supplierName: row.suppliers?.name ?? null,
+    }));
+  };
+
+  // Todas as páginas: o total e a quantidade da resposta batem.
+  const items: Awaited<ReturnType<typeof page>> = [];
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const batch = await page(i * PAGE_SIZE);
+    items.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
   return {
     name: "payables",
     status: call.status,
@@ -320,6 +328,6 @@ async function payables(
     to: call.to,
     items: items.slice(0, PAYABLES_SHOWN),
     totalCents: sum(items),
-    count: count ?? items.length,
+    count: items.length,
   };
 }

@@ -6,6 +6,7 @@ const {
   buildReceiptText,
   interpretAiReceipt,
   interpretItems,
+  itemsMatchingTotal,
   receiptMimeType,
 } = await import("@/lib/ai/read-receipt");
 type AiReceipt = import("@/lib/ai/read-receipt").AiReceipt;
@@ -117,11 +118,21 @@ describe("leitura de comprovante: regras do app", () => {
     expect(read?.expense.hasInvoice).toBe(false);
   });
 
-  it("sem total: pergunta o valor e não guarda itens", () => {
+  it("sem total: pergunta o valor e guarda os itens para conferir depois", () => {
     const read = interpretAiReceipt(raw({ amount_brl: null }), null, context);
     expect(read?.expense.amountCents).toBeNull();
     expect(read?.expense.missing).toContain("amount");
     expect(read?.details.items).toEqual([]);
+    const unchecked = read?.details.uncheckedItems ?? [];
+    expect(unchecked).toHaveLength(2);
+    // O valor que a pessoa mandar decide se os itens valem.
+    expect(itemsMatchingTotal(unchecked, 15600)).toHaveLength(2);
+    expect(itemsMatchingTotal(unchecked, 30000)).toEqual([]);
+  });
+
+  it("com total, não guarda itens para conferir", () => {
+    const read = interpretAiReceipt(raw(), null, context);
+    expect(read?.details.uncheckedItems).toBeUndefined();
   });
 
   it("data no futuro vira hoje", () => {

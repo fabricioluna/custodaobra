@@ -104,6 +104,11 @@ export type ReceiptDetails = {
   invoiceNumber: string | null;
   accessKey: string | null;
   items: ReceiptItem[];
+  /**
+   * Itens lidos quando o total não foi: só valem depois que a pessoa manda o
+   * valor e a soma bate (itemsMatchingTotal).
+   */
+  uncheckedItems?: ReceiptItem[];
 };
 
 export type ReceiptResult =
@@ -134,7 +139,13 @@ export function interpretItems(
   raw: AiReceipt["items"],
   amountCents: number | null,
 ): ReceiptItem[] {
-  if (amountCents === null || !raw.length || raw.length > MAX_ITEMS) return [];
+  if (amountCents === null) return [];
+  return itemsMatchingTotal(parseItems(raw), amountCents);
+}
+
+/** Itens no formato do app; qualquer item ilegível descarta a lista. */
+function parseItems(raw: AiReceipt["items"]): ReceiptItem[] {
+  if (!raw.length || raw.length > MAX_ITEMS) return [];
   const items: ReceiptItem[] = [];
   for (const item of raw) {
     const description = clean(item.description, 200);
@@ -156,6 +167,15 @@ export function interpretItems(
       totalCents,
     });
   }
+  return items;
+}
+
+/** Os itens, se a soma bate com o total (folgas acima); senão, nenhum. */
+export function itemsMatchingTotal(
+  items: ReceiptItem[],
+  amountCents: number,
+): ReceiptItem[] {
+  if (!items.length) return [];
   const sum = items.reduce((total, item) => total + item.totalCents, 0);
   const below = Math.max(100, Math.round(amountCents * 0.02));
   const above = Math.max(below, Math.round(amountCents * 0.1));
@@ -209,6 +229,10 @@ export function interpretAiReceipt(
       invoiceNumber: clean(raw.invoice_number?.replace(/\D/g, "") ?? null, 60),
       accessKey: normalizeAccessKey(raw.access_key),
       items,
+      // Sem total: guarda os itens para conferir quando o valor chegar.
+      ...(expense.amountCents === null
+        ? { uncheckedItems: parseItems(raw.items) }
+        : {}),
     },
   };
 }

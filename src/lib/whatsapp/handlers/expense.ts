@@ -10,13 +10,18 @@ import {
   extractExpense,
 } from "@/lib/ai/extract-expense";
 import {
+  itemsMatchingTotal,
   maxReceiptBytes,
   type ReceiptDetails,
   type ReceiptMimeType,
   readReceipt,
   receiptMimeType,
 } from "@/lib/ai/read-receipt";
-import { canUseWhatsappAi } from "@/lib/billing/limits";
+import {
+  canAskWhatsappQuestion,
+  type LimitResult,
+  whatsappAllowance,
+} from "@/lib/billing/limits";
 import { recordUsage } from "@/lib/billing/usage";
 import { addDays, isIsoDate, todayIn } from "@/lib/dates";
 import { isValidAmountCents, parseMoneyToCents } from "@/lib/money";
@@ -212,16 +217,20 @@ function rememberActiveProject(
 }
 
 /**
- * Limite do plano e contexto da obra ao mesmo tempo. Fora do limite, avisa a
- * pessoa e devolve null.
+ * Limite do plano e contexto da obra ao mesmo tempo. Sem chamadas de IA no
+ * plano, avisa a pessoa e devolve null. O limite de lançamentos volta junto
+ * (`entries`): texto pode ser pergunta, que não esbarra nele, então quem
+ * chama confere depois de saber que é gasto. Comprovante é sempre gasto
+ * (`requireEntries`): confere antes de baixar a foto.
  */
 async function aiContextOrRefuse(
   session: BotSession,
   project: LaunchableProject,
   today: string,
-): Promise<ExtractionContext | null> {
+  options: { requireEntries?: boolean } = {},
+): Promise<{ context: ExtractionContext; entries: LimitResult } | null> {
   const [allowed, context] = await Promise.all([
-    canUseWhatsappAi(session.admin, project.orgId, today),
+    whatsappAllowance(session.admin, project.orgId, today),
     loadExtractionContext(
       session.admin,
       project.orgId,
@@ -229,21 +238,30 @@ async function aiContextOrRefuse(
       project.timezone,
     ),
   ]);
-  if (allowed.ok) return context;
-  await refuseAi(session, allowed.reason);
-  return null;
+  const refused = !allowed.ai.ok
+    ? allowed.ai
+    : options.requireEntries && !allowed.entries.ok
+      ? allowed.entries
+      : null;
+  if (refused && !refused.ok) {
+    await refuseAi(session, refused.reason);
+    return null;
+  }
+  return { context, entries: allowed.entries };
 }
 
 /**
  * Limite do plano antes de usar IA fora da leitura do gasto (ex.: ouvir um
- * áudio). Fora do limite, avisa a pessoa e devolve false.
+ * áudio, que pode ser pergunta). Só as chamadas de IA: o limite de
+ * lançamentos é conferido se o áudio for um gasto. Fora do limite, avisa a
+ * pessoa e devolve false.
  */
 export async function checkAiAllowed(
   session: BotSession,
   orgId: string,
   today: string,
 ): Promise<boolean> {
-  const allowed = await canUseWhatsappAi(session.admin, orgId, today);
+  const allowed = await canAskWhatsappQuestion(session.admin, orgId, today);
   if (allowed.ok) return true;
   await refuseAi(session, allowed.reason);
   return false;
@@ -274,8 +292,9 @@ async function readExpense(
   const { admin, userId } = session;
   const heard = source === "whatsapp_audio" ? heardPrefix(text) : "";
   const today = todayIn(project.timezone);
-  const context = await aiContextOrRefuse(session, project, today);
-  if (!context) return;
+  const allowed = await aiContextOrRefuse(session, project, today);
+  if (!allowed) return;
+  const { context } = allowed;
 
   const result = await extractExpense(text, context);
   // Toda chamada conta no plano, mesmo a que falhou (tokens, se vieram).
@@ -294,6 +313,11 @@ async function readExpense(
         heard,
       }),
     ]);
+    return;
+  }
+  if (result.kind === "expense" && !allowed.entries.ok) {
+    // É gasto, mas os lançamentos do mês acabaram (perguntas continuam).
+    await Promise.all([usage, refuseAi(session, allowed.entries.reason)]);
     return;
   }
   if (result.kind === "failed") session.noteError?.(`ai_${result.reason}`);
@@ -355,18 +379,24 @@ async function readExpense(
 type ReceiptFile = { data: ArrayBuffer; mimeType: ReceiptMimeType };
 
 /**
- * Baixa o comprovante. Falhou ou é grande demais: avisa a pessoa e devolve
- * null.
+ * Baixa o comprovante. Falhou ou é grande demais: devolve `failure`, que
+ * avisa a pessoa. Quem chama decide se avisa (fora do limite do plano, o
+ * aviso do limite é o único que vai).
  */
 async function fetchReceipt(
-  session: BotSession,
   media: ReceiptMedia,
-): Promise<ReceiptFile | null> {
+): Promise<
+  { file: ReceiptFile } | { failure: (s: BotSession) => Promise<void> }
+> {
+  const fail = (code: string, body: string) => ({
+    failure: async (session: BotSession) => {
+      session.noteError?.(code);
+      await session.send({ type: "text", body });
+    },
+  });
   const declared = receiptMimeType(media.mimeType);
   if (!declared) {
-    session.noteError?.("media_unsupported");
-    await session.send({ type: "text", body: botMessages.receiptUnsupported });
-    return null;
+    return fail("media_unsupported", botMessages.receiptUnsupported);
   }
   try {
     const file = await downloadMedia(media.id, maxReceiptBytes(declared));
@@ -374,18 +404,13 @@ async function fetchReceipt(
     if (file.data.byteLength > maxReceiptBytes(mimeType)) {
       throw new MediaTooLargeError(file.data.byteLength);
     }
-    return { data: file.data, mimeType };
+    return { file: { data: file.data, mimeType } };
   } catch (error) {
     const tooLarge = error instanceof MediaTooLargeError;
     if (!tooLarge) console.error("[whatsapp] falha ao baixar a mídia", error);
-    session.noteError?.(tooLarge ? "media_too_large" : "media_download_failed");
-    await session.send({
-      type: "text",
-      body: tooLarge
-        ? botMessages.receiptTooLarge
-        : botMessages.receiptDownloadFailed,
-    });
-    return null;
+    return tooLarge
+      ? fail("media_too_large", botMessages.receiptTooLarge)
+      : fail("media_download_failed", botMessages.receiptDownloadFailed);
   }
 }
 
@@ -398,12 +423,16 @@ async function readReceiptMessage(
 ): Promise<void> {
   const { admin, userId } = session;
   const today = todayIn(project.timezone);
-  // Limite e contexto junto com o download: são independentes.
-  const [context, file] = await Promise.all([
-    aiContextOrRefuse(session, project, today),
-    fetchReceipt(session, media),
+  // Limite e contexto junto com o download: são independentes. Fora do
+  // limite, só o aviso do limite vai (o do download fica de fora).
+  const [allowed, fetched] = await Promise.all([
+    aiContextOrRefuse(session, project, today, { requireEntries: true }),
+    fetchReceipt(media),
   ]);
-  if (!context || !file) return;
+  if (!allowed) return;
+  if ("failure" in fetched) return fetched.failure(session);
+  const { context } = allowed;
+  const { file } = fetched;
 
   const result = await readReceipt(file, media.caption, context);
   const usage = recordUsage(admin, project.orgId, today, {
@@ -490,6 +519,16 @@ async function refetchReceipt(
 }
 
 /** Resposta à pergunta do valor: completa o rascunho ou corrige o pendente. */
+/** Valor do cupom chegou: os itens lidos valem se a soma bate com ele. */
+function withCheckedItems(
+  details: ReceiptDetails,
+  amountCents: number,
+): ReceiptDetails {
+  const { uncheckedItems, ...rest } = details;
+  if (!uncheckedItems?.length) return rest;
+  return { ...rest, items: itemsMatchingTotal(uncheckedItems, amountCents) };
+}
+
 async function applyAmount(session: BotSession, cents: number): Promise<void> {
   const { admin, userId, conversation } = session;
   const draft = conversation.context.draft;
@@ -529,7 +568,7 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
             ? "whatsapp_audio"
             : "whatsapp_text",
         receipt: draft.receipt
-          ? { file, details: draft.receipt.details }
+          ? { file, details: withCheckedItems(draft.receipt.details, cents) }
           : undefined,
       },
     );
@@ -697,23 +736,19 @@ async function confirm(
   pending: PendingExpense,
   extra: ExpenseUpdate = {},
 ): Promise<void> {
-  // O fornecedor só é cadastrado agora, na confirmação.
-  const supplierId = await resolveSupplier(
-    session.admin,
-    pending.orgId,
-    pending.supplierName,
-    pending.supplierDocument,
-  );
+  // Confirma primeiro: se o pendente já foi cancelado (cron, mensagem nova),
+  // nada é gravado, nem o fornecedor.
   const ok = await updatePending(session, pending, {
     ...extra,
-    supplier_id: supplierId,
     status: "confirmed",
   });
   if (!ok) {
     return session.send({ type: "text", body: botMessages.alreadyHandled });
   }
-  // A resposta sai junto com a contagem do plano e a limpeza da conversa.
+  // A resposta sai junto com o fornecedor (só cadastrado agora, na
+  // confirmação), a contagem do plano e a limpeza da conversa.
   await Promise.all([
+    attachSupplier(session, pending),
     session.send({
       type: "text",
       body: botMessages.confirmed(summaryOf(pending)),
@@ -723,6 +758,38 @@ async function confirm(
     }),
     resetConversation(session.admin, session.userId),
   ]);
+}
+
+/**
+ * Cadastra (ou reaproveita) o fornecedor lido pela IA e liga ao gasto já
+ * confirmado. Se falhar, o gasto continua valendo sem fornecedor: fica no
+ * log e a pessoa ajusta no app.
+ */
+async function attachSupplier(
+  session: BotSession,
+  pending: PendingExpense,
+): Promise<void> {
+  if (!pending.supplierName) return;
+  try {
+    const supplierId = await resolveSupplier(
+      session.admin,
+      pending.orgId,
+      pending.supplierName,
+      pending.supplierDocument,
+    );
+    if (!supplierId) return;
+    const { error } = await session.admin
+      .from("expenses")
+      .update({ supplier_id: supplierId })
+      .eq("id", pending.id)
+      .eq("org_id", pending.orgId)
+      .eq("created_by", session.userId)
+      .eq("status", "confirmed");
+    if (error) throw error;
+  } catch (error) {
+    console.error("[whatsapp] falha ao ligar o fornecedor", error);
+    session.noteError?.("supplier_failed");
+  }
 }
 
 async function chooseProject(

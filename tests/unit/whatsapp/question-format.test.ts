@@ -216,6 +216,34 @@ describe("formatAnswer", () => {
     expect(text).not.toContain("Fundação");
   });
 
+  it("orçamento da obra só compara o previsto com as etapas que têm previsto", () => {
+    const text = format({
+      name: "budget_status",
+      stageId: null,
+      stages: [
+        {
+          id: "a",
+          name: "Alvenaria",
+          budgetCents: 1_000_000,
+          spentCents: 500_000,
+          committedCents: 0,
+          progressPercent: 0,
+        },
+        {
+          id: "f",
+          name: "Fundação",
+          budgetCents: null,
+          spentCents: 2_000_000,
+          committedCents: 0,
+          progressPercent: 0,
+        },
+      ],
+    });
+    expect(text).toContain("Gasto: *R$ 5.000,00* (50%)");
+    expect(text).toContain("Sobra: R$ 5.000,00");
+    expect(text).toContain("Gasto em etapas sem previsto: R$ 20.000,00");
+  });
+
   it("orçamento ainda não definido", () => {
     const text = format({
       name: "budget_status",

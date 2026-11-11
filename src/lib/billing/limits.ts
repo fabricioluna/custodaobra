@@ -195,52 +195,61 @@ async function getUsage(supabase: Client, orgId: string, month: string) {
 }
 
 /**
- * Pode lançar mais um gasto pelo WhatsApp e chamar a IA para lê-lo? Usado
- * pelo webhook (cliente service_role, sem sessão). `today` é a data no fuso
- * da organização: o mês do plano vira no fuso dela.
+ * O que o plano ainda permite pelo WhatsApp neste mês, numa leitura só:
+ * - `ai`: chamar a IA (WhatsApp no plano e chamadas de IA sobrando). Vale
+ *   para ler qualquer mensagem, inclusive perguntas.
+ * - `entries`: lançar mais um gasto (limite de lançamentos pelo WhatsApp).
+ * Usado pelo webhook (cliente service_role, sem sessão). `today` é a data no
+ * fuso da organização: o mês do plano vira no fuso dela.
+ */
+export async function whatsappAllowance(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<{ ai: LimitResult; entries: LimitResult }> {
+  const [subscription, usage] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+  ]);
+  const blocked = (result: LimitResult) => ({ ai: result, entries: result });
+  if (!subscription?.plans) {
+    return blocked({ ok: false, reason: "no_subscription" });
+  }
+  if (!isSubscriptionUsable(subscription)) {
+    return blocked({ ok: false, reason: "subscription_inactive" });
+  }
+  if (!subscription.plans.whatsapp_enabled) {
+    return blocked({ ok: false, reason: "whatsapp_disabled" });
+  }
+  return {
+    ai: checkAiCalls(subscription.plans, usage.ai_calls),
+    entries: checkWhatsappEntries(subscription.plans, usage.whatsapp_entries),
+  };
+}
+
+/**
+ * Pode lançar mais um gasto pelo WhatsApp e chamar a IA para lê-lo? (Foto
+ * de comprovante: é sempre um gasto.)
  */
 export async function canUseWhatsappAi(
   supabase: Client,
   orgId: string,
   today: string,
 ): Promise<LimitResult> {
-  const [subscription, usage] = await Promise.all([
-    getOrgPlan(supabase, orgId),
-    getUsage(supabase, orgId, monthOf(today)),
-  ]);
-  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
-
-  const entries = checkWhatsappEntries(
-    subscription.plans,
-    usage.whatsapp_entries,
-  );
-  if (!entries.ok) return entries;
-  return checkAiCalls(subscription.plans, usage.ai_calls);
+  const { ai, entries } = await whatsappAllowance(supabase, orgId, today);
+  return entries.ok ? ai : entries;
 }
 
 /**
- * Pode fazer uma pergunta pelo WhatsApp ("quanto gastei com cimento?")?
- * Pergunta não é lançamento: exige o WhatsApp no plano e chamadas de IA
- * sobrando no mês, mas não conta nem esbarra no limite de lançamentos.
+ * Pode chamar a IA para ler uma mensagem que ainda não se sabe se é gasto
+ * (texto, áudio) ou que é pergunta ("quanto gastei com cimento?")? Pergunta
+ * não é lançamento: não conta nem esbarra no limite de lançamentos, que é
+ * conferido depois, quando a mensagem é mesmo um gasto.
  */
 export async function canAskWhatsappQuestion(
   supabase: Client,
   orgId: string,
   today: string,
 ): Promise<LimitResult> {
-  const [subscription, usage] = await Promise.all([
-    getOrgPlan(supabase, orgId),
-    getUsage(supabase, orgId, monthOf(today)),
-  ]);
-  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
-  if (!subscription.plans.whatsapp_enabled) {
-    return { ok: false, reason: "whatsapp_disabled" };
-  }
-  return checkAiCalls(subscription.plans, usage.ai_calls);
+  return (await whatsappAllowance(supabase, orgId, today)).ai;
 }
