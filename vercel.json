@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "crons": [
     { "path": "/api/cron/expire-pending", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/purge-whatsapp-log", "schedule": "30 6 * * *" }
+    { "path": "/api/cron/purge-whatsapp-log", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/whatsapp-notifications", "schedule": "0 12 * * *" }
   ]
 }

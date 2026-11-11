@@ -28,6 +28,18 @@ export type OutgoingMessage =
       body: string;
       buttonLabel: string;
       rows: ListRow[];
+    }
+  /**
+   * Mensagem por modelo aprovado pela Meta (fora da janela de 24 h). `body`
+   * é o texto já montado, só para o log e o simulador: a Meta monta o dela
+   * com o modelo e os parâmetros.
+   */
+  | {
+      type: "template";
+      name: string;
+      language: string;
+      params: string[];
+      body: string;
     };
 
 export class WhatsAppApiError extends Error {
@@ -109,6 +121,26 @@ export function buildMessageBody(to: string, message: OutgoingMessage) {
               },
             ],
           },
+        },
+      };
+    case "template":
+      return {
+        ...base,
+        type: "template",
+        template: {
+          name: message.name,
+          language: { code: message.language },
+          components: message.params.length
+            ? [
+                {
+                  type: "body",
+                  parameters: message.params.map((text) => ({
+                    type: "text",
+                    text,
+                  })),
+                },
+              ]
+            : [],
         },
       };
   }

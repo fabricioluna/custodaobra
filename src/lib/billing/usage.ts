@@ -22,6 +22,8 @@ export async function recordUsage(
     outputTokens?: number;
     /** Segundos de áudio transcritos (Groq), já com o mínimo cobrado. */
     audioSeconds?: number;
+    /** Mensagens por modelo (avisos que o bot manda por conta própria). */
+    templateMessages?: number;
   },
 ): Promise<void> {
   const { error } = await admin.rpc("increment_usage", {
@@ -32,6 +34,7 @@ export async function recordUsage(
     p_ai_input_tokens: usage.inputTokens ?? 0,
     p_ai_output_tokens: usage.outputTokens ?? 0,
     p_audio_seconds: usage.audioSeconds ?? 0,
+    p_template_messages: usage.templateMessages ?? 0,
   });
   if (error) {
     // Não derruba o lançamento por causa da contagem, mas deixa rastro.

@@ -22,7 +22,8 @@ export type LimitReason =
   | "max_members"
   | "whatsapp_disabled"
   | "max_whatsapp_entries"
-  | "max_ai_calls";
+  | "max_ai_calls"
+  | "max_template_messages";
 
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
 
@@ -110,6 +111,26 @@ export function checkAiCalls(
   return { ok: true };
 }
 
+/**
+ * Regra pura: dá para mandar mais `count` mensagens por modelo (avisos que o
+ * bot manda sem a pessoa ter escrito, cobradas pela Meta) este mês?
+ */
+export function checkTemplateMessages(
+  plan: Pick<Plan, "whatsapp_enabled" | "max_template_messages_month">,
+  usedThisMonth: number,
+  count = 1,
+): LimitResult {
+  if (!plan.whatsapp_enabled) return { ok: false, reason: "whatsapp_disabled" };
+  if (usedThisMonth + count > plan.max_template_messages_month) {
+    return {
+      ok: false,
+      reason: "max_template_messages",
+      limit: plan.max_template_messages_month,
+    };
+  }
+  return { ok: true };
+}
+
 /** Primeiro dia do mês (AAAA-MM-01) de uma data AAAA-MM-DD. */
 export function monthOf(isoDate: string): string {
   return `${isoDate.slice(0, 7)}-01`;
@@ -186,12 +207,12 @@ export async function canInviteMember(
 async function getUsage(supabase: Client, orgId: string, month: string) {
   const { data, error } = await supabase
     .from("usage_counters")
-    .select("whatsapp_entries, ai_calls")
+    .select("whatsapp_entries, ai_calls, template_messages")
     .eq("org_id", orgId)
     .eq("month", month)
     .maybeSingle();
   if (error) throw new Error("Não foi possível ler o uso do plano.");
-  return data ?? { whatsapp_entries: 0, ai_calls: 0 };
+  return data ?? { whatsapp_entries: 0, ai_calls: 0, template_messages: 0 };
 }
 
 /**
@@ -252,4 +273,29 @@ export async function canAskWhatsappQuestion(
   today: string,
 ): Promise<LimitResult> {
   return (await whatsappAllowance(supabase, orgId, today)).ai;
+}
+
+/**
+ * Pode mandar mais `count` avisos por modelo (alerta de orçamento, resumo
+ * semanal) para pessoas desta conta? Usado pelo cron (service_role).
+ */
+export async function canSendTemplates(
+  supabase: Client,
+  orgId: string,
+  today: string,
+  count = 1,
+): Promise<LimitResult> {
+  const [subscription, usage] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+  ]);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+  return checkTemplateMessages(
+    subscription.plans,
+    usage.template_messages,
+    count,
+  );
 }
