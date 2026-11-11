@@ -2,6 +2,7 @@ import { type ReactNode, Suspense } from "react";
 
 import { AppNav } from "@/components/layout/app-nav";
 import { AppShell } from "@/components/layout/app-shell";
+import { BillingBanner } from "@/features/billing/components/billing-banner";
 import { getLaunchAccess } from "@/features/members/queries";
 import { requireOrg } from "@/features/organizations/queries";
 
@@ -34,8 +35,13 @@ async function OrgGate({
   children: ReactNode;
 }) {
   const { orgSlug } = await params;
-  await requireOrg(orgSlug);
-  return children;
+  const org = await requireOrg(orgSlug);
+  return (
+    <>
+      <BillingBanner orgId={org.id} orgSlug={org.slug} />
+      {children}
+    </>
+  );
 }
 
 /** Navegação com a tecla "Lançar gasto" só para quem pode lançar. */

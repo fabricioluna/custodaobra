@@ -1,20 +1,20 @@
 import {
   ChevronRight,
   Database,
+  Gauge,
   LogOut,
   MessageCircle,
-  Settings,
   Users,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { EmptyState } from "@/components/empty-state";
 import { orgPath } from "@/components/layout/nav";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { accountCopy } from "@/features/account/copy";
 import { signOut } from "@/features/auth/actions";
+import { billingCopy } from "@/features/billing/copy";
 import { authCopy } from "@/features/auth/copy";
 import { membersCopy } from "@/features/members/copy";
 import {
@@ -177,11 +177,32 @@ export default async function SettingsPage({
           </Link>
         </section>
 
-        <EmptyState
-          icon={Settings}
-          title={copy.comingSoonTitle}
-          description={copy.comingSoonDescription}
-        />
+        {canManage ? (
+          <section>
+            <h2 className="mb-3 text-lg heading">{copy.plan}</h2>
+            <Link
+              href={orgPath(org.slug, "configuracoes", "plano")}
+              className={rowClass}
+            >
+              <Gauge
+                className="size-6 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span className="flex flex-1 flex-col">
+                <span className="font-semibold">
+                  {billingCopy.settingsRow.title}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {billingCopy.settingsRow.description}
+                </span>
+              </span>
+              <ChevronRight
+                className="size-5 text-muted-foreground"
+                aria-hidden
+              />
+            </Link>
+          </section>
+        ) : null}
       </div>
 
       <form action={signOut} className="mt-10 border-t pt-6">

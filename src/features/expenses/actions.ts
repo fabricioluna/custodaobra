@@ -4,10 +4,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import { orgPath } from "@/components/layout/nav";
+import { billingCopy } from "@/features/billing/copy";
 import { requireOrg } from "@/features/organizations/queries";
 import { getProjectAccess } from "@/features/projects/queries";
 import { resolveSupplier } from "@/features/suppliers/resolve";
 import { requireUserId } from "@/lib/auth/session";
+import { canWrite } from "@/lib/billing/limits";
 import { addDays, todayIn } from "@/lib/dates";
 import { fieldErrorsFrom, type FormState, textField } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
@@ -187,6 +189,11 @@ export async function createExpense(
   const ready = await prepare(orgSlug, projectId, formData);
   if (!ready.ok) return ready.state;
   const { userId, org, supabase, file, row } = ready;
+
+  // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
+  if (!(await canWrite(supabase, org.id)).ok) {
+    return { status: "error", message: billingCopy.inactive };
+  }
 
   const { data, error } = await supabase
     .from("expenses")
