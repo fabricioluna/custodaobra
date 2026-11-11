@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { AuthScreen } from "@/components/layout/auth-screen";
@@ -17,6 +18,17 @@ export default function LoginPage({ searchParams }: PageProps<"/entrar">) {
       <Suspense fallback={<div className="h-80" />}>
         <LoginPanelFromUrl searchParams={searchParams} />
       </Suspense>
+      <p className="mt-6 text-sm text-muted-foreground">
+        {copy.legalPrefix}
+        <Link href="/termos" className="underline underline-offset-2">
+          {copy.legalTerms}
+        </Link>
+        {copy.legalAnd}
+        <Link href="/privacidade" className="underline underline-offset-2">
+          {copy.legalPrivacy}
+        </Link>
+        {copy.legalSuffix}
+      </p>
     </AuthScreen>
   );
 }

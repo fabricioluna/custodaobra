@@ -17,6 +17,11 @@ export const authCopy = {
     verify: "Entrar",
     verifying: "Entrando…",
     useOtherEmail: "Usar outro e-mail",
+    legalPrefix: "Ao entrar, você concorda com os ",
+    legalTerms: "Termos de Uso",
+    legalAnd: " e a ",
+    legalPrivacy: "Política de Privacidade",
+    legalSuffix: ".",
   },
   errors: {
     invalidEmail: "Digite um e-mail válido, como voce@exemplo.com.",

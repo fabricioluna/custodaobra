@@ -13,6 +13,23 @@ test.describe("entrada no app", () => {
     await expect(page.getByLabel("Seu e-mail")).toBeVisible();
   });
 
+  test("página inicial mostra preços e leva aos termos e à privacidade", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "Preços", level: 2 }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Termos de Uso" }).click();
+    await expect(page).toHaveURL(/\/termos$/);
+    await expect(
+      page.getByRole("heading", { name: "Termos de Uso", level: 1 }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Política de Privacidade" }).click();
+    await expect(page).toHaveURL(/\/privacidade$/);
+    await expect(page.getByText("Anthropic").first()).toBeVisible();
+  });
+
   test("área logada sem sessão manda para o login e guarda o destino", async ({
     page,
   }) => {
