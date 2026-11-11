@@ -8,7 +8,7 @@ export const ONBOARDING_PATH = "/primeiro-acesso";
 export const ACCOUNT_DELETED_PATH = "/conta-excluida";
 
 /** Áreas que exigem login. */
-const PROTECTED_PREFIXES = ["/o", AFTER_LOGIN_PATH, ONBOARDING_PATH];
+const PROTECTED_PREFIXES = ["/o", "/admin", AFTER_LOGIN_PATH, ONBOARDING_PATH];
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(

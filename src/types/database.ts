@@ -723,6 +723,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      platform_admins: {
+        Row: {
+          created_at: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -1406,6 +1424,30 @@ export type Database = {
         Returns: {
           org_slug: string;
           project_id: string;
+        }[];
+      };
+      admin_orgs: {
+        Args: { p_month: string };
+        Returns: {
+          ai_calls: number;
+          ai_input_tokens: number;
+          ai_output_tokens: number;
+          audio_seconds: number;
+          created_at: string;
+          current_period_end: string;
+          expenses_month: number;
+          kind: Database["public"]["Enums"]["org_kind"];
+          members: number;
+          name: string;
+          org_id: string;
+          owner_email: string;
+          plan_code: string;
+          plan_name: string;
+          projects: number;
+          status: Database["public"]["Enums"]["subscription_status"];
+          template_messages: number;
+          trial_ends_at: string;
+          whatsapp_entries: number;
         }[];
       };
       delete_my_account: { Args: never; Returns: undefined };
