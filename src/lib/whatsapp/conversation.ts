@@ -29,6 +29,8 @@ export type ExpenseDraft = {
   expense: ExtractedExpense;
   rawInput: string | null;
   logId: string | null;
+  /** Veio de um áudio (o texto é a transcrição). */
+  audio?: boolean;
   /** Veio de um comprovante: a foto é baixada de novo quando o valor chega. */
   receipt?: { media: ReceiptMedia; details: ReceiptDetails };
 };
@@ -36,6 +38,8 @@ export type ExpenseDraft = {
 export type ConversationContext = {
   /** Mensagem guardada enquanto a pessoa escolhe a obra. */
   pendingText?: string;
+  /** `pendingText` é a transcrição de um áudio. */
+  pendingAudio?: boolean;
   /** Comprovante guardado enquanto a pessoa escolhe a obra. */
   pendingMedia?: ReceiptMedia;
   pendingLogId?: string | null;

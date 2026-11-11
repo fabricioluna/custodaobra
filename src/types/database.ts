@@ -1000,6 +1000,7 @@ export type Database = {
           ai_calls: number;
           ai_input_tokens: number;
           ai_output_tokens: number;
+          audio_seconds: number;
           created_at: string;
           month: string;
           org_id: string;
@@ -1010,6 +1011,7 @@ export type Database = {
           ai_calls?: number;
           ai_input_tokens?: number;
           ai_output_tokens?: number;
+          audio_seconds?: number;
           created_at?: string;
           month: string;
           org_id: string;
@@ -1020,6 +1022,7 @@ export type Database = {
           ai_calls?: number;
           ai_input_tokens?: number;
           ai_output_tokens?: number;
+          audio_seconds?: number;
           created_at?: string;
           month?: string;
           org_id?: string;
@@ -1347,6 +1350,7 @@ export type Database = {
           p_ai_calls?: number;
           p_ai_input_tokens?: number;
           p_ai_output_tokens?: number;
+          p_audio_seconds?: number;
           p_month: string;
           p_org_id: string;
           p_whatsapp_entries?: number;

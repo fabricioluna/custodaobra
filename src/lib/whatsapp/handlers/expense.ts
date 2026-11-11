@@ -45,6 +45,7 @@ import {
   dateListMessage,
   editMenuMessage,
   formatSummary,
+  heardPrefix,
   parseAmountReply,
   projectListMessage,
   stageListMessage,
@@ -71,14 +72,21 @@ export type BotSession = {
 
 // Mensagem de texto ----------------------------------------------------------------
 
+/** Origem de um gasto lido de texto: escrito ou transcrito de um áudio. */
+export type TextSource = "whatsapp_text" | "whatsapp_audio";
+
 export async function handleText(
   session: BotSession,
   text: string,
   logId: string | null,
+  source: TextSource = "whatsapp_text",
 ): Promise<void> {
   const { conversation } = session;
   if (conversation.state === "awaiting_amount") {
-    const amount = parseAmountReply(text);
+    // A transcrição termina com ponto ("300.").
+    const amount = parseAmountReply(
+      source === "whatsapp_audio" ? text.replace(/[.!?…]+$/u, "") : text,
+    );
     if (amount !== null) {
       const cents = parseMoneyToCents(amount);
       if (cents === null || !isValidAmountCents(cents)) {
@@ -91,11 +99,12 @@ export async function handleText(
   const project = await projectForNewExpense(session, {
     pendingText: text,
     pendingLogId: logId,
+    ...(source === "whatsapp_audio" ? { pendingAudio: true } : {}),
   });
   if (!project) return;
   await Promise.all([
     rememberActiveProject(session, project),
-    readExpense(session, project, text, logId),
+    readExpense(session, project, text, logId, source),
   ]);
 }
 
@@ -194,26 +203,49 @@ async function aiContextOrRefuse(
     ),
   ]);
   if (allowed.ok) return context;
-  session.noteError?.(`limit_${allowed.reason}`);
-  const body =
-    allowed.reason === "whatsapp_disabled"
-      ? botMessages.whatsappDisabled
-      : allowed.reason === "max_whatsapp_entries" ||
-          allowed.reason === "max_ai_calls"
-        ? botMessages.limitReached
-        : botMessages.unavailable;
-  await session.send({ type: "text", body });
+  await refuseAi(session, allowed.reason);
   return null;
 }
 
-/** IA lê a mensagem; o gasto nasce pendente (ou vira rascunho sem valor). */
+/**
+ * Limite do plano antes de usar IA fora da leitura do gasto (ex.: ouvir um
+ * áudio). Fora do limite, avisa a pessoa e devolve false.
+ */
+export async function checkAiAllowed(
+  session: BotSession,
+  orgId: string,
+  today: string,
+): Promise<boolean> {
+  const allowed = await canUseWhatsappAi(session.admin, orgId, today);
+  if (allowed.ok) return true;
+  await refuseAi(session, allowed.reason);
+  return false;
+}
+
+async function refuseAi(session: BotSession, reason: string): Promise<void> {
+  session.noteError?.(`limit_${reason}`);
+  const body =
+    reason === "whatsapp_disabled"
+      ? botMessages.whatsappDisabled
+      : reason === "max_whatsapp_entries" || reason === "max_ai_calls"
+        ? botMessages.limitReached
+        : botMessages.unavailable;
+  await session.send({ type: "text", body });
+}
+
+/**
+ * IA lê a mensagem; o gasto nasce pendente (ou vira rascunho sem valor).
+ * Veio de um áudio: a resposta começa com o que o bot ouviu.
+ */
 async function readExpense(
   session: BotSession,
   project: LaunchableProject,
   text: string,
   logId: string | null,
+  source: TextSource = "whatsapp_text",
 ): Promise<void> {
   const { admin, userId } = session;
+  const heard = source === "whatsapp_audio" ? heardPrefix(text) : "";
   const today = todayIn(project.timezone);
   const context = await aiContextOrRefuse(session, project, today);
   if (!context) return;
@@ -233,11 +265,12 @@ async function readExpense(
       session.send({
         type: "text",
         body:
-          result.kind === "not_expense"
+          heard +
+          (result.kind === "not_expense"
             ? botMessages.howTo
             : result.reason === "unavailable"
               ? botMessages.unavailable
-              : botMessages.notUnderstood,
+              : botMessages.notUnderstood),
       }),
     ]);
     return;
@@ -253,12 +286,18 @@ async function readExpense(
         state: "awaiting_amount",
         pendingExpenseId: null,
         context: {
-          draft: { projectId: project.id, expense, rawInput: text, logId },
+          draft: {
+            projectId: project.id,
+            expense,
+            rawInput: text,
+            logId,
+            ...(source === "whatsapp_audio" ? { audio: true } : {}),
+          },
         },
       }),
       session.send({
         type: "text",
-        body: botMessages.askAmount(expense.description),
+        body: heard + botMessages.askAmount(expense.description),
       }),
     ]);
     return;
@@ -269,9 +308,9 @@ async function readExpense(
     project,
     context.stages,
     { ...expense, amountCents: expense.amountCents },
-    { rawInput: text, logId, source: "whatsapp_text" },
+    { rawInput: text, logId, source },
   );
-  return presentPending(session, pending, "new");
+  return presentPending(session, pending, "new", heard);
 }
 
 /** Arquivo baixado da Meta, já com o tipo conferido. */
@@ -446,7 +485,11 @@ async function applyAmount(session: BotSession, cents: number): Promise<void> {
       {
         rawInput: draft.rawInput,
         logId: draft.logId,
-        source: draft.receipt ? "whatsapp_image" : "whatsapp_text",
+        source: draft.receipt
+          ? "whatsapp_image"
+          : draft.audio
+            ? "whatsapp_audio"
+            : "whatsapp_text",
         receipt: draft.receipt
           ? { file, details: draft.receipt.details }
           : undefined,
@@ -654,8 +697,13 @@ async function chooseProject(
   if (!project) {
     return session.send({ type: "text", body: botMessages.noProjects });
   }
-  const { pendingText, pendingMedia, pendingLogId, pendingCommand } =
-    conversation.context;
+  const {
+    pendingText,
+    pendingAudio,
+    pendingMedia,
+    pendingLogId,
+    pendingCommand,
+  } = conversation.context;
   const select = saveConversation(admin, userId, {
     state: "idle",
     activeOrgId: project.orgId,
@@ -667,7 +715,13 @@ async function chooseProject(
     await select;
     return pendingMedia
       ? readReceiptMessage(session, project, pendingMedia, pendingLogId ?? null)
-      : readExpense(session, project, pendingText ?? "", pendingLogId ?? null);
+      : readExpense(
+          session,
+          project,
+          pendingText ?? "",
+          pendingLogId ?? null,
+          pendingAudio ? "whatsapp_audio" : "whatsapp_text",
+        );
   }
   await Promise.all([
     select,
@@ -829,8 +883,10 @@ async function presentPending(
   session: BotSession,
   pending: PendingExpense,
   mode: "new" | "updated",
+  /** Texto antes do resumo (o que o bot ouviu de um áudio). */
+  prefix = "",
 ): Promise<void> {
-  const summary = summaryOf(pending);
+  const summary = prefix + summaryOf(pending);
   const askStage =
     mode === "new" && !pending.stageId && pending.stages.length > 0;
   await Promise.all([
@@ -907,7 +963,7 @@ async function categoryIdOf(admin: Admin, code: string): Promise<string> {
 type PendingInput = {
   rawInput: string | null;
   logId: string | null;
-  source: "whatsapp_text" | "whatsapp_image";
+  source: TextSource | "whatsapp_image";
   /** Comprovante: a foto (se baixou) e o que foi lido dela. */
   receipt?: { file: ReceiptFile | null; details: ReceiptDetails };
 };

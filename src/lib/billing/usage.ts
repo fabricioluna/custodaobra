@@ -20,6 +20,8 @@ export async function recordUsage(
     aiCalls?: number;
     inputTokens?: number;
     outputTokens?: number;
+    /** Segundos de áudio transcritos (Groq), já com o mínimo cobrado. */
+    audioSeconds?: number;
   },
 ): Promise<void> {
   const { error } = await admin.rpc("increment_usage", {
@@ -29,6 +31,7 @@ export async function recordUsage(
     p_ai_calls: usage.aiCalls ?? 0,
     p_ai_input_tokens: usage.inputTokens ?? 0,
     p_ai_output_tokens: usage.outputTokens ?? 0,
+    p_audio_seconds: usage.audioSeconds ?? 0,
   });
   if (error) {
     // Não derruba o lançamento por causa da contagem, mas deixa rastro.

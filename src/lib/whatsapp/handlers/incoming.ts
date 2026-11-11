@@ -21,6 +21,7 @@ import { botMessages } from "../messages";
 import { phoneVariants } from "../phone";
 import { sendAndLog } from "../send";
 import { type IncomingMessage, messageText } from "../webhook";
+import { handleAudio } from "./audio";
 import { handleCommand } from "./commands";
 import {
   type BotSession,
@@ -292,8 +293,8 @@ function reply(
 
 /**
  * Mensagem de quem já está ligado: toque em botão ou lista (pelo id que o bot
- * mandou), foto ou documento (comprovante), texto (gasto novo ou resposta a
- * uma pergunta) ou outro tipo (áudio chega na parte 3 da Fase 4).
+ * mandou), foto ou documento (comprovante), áudio (transcrito e tratado como
+ * texto), texto (gasto novo ou resposta a uma pergunta) ou outro tipo.
  */
 async function handleFromSender(
   admin: Admin,
@@ -339,6 +340,16 @@ async function handleFromSender(
         caption: media.caption?.trim().slice(0, 500) || null,
       },
       logId,
+    );
+  }
+
+  // Mensagem de voz ou arquivo de áudio: vira texto e segue como texto.
+  if (message.type === "audio" && message.audio) {
+    return handleAudio(
+      session,
+      { id: message.audio.id, mimeType: message.audio.mime_type ?? "" },
+      logId,
+      sender.orgId,
     );
   }
 

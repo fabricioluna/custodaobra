@@ -22,8 +22,8 @@ export const botMessages = {
     "Muitas tentativas com código errado. Espere uma hora, gere um código novo no app e tente de novo.",
 
   howTo:
-    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nOu mande a foto (ou o PDF) do cupom ou da nota.\n\nMande *ajuda* para ver os comandos.",
-  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota.\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+    "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nOu mande a foto (ou o PDF) do cupom ou da nota, ou um áudio falando o gasto.\n\nMande *ajuda* para ver os comandos.",
+  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
   projectsQuestion: "Para qual obra vão os próximos gastos?",
   onlyProject: (name: string) =>
     `Sua obra é *${name}*. Os gastos vão para ela.`,
@@ -38,7 +38,17 @@ export const botMessages = {
   notUnderstood:
     "Não consegui entender esse gasto. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
   onlyText:
-    "Por enquanto eu entendo texto e foto (ou PDF) de cupom. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
+    "Por enquanto eu entendo texto, áudio e foto (ou PDF) de cupom. Mande o valor e o que foi, por exemplo: _300 pedreiro_",
+  audioUnsupported:
+    "Esse tipo de áudio eu não consigo ouvir. Grave uma mensagem de voz pelo WhatsApp ou escreva o gasto, por exemplo: _300 pedreiro_",
+  audioTooLarge:
+    "Esse áudio é longo demais. Grave uma mensagem curta só com o gasto, por exemplo: _trezentos reais pro pedreiro_",
+  audioDownloadFailed:
+    "Não consegui abrir esse áudio. Mande de novo daqui a pouco ou escreva o gasto.",
+  audioEmpty:
+    "Não ouvi nada nesse áudio. Grave de novo falando o valor e o que foi, por exemplo: _trezentos reais pro pedreiro_",
+  audioUnavailable:
+    "Não consegui ouvir áudio agora. Escreva o gasto, por exemplo: _300 pedreiro_, ou tente de novo em alguns minutos.",
   receiptUnsupported:
     "Esse tipo de arquivo eu não consigo ler. Mande uma foto (JPG ou PNG) ou o PDF do cupom ou da nota.",
   receiptTooLarge:
@@ -136,6 +146,21 @@ export function formatSummary(expense: ExpenseSummary, today: string): string {
     expense.hasInvoice ? "com nota" : "sem nota",
   ].filter(Boolean);
   return `${parts.join(" · ")}\nObra: ${expense.projectName}`;
+}
+
+/** Tamanho máximo do trecho ouvido repetido na resposta. */
+const HEARD_MAX_LENGTH = 200;
+
+/**
+ * O que o bot entendeu de um áudio, antes da resposta, para a pessoa
+ * conferir a transcrição (nada da IA vale sem ela ver).
+ */
+export function heardPrefix(transcript: string): string {
+  const text =
+    transcript.length > HEARD_MAX_LENGTH
+      ? `${transcript.slice(0, HEARD_MAX_LENGTH - 1).trimEnd()}…`
+      : transcript;
+  return `🎤 _"${text.replaceAll("_", " ")}"_\n\n`;
 }
 
 /** Resumo com Confirmar, Editar e Cancelar. */
