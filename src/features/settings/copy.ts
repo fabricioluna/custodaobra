@@ -12,5 +12,6 @@ export const settingsCopy = {
       ? "Só você por enquanto. Convide quem vai acompanhar a obra."
       : `${people} pessoas com acesso.`,
   comingSoonTitle: "Em breve",
-  comingSoonDescription: "Plano e dados da conta vão aparecer aqui.",
+  comingSoonDescription: "O plano da conta e o uso do mês vão aparecer aqui.",
+  privacy: "Privacidade",
 } as const;

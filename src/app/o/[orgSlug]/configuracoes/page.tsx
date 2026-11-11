@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  Database,
   LogOut,
   MessageCircle,
   Settings,
@@ -12,6 +13,7 @@ import { EmptyState } from "@/components/empty-state";
 import { orgPath } from "@/components/layout/nav";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { accountCopy } from "@/features/account/copy";
 import { signOut } from "@/features/auth/actions";
 import { authCopy } from "@/features/auth/copy";
 import { membersCopy } from "@/features/members/copy";
@@ -149,6 +151,31 @@ export default async function SettingsPage({
             </ul>
           </section>
         ) : null}
+
+        <section>
+          <h2 className="mb-3 text-lg heading">{copy.privacy}</h2>
+          <Link
+            href={orgPath(org.slug, "configuracoes", "meus-dados")}
+            className={rowClass}
+          >
+            <Database
+              className="size-6 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            <span className="flex flex-1 flex-col">
+              <span className="font-semibold">
+                {accountCopy.settingsRow.title}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {accountCopy.settingsRow.description}
+              </span>
+            </span>
+            <ChevronRight
+              className="size-5 text-muted-foreground"
+              aria-hidden
+            />
+          </Link>
+        </section>
 
         <EmptyState
           icon={Settings}

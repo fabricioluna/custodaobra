@@ -4,6 +4,8 @@ export const LOGIN_PATH = "/entrar";
 /** Decide para onde a pessoa vai depois de entrar (primeiro acesso ou obras). */
 export const AFTER_LOGIN_PATH = "/inicio";
 export const ONBOARDING_PATH = "/primeiro-acesso";
+/** Para onde vai quem acabou de excluir a conta (página pública). */
+export const ACCOUNT_DELETED_PATH = "/conta-excluida";
 
 /** Áreas que exigem login. */
 const PROTECTED_PREFIXES = ["/o", AFTER_LOGIN_PATH, ONBOARDING_PATH];

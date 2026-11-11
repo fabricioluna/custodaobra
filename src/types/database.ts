@@ -1408,6 +1408,7 @@ export type Database = {
           project_id: string;
         }[];
       };
+      delete_my_account: { Args: never; Returns: undefined };
       expire_pending_expenses: {
         Args: { p_older_than?: string };
         Returns: number;
