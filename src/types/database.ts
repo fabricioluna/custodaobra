@@ -142,6 +142,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "budget_alerts_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "v_project_summary";
+            referencedColumns: ["project_id"];
+          },
+          {
             foreignKeyName: "budget_alerts_stage_id_fkey";
             columns: ["stage_id"];
             isOneToOne: true;
