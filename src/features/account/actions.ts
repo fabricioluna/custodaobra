@@ -7,7 +7,7 @@ import { requireUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 import { accountCopy } from "./copy";
-import { deleteOwnAccount } from "./delete";
+import { AccountDeletionAfterFilesError, deleteOwnAccount } from "./delete";
 import { deleteAccountSchema } from "./schemas";
 
 export type DeleteAccountState = { error: string | null };
@@ -28,7 +28,12 @@ export async function deleteAccount(
     await deleteOwnAccount(supabase, userId);
   } catch (error) {
     console.error("[conta] falha ao excluir", error);
-    return { error: accountCopy.errors.failed };
+    return {
+      error:
+        error instanceof AccountDeletionAfterFilesError
+          ? accountCopy.errors.failedAfterFiles
+          : accountCopy.errors.failed,
+    };
   }
   // O login já não existe: só limpa os cookies da sessão.
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);

@@ -13,7 +13,8 @@ const copy = billingCopy.banner;
 
 /**
  * Aviso no topo da área logada: teste acabando ou encerrado, mensalidade
- * atrasada. Só existe com a cobrança no ar. O atalho para o plano aparece
+ * atrasada, plano cancelado. Sem a cobrança no ar, só a conta cancelada
+ * (que bloqueia mesmo assim) recebe aviso. O atalho para o plano aparece
  * para dono e admin.
  */
 export async function BillingBanner({
@@ -23,7 +24,6 @@ export async function BillingBanner({
   orgId: string;
   orgSlug: string;
 }) {
-  if (!BILLING_LIVE) return null;
   const supabase = await createClient();
   const [state, role] = await Promise.all([
     getSubscriptionState(supabase, orgId),
@@ -32,7 +32,11 @@ export async function BillingBanner({
   if (!state) return null;
 
   let message: string | null = null;
-  if (
+  if (state.phase === "cancelled" && !state.usable) {
+    message = copy.cancelled;
+  } else if (!BILLING_LIVE) {
+    return null;
+  } else if (
     state.phase === "trial" &&
     state.daysLeft !== null &&
     state.daysLeft <= TRIAL_WARNING_DAYS

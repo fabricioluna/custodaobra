@@ -23,7 +23,7 @@ export const billingCopy = {
       days === null
         ? "Em teste"
         : days <= 1
-          ? "Em teste · acaba amanhã"
+          ? "Em teste · acaba em menos de 24 horas"
           : `Em teste · faltam ${days} dias`,
     trialOver: "Teste encerrado",
     active: "Em dia",
@@ -45,8 +45,10 @@ export const billingCopy = {
   banner: {
     trialEnding: (days: number) =>
       days <= 1
-        ? "Seu teste grátis acaba amanhã."
+        ? "Seu teste grátis acaba nas próximas 24 horas."
         : `Seu teste grátis acaba em ${days} dias.`,
+    cancelled:
+      "O plano desta conta foi cancelado. Você ainda vê e baixa tudo, mas não lança coisas novas.",
     trialOver:
       "Seu teste grátis acabou. Você ainda vê tudo, mas não lança gastos novos.",
     pastDue: "A mensalidade está atrasada. Confira o pagamento.",

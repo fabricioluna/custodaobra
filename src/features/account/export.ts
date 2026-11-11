@@ -34,13 +34,19 @@ async function fetchAll<T>(
     from: number,
     to: number,
   ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  onTruncated: () => void,
 ): Promise<T[]> {
   const rows: T[] = [];
-  for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
+  for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await query(from, from + PAGE_SIZE - 1);
     if (error) throw error;
     rows.push(...(data ?? []));
     if (!data || data.length < PAGE_SIZE) break;
+    // Chegou ao teto com mais linhas pela frente: a planilha avisa.
+    if (rows.length >= MAX_ROWS) {
+      onTruncated();
+      break;
+    }
   }
   return rows;
 }
@@ -63,6 +69,8 @@ export async function buildAccountExport(
   supabase: Client,
   user: { id: string; email: string | null },
 ): Promise<Buffer> {
+  const truncated: string[] = [];
+  const cut = (sheet: string) => () => truncated.push(sheet);
   const [
     profile,
     orgs,
@@ -79,77 +87,98 @@ export async function buildAccountExport(
       .select("full_name, whatsapp_phone, created_at")
       .eq("id", user.id)
       .maybeSingle(),
-    fetchAll((from, to) =>
-      supabase
-        .from("organization_members")
-        .select("role, organizations(name, created_at)")
-        .eq("user_id", user.id)
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("organization_members")
+          .select("role, organizations(name, created_at)")
+          .eq("user_id", user.id)
+          .order("org_id")
+          .range(from, to),
+      cut(copy.sheets.accounts),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("projects")
-        .select(
-          "id, name, address, city, state, built_area_m2, standard, start_date, expected_end_date, status, cost_per_m2_cents, archived_at, organizations(name)",
-        )
-        .order("created_at")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("projects")
+          .select(
+            "id, name, address, city, state, built_area_m2, standard, start_date, expected_end_date, status, cost_per_m2_cents, archived_at, organizations(name)",
+          )
+          .order("created_at")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.projects),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("stages")
-        .select(
-          "name, sort_order, budget_cents, progress_percent, projects(name)",
-        )
-        .order("project_id")
-        .order("sort_order")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("stages")
+          .select(
+            "name, sort_order, budget_cents, progress_percent, projects(name)",
+          )
+          .order("project_id")
+          .order("sort_order")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.stages),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("expenses")
-        .select(
-          "id, spent_on, description, amount_cents, payment_method, has_invoice, invoice_number, nfe_access_key, quantity, unit, unit_price_cents, status, source, raw_input, deleted_at, projects(name), categories(name), stages(name), suppliers(name)",
-        )
-        .order("spent_on")
-        .order("id")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("expenses")
+          .select(
+            "id, spent_on, description, amount_cents, payment_method, has_invoice, invoice_number, nfe_access_key, quantity, unit, unit_price_cents, status, source, raw_input, deleted_at, projects(name), categories(name), stages(name), suppliers(name)",
+          )
+          .order("spent_on")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.expenses),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("expense_items")
-        .select(
-          "description, quantity, unit, unit_price_cents, total_cents, expenses(description, spent_on, projects(name))",
-        )
-        .order("expense_id")
-        .order("id")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("expense_items")
+          .select(
+            "description, quantity, unit, unit_price_cents, total_cents, expenses(description, spent_on, projects(name))",
+          )
+          .order("expense_id")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.items),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("suppliers")
-        .select("name, document, phone, kind, organizations(name)")
-        .order("name")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("suppliers")
+          .select("name, document, phone, kind, organizations(name)")
+          .order("name")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.suppliers),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("payables")
-        .select(
-          "description, amount_cents, due_date, status, installment_number, installment_total, projects(name)",
-        )
-        .order("due_date")
-        .order("id")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("payables")
+          .select(
+            "description, amount_cents, due_date, status, installment_number, installment_total, projects(name)",
+          )
+          .order("due_date")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.payables),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("attachments")
-        .select(
-          "storage_path, mime_type, size_bytes, created_at, expenses(description, spent_on, projects(name))",
-        )
-        .order("created_at")
-        .range(from, to),
+    fetchAll(
+      (from, to) =>
+        supabase
+          .from("attachments")
+          .select(
+            "storage_path, mime_type, size_bytes, created_at, expenses(description, spent_on, projects(name))",
+          )
+          .order("created_at")
+          .order("id")
+          .range(from, to),
+      cut(copy.sheets.attachments),
     ),
   ]);
   if (profile.error) throw profile.error;
@@ -356,6 +385,14 @@ export async function buildAccountExport(
       ]),
     },
   ];
+
+  if (truncated.length) {
+    sheets.unshift({
+      name: copy.sheets.notice,
+      columns: [{ header: copy.columns.notice, width: 90 }],
+      rows: [[copy.truncated(MAX_ROWS, truncated)]],
+    });
+  }
 
   const workbook = new ExcelJS.Workbook();
   for (const sheet of sheets) {

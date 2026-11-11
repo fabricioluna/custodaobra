@@ -114,7 +114,12 @@ function checkDate(data: ExpenseFormData, timezone: string) {
   return data.spentOn > limit ? errors.dateInFuture : null;
 }
 
-async function prepare(orgSlug: string, projectId: string, formData: FormData) {
+async function prepare(
+  orgSlug: string,
+  projectId: string,
+  formData: FormData,
+  { creating }: { creating: boolean },
+) {
   const userId = await requireUserId();
   const org = await requireOrg(orgSlug);
   const access = await getProjectAccess(org.id, projectId);
@@ -150,6 +155,14 @@ async function prepare(orgSlug: string, projectId: string, formData: FormData) {
   }
 
   const supabase = await createClient();
+  // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
+  // Antes do fornecedor, para não cadastrar um à toa.
+  if (creating && !(await canWrite(supabase, org.id)).ok) {
+    return {
+      ok: false,
+      state: { status: "error", message: billingCopy.inactive },
+    } as const;
+  }
   const [supplierId, categoryName] = await Promise.all([
     resolveSupplier(supabase, org.id, parsed.data.supplierName),
     parsed.data.description
@@ -186,14 +199,9 @@ export async function createExpense(
   _prev: ExpenseFormState,
   formData: FormData,
 ): Promise<ExpenseFormState> {
-  const ready = await prepare(orgSlug, projectId, formData);
+  const ready = await prepare(orgSlug, projectId, formData, { creating: true });
   if (!ready.ok) return ready.state;
   const { userId, org, supabase, file, row } = ready;
-
-  // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
-  if (!(await canWrite(supabase, org.id)).ok) {
-    return { status: "error", message: billingCopy.inactive };
-  }
 
   const { data, error } = await supabase
     .from("expenses")
@@ -237,7 +245,9 @@ export async function updateExpense(
   _prev: ExpenseFormState,
   formData: FormData,
 ): Promise<ExpenseFormState> {
-  const ready = await prepare(orgSlug, projectId, formData);
+  const ready = await prepare(orgSlug, projectId, formData, {
+    creating: false,
+  });
   if (!ready.ok) return ready.state;
   const { userId, org, supabase, file, row } = ready;
 

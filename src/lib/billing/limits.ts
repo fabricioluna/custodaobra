@@ -223,6 +223,17 @@ export async function canCreateProject(
     return { ok: false, reason: "subscription_inactive" };
   }
 
+  return checkProjectCount(
+    subscription.plans,
+    await countActiveProjects(supabase, orgId),
+  );
+}
+
+/** Obras ativas (arquivadas não contam). */
+async function countActiveProjects(
+  supabase: Client,
+  orgId: string,
+): Promise<number> {
   const { count, error } = await supabase
     .from("projects")
     .select("id", { count: "exact", head: true })
@@ -231,21 +242,14 @@ export async function canCreateProject(
   if (error || count === null) {
     throw new Error("Não foi possível contar as obras da organização.");
   }
-
-  return checkProjectCount(subscription.plans, count);
+  return count;
 }
 
-/** Pode convidar mais uma pessoa para esta organização? */
-export async function canInviteMember(
+/** Pessoas da organização e convites ainda pendentes. */
+async function countMembers(
   supabase: Client,
   orgId: string,
-): Promise<LimitResult> {
-  const subscription = await getOrgPlan(supabase, orgId);
-  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
-
+): Promise<{ members: number; pending: number }> {
   const [members, invitations] = await Promise.all([
     supabase
       .from("organization_members")
@@ -267,8 +271,22 @@ export async function canInviteMember(
   ) {
     throw new Error("Não foi possível contar as pessoas da organização.");
   }
+  return { members: members.count, pending: invitations.count };
+}
 
-  return checkMemberCount(subscription.plans, members.count, invitations.count);
+/** Pode convidar mais uma pessoa para esta organização? */
+export async function canInviteMember(
+  supabase: Client,
+  orgId: string,
+): Promise<LimitResult> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+
+  const { members, pending } = await countMembers(supabase, orgId);
+  return checkMemberCount(subscription.plans, members, pending);
 }
 
 async function getUsage(supabase: Client, orgId: string, month: string) {
@@ -410,27 +428,12 @@ export async function getPlanOverview(
   orgId: string,
   today: string,
 ): Promise<PlanOverview | null> {
-  const [subscription, usage, projects, members, invitations] =
-    await Promise.all([
-      getOrgPlan(supabase, orgId),
-      getUsage(supabase, orgId, monthOf(today)),
-      supabase
-        .from("projects")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      supabase
-        .from("organization_members")
-        .select("user_id", { count: "exact", head: true })
-        .eq("org_id", orgId),
-      supabase
-        .from("invitations")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .is("accepted_at", null)
-        .is("revoked_at", null)
-        .gt("expires_at", new Date().toISOString()),
-    ]);
+  const [subscription, usage, projects, people] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+    countActiveProjects(supabase, orgId),
+    countMembers(supabase, orgId),
+  ]);
   if (!subscription?.plans) return null;
   const plan = subscription.plans;
   return {
@@ -444,9 +447,9 @@ export async function getPlanOverview(
     trialEndsAt: subscription.trial_ends_at,
     periodEndsAt: subscription.current_period_end,
     usage: {
-      projects: { used: projects.count ?? 0, limit: plan.max_projects },
+      projects: { used: projects, limit: plan.max_projects },
       members: {
-        used: (members.count ?? 0) + (invitations.count ?? 0),
+        used: people.members + people.pending,
         limit: plan.max_members,
       },
       whatsappEntries: {

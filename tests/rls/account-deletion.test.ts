@@ -131,6 +131,15 @@ describe("excluir a própria conta", () => {
       uploaded_by: ana.id,
     });
     if (attachment.error) throw attachment.error;
+    // Arquivo sem linha em attachments (envio cujo registro falhou).
+    const orphan = await ana.client.storage.from(RECEIPTS_BUCKET).upload(
+      `${ana.orgId}/${anaExpense}/sobra.jpg`,
+      new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], {
+        type: "image/jpeg",
+      }),
+      { contentType: "image/jpeg" },
+    );
+    if (orphan.error) throw orphan.error;
 
     await admin
       .from("profiles")
@@ -202,7 +211,7 @@ describe("excluir a própria conta", () => {
     expect(members.data?.map((m) => m.user_id)).toEqual([ana.id]);
   });
 
-  it("a dona apaga a conta inteira, os comprovantes e o log do WhatsApp", async () => {
+  it("a dona apaga a conta inteira, os comprovantes (até os sem registro) e o log do WhatsApp", async () => {
     await deleteOwnAccount(ana.client, ana.id);
 
     const user = await admin.auth.admin.getUserById(ana.id);

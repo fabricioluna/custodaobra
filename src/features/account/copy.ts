@@ -39,8 +39,9 @@ export const accountCopy = {
   },
   errors: {
     confirm: "Digite EXCLUIR, em letras maiúsculas, para confirmar.",
-    failed:
-      "Não deu para excluir a conta agora. Nada foi apagado do banco; tente de novo em instantes.",
+    failed: "Não deu para excluir a conta agora. Tente de novo em instantes.",
+    failedAfterFiles:
+      "As fotos dos comprovantes já foram apagadas, mas o resto da conta não. Tente de novo em instantes para terminar a exclusão.",
   },
   deleted: {
     title: "Conta excluída",
@@ -60,8 +61,12 @@ export const accountCopy = {
       suppliers: "Fornecedores",
       payables: "Contas a pagar",
       attachments: "Comprovantes",
+      notice: "Aviso",
     },
+    truncated: (max: number, sheets: string[]) =>
+      `Esta planilha traz até ${max.toLocaleString("pt-BR")} linhas por aba, e estas abas passaram disso: ${sheets.join(", ")}. Para receber tudo, fale com a gente pelo e-mail de contato.`,
     columns: {
+      notice: "Aviso",
       name: "Nome",
       email: "E-mail",
       whatsapp: "WhatsApp",

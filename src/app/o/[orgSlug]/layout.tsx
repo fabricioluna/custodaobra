@@ -38,7 +38,10 @@ async function OrgGate({
   const org = await requireOrg(orgSlug);
   return (
     <>
-      <BillingBanner orgId={org.id} orgSlug={org.slug} />
+      {/* Suspense próprio: a página não espera o aviso. */}
+      <Suspense fallback={null}>
+        <BillingBanner orgId={org.id} orgSlug={org.slug} />
+      </Suspense>
       {children}
     </>
   );

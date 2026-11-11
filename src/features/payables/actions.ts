@@ -127,10 +127,8 @@ export async function updatePayable(
   }
   const data = parsed.data;
 
+  // Editar continua liberado no bloqueio suave (só criar é bloqueado).
   const supabase = await createClient();
-  if (!(await canWrite(supabase, org.id)).ok) {
-    return { status: "error", message: billingCopy.inactive };
-  }
   const supplierId = await resolveSupplier(supabase, org.id, data.supplierName);
   const { data: updated, error } = await supabase
     .from("payables")
