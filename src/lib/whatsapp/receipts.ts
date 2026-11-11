@@ -22,8 +22,9 @@ const EXTENSIONS: Record<ReceiptMimeType, string> = {
  * Guarda o comprovante de um gasto lido pelo WhatsApp: o arquivo no bucket
  * privado (org_id/expense_id/arquivo) com a linha em `attachments`, e os
  * itens lidos em `expense_items`. Roda com service_role: os caminhos e linhas
- * levam o org_id de quem lançou. Devolve false se algo não foi gravado (o
- * gasto continua valendo; quem chama anota no log).
+ * levam o org_id de quem lançou. Devolve `ok = false` se algo não foi
+ * gravado (o gasto continua valendo; quem chama anota no log) e os ids dos
+ * itens, na ordem do cupom.
  */
 export async function saveReceipt(
   admin: Admin,
@@ -40,12 +41,15 @@ export async function saveReceipt(
     file: { data: ArrayBuffer; mimeType: ReceiptMimeType } | null;
     items: ReceiptItem[];
   },
-): Promise<boolean> {
-  const [fileSaved, itemsSaved] = await Promise.all([
+): Promise<{ ok: boolean; itemIds: string[] }> {
+  const [fileSaved, itemIds] = await Promise.all([
     file ? saveFile(admin, { orgId, expenseId, userId, file }) : true,
-    items.length ? saveItems(admin, { orgId, expenseId, items }) : true,
+    items.length ? saveItems(admin, { orgId, expenseId, items }) : [],
   ]);
-  return fileSaved && itemsSaved;
+  return {
+    ok: fileSaved && itemIds !== null,
+    itemIds: itemIds ?? [],
+  };
 }
 
 async function saveFile(
@@ -93,9 +97,13 @@ async function saveItems(
     expenseId,
     items,
   }: { orgId: string; expenseId: string; items: ReceiptItem[] },
-): Promise<boolean> {
+): Promise<string[] | null> {
+  // Os ids nascem aqui, na ordem do cupom: a divisão por etapa liga cada item
+  // à sua etapa sem depender da ordem em que o banco devolve as linhas.
+  const ids = items.map(() => crypto.randomUUID());
   const { error } = await admin.from("expense_items").insert(
-    items.map((item) => ({
+    items.map((item, index) => ({
+      id: ids[index],
       org_id: orgId,
       expense_id: expenseId,
       description: item.description,
@@ -105,8 +113,76 @@ async function saveItems(
       total_cents: item.totalCents,
     })),
   );
-  if (error) console.error("[whatsapp] itens não gravados", error.message);
-  return !error;
+  if (error) {
+    console.error("[whatsapp] itens não gravados", error.message);
+    return null;
+  }
+  return ids;
+}
+
+/**
+ * Copia os comprovantes de um gasto para outro da mesma conta (divisão da
+ * nota por etapa): cada gasto fica com o seu arquivo, porque o caminho no
+ * bucket é único e apagar um gasto apaga o arquivo dele. Devolve false se
+ * algum não foi copiado.
+ */
+export async function copyReceipts(
+  admin: Admin,
+  {
+    orgId,
+    fromExpenseId,
+    toExpenseIds,
+    userId,
+  }: {
+    orgId: string;
+    fromExpenseId: string;
+    toExpenseIds: string[];
+    userId: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("attachments")
+    .select("storage_path, mime_type, size_bytes")
+    .eq("org_id", orgId)
+    .eq("expense_id", fromExpenseId);
+  if (error) {
+    console.error("[whatsapp] comprovantes não lidos", error.message);
+    return false;
+  }
+  const copies = toExpenseIds.flatMap((expenseId) =>
+    data.map(async (file) => {
+      const extension = file.storage_path.split(".").pop() ?? "jpg";
+      const path = `${orgId}/${expenseId}/${crypto.randomUUID()}.${extension}`;
+      const copied = await admin.storage
+        .from(BUCKET)
+        .copy(file.storage_path, path);
+      if (copied.error) {
+        console.error(
+          "[whatsapp] comprovante não copiado",
+          copied.error.message,
+        );
+        return false;
+      }
+      const { error: insertError } = await admin.from("attachments").insert({
+        org_id: orgId,
+        expense_id: expenseId,
+        storage_path: path,
+        mime_type: file.mime_type,
+        size_bytes: file.size_bytes,
+        uploaded_by: userId,
+      });
+      if (insertError) {
+        console.error(
+          "[whatsapp] anexo copiado não gravado",
+          insertError.message,
+        );
+        await admin.storage.from(BUCKET).remove([path]);
+        return false;
+      }
+      return true;
+    }),
+  );
+  return (await Promise.all(copies)).every(Boolean);
 }
 
 /** Arquivos por rodada do cron (a API do Storage apaga em lotes). */

@@ -40,6 +40,7 @@ const raw = (fields: Partial<AiReceipt> = {}): AiReceipt => ({
       unit: "saco",
       unit_price_brl: 39,
       total_brl: 78,
+      stage_number: null,
     },
     {
       description: "Areia média",
@@ -47,6 +48,7 @@ const raw = (fields: Partial<AiReceipt> = {}): AiReceipt => ({
       unit: "m³",
       unit_price_brl: 78,
       total_brl: 78,
+      stage_number: null,
     },
   ],
   confidence: 0.9,
@@ -78,6 +80,7 @@ describe("leitura de comprovante: regras do app", () => {
           unit: "saco",
           unitPriceCents: 3900,
           totalCents: 7800,
+          stageId: null,
         },
         {
           description: "Areia média",
@@ -85,6 +88,7 @@ describe("leitura de comprovante: regras do app", () => {
           unit: "m³",
           unitPriceCents: 7800,
           totalCents: 7800,
+          stageId: null,
         },
       ],
     });
@@ -155,6 +159,7 @@ describe("leitura de comprovante: regras do app", () => {
             unit: "unidade",
             unit_price_brl: 3.5,
             total_brl: 140,
+            stage_number: null,
           },
         ],
       }),
@@ -165,6 +170,27 @@ describe("leitura de comprovante: regras do app", () => {
   });
 });
 
+describe("etapa de cada item", () => {
+  it("vem da lista da obra; número fora da lista vira nulo", () => {
+    const base = raw();
+    const read = interpretAiReceipt(
+      {
+        ...base,
+        items: [
+          { ...base.items[0]!, stage_number: 2 },
+          { ...base.items[1]!, stage_number: 99 },
+        ],
+      },
+      null,
+      context,
+    );
+    expect(read?.details.items.map((item) => item.stageId)).toEqual([
+      context.stages[1]?.id,
+      null,
+    ]);
+  });
+});
+
 describe("itens do cupom", () => {
   const item = (total: number) => ({
     description: "Item",
@@ -172,6 +198,7 @@ describe("itens do cupom", () => {
     unit: null,
     unit_price_brl: null,
     total_brl: total,
+    stage_number: null,
   });
 
   it("valem quando a soma bate com o total (com folga pequena)", () => {

@@ -308,4 +308,102 @@ describe("comprovante pelo WhatsApp", () => {
     expect(last()?.body).toContain("Não achei um cupom");
     expect((await latestExpense())?.id).toBe(before?.id);
   });
+  it("itens de etapas diferentes: propõe, ajusta e divide em um gasto por etapa", async () => {
+    await admin.from("whatsapp_messages").delete().eq("from_phone", phone);
+    const { data: stages } = await admin
+      .from("stages")
+      .select("id, name")
+      .eq("org_id", carla.orgId);
+    const stageId = (name: string) => stages!.find((s) => s.name === name)!.id;
+
+    // 3 itens: cimento (Alvenaria), fio (Elétrica), tubo (sem etapa). Total
+    // com desconto: R$ 190,00 para R$ 200,00 de itens.
+    readReceipt.mockResolvedValueOnce(
+      receipt(
+        { amountCents: 19000, description: "Material de construção" },
+        {
+          items: [
+            {
+              description: "Cimento CP II",
+              quantity: 2,
+              unit: "saco",
+              unitPriceCents: 4000,
+              totalCents: 8000,
+              stageId: stageId("Alvenaria"),
+            },
+            {
+              description: "Fio 2,5mm",
+              quantity: 1,
+              unit: "rolo",
+              unitPriceCents: 7000,
+              totalCents: 7000,
+              stageId: stageId("Instalações elétricas"),
+            },
+            {
+              description: "Tubo PVC 25mm",
+              quantity: 1,
+              unit: "barra",
+              unitPriceCents: 5000,
+              totalCents: 5000,
+              stageId: null,
+            },
+          ],
+        },
+      ),
+    );
+    await photo();
+    const proposal = last();
+    expect(proposal?.type).toBe("buttons");
+    const proposalText = proposal?.body.replace(/ /g, " ") ?? "";
+    expect(proposalText).toContain("em 3 gastos");
+    expect(proposalText).toContain("• Alvenaria: R$ 76,00 (Cimento CP II)");
+
+    // Ajusta: o tubo vai para Instalações hidrossanitárias.
+    await tap(optionId("Ajustar divisão"));
+    await tap(optionId("Tubo PVC 25mm"), true);
+    let stageRow = optionId("Instalações hidrossanitárias");
+    if (!stageRow) {
+      await tap(optionId("Mais etapas"), true);
+      stageRow = optionId("Instalações hidrossanitárias");
+    }
+    await tap(stageRow, true);
+    expect(last()?.body).toContain("Instalações hidrossanitárias");
+
+    await tap(optionId("Dividir e lançar"));
+    expect(last()?.body).toContain("Lançados 3 gastos");
+
+    const { data: all } = await admin
+      .from("expenses")
+      .select(
+        "id, status, amount_cents, stage_id, description, supplier_id, nfe_access_key, attachments(storage_path), expense_items(description)",
+      )
+      .eq("org_id", carla.orgId)
+      .in("description", ["Cimento CP II", "Fio 2,5mm", "Tubo PVC 25mm"]);
+    expect(all).toHaveLength(3);
+    const byDescription = new Map(all!.map((row) => [row.description, row]));
+    // O desconto fica repartido e a soma bate com o total pago.
+    expect(all!.reduce((sum, row) => sum + row.amount_cents, 0)).toBe(19000);
+    expect(byDescription.get("Cimento CP II")).toMatchObject({
+      status: "confirmed",
+      amount_cents: 7600,
+      stage_id: stageId("Alvenaria"),
+    });
+    expect(byDescription.get("Fio 2,5mm")?.stage_id).toBe(
+      stageId("Instalações elétricas"),
+    );
+    expect(byDescription.get("Tubo PVC 25mm")?.stage_id).toBe(
+      stageId("Instalações hidrossanitárias"),
+    );
+    for (const row of all!) {
+      expect(row.status).toBe("confirmed");
+      expect(row.expense_items).toHaveLength(1);
+      expect(row.attachments).toHaveLength(1);
+      expect(row.nfe_access_key).toBe(KEY);
+      expect(row.supplier_id).toBeTruthy();
+    }
+    // Cada gasto tem o seu arquivo no bucket.
+    const paths = all!.map((row) => row.attachments[0]!.storage_path);
+    expect(new Set(paths).size).toBe(3);
+    for (const path of paths) expect(await fileExists(path)).toBe(true);
+  }, 120_000);
 });

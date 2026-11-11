@@ -18,7 +18,7 @@ import {
 import {
   READ_RECEIPT_PROMPT_VERSION,
   READ_RECEIPT_SYSTEM,
-} from "./prompts/read-receipt.v1";
+} from "./prompts/read-receipt.v2";
 import {
   type AiFailureReason,
   type AiUsage,
@@ -69,6 +69,7 @@ const aiItemSchema = z.object({
   unit: z.string().nullable(),
   unit_price_brl: z.number().nullable(),
   total_brl: z.number().nullable(),
+  stage_number: z.number().int().nullable(),
 });
 
 export const aiReceiptSchema = z.object({
@@ -96,6 +97,8 @@ export type ReceiptItem = {
   unit: string | null;
   unitPriceCents: number | null;
   totalCents: number;
+  /** Etapa sugerida pela IA para o item (da lista da obra), ou null. */
+  stageId?: string | null;
 };
 
 /** O que o comprovante traz além do lançamento. */
@@ -138,13 +141,20 @@ const clean = (value: string | null, max: number): string | null => {
 export function interpretItems(
   raw: AiReceipt["items"],
   amountCents: number | null,
+  stages: { id: string }[] = [],
 ): ReceiptItem[] {
   if (amountCents === null) return [];
-  return itemsMatchingTotal(parseItems(raw), amountCents);
+  return itemsMatchingTotal(parseItems(raw, stages), amountCents);
 }
 
-/** Itens no formato do app; qualquer item ilegível descarta a lista. */
-function parseItems(raw: AiReceipt["items"]): ReceiptItem[] {
+/**
+ * Itens no formato do app; qualquer item ilegível descarta a lista. A etapa
+ * de cada item só vale se é da lista enviada.
+ */
+function parseItems(
+  raw: AiReceipt["items"],
+  stages: { id: string }[] = [],
+): ReceiptItem[] {
   if (!raw.length || raw.length > MAX_ITEMS) return [];
   const items: ReceiptItem[] = [];
   for (const item of raw) {
@@ -165,6 +175,10 @@ function parseItems(raw: AiReceipt["items"]): ReceiptItem[] {
       unitPriceCents:
         unitPriceCents !== null && unitPriceCents > 0 ? unitPriceCents : null,
       totalCents,
+      stageId:
+        item.stage_number !== null && Number.isInteger(item.stage_number)
+          ? (stages[item.stage_number - 1]?.id ?? null)
+          : null,
     });
   }
   return items;
@@ -212,7 +226,7 @@ export function interpretAiReceipt(
   );
   if (!expense) return null;
 
-  const items = interpretItems(raw.items, expense.amountCents);
+  const items = interpretItems(raw.items, expense.amountCents, context.stages);
   // Um item só, com quantidade: vira quantidade e unidade do lançamento.
   const [single] = items;
   if (items.length === 1 && single && single.quantity !== null) {
@@ -231,7 +245,7 @@ export function interpretAiReceipt(
       items,
       // Sem total: guarda os itens para conferir quando o valor chegar.
       ...(expense.amountCents === null
-        ? { uncheckedItems: parseItems(raw.items) }
+        ? { uncheckedItems: parseItems(raw.items, context.stages) }
         : {}),
     },
   };

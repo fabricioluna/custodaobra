@@ -17,6 +17,7 @@ export const EDIT_FIELDS = [
   "payment",
   "invoice",
   "project",
+  "split",
 ] as const;
 export type EditField = (typeof EDIT_FIELDS)[number];
 
@@ -43,6 +44,18 @@ export type BotAction =
   | { type: "payment"; method: string | null; expenseId: string }
   | { type: "invoice"; hasInvoice: boolean; expenseId: string }
   | { type: "move"; projectId: string; expenseId: string }
+  /** Dividir a nota por etapa: lançar, ajustar (lista de itens) ou não. */
+  | { type: "split_do"; expenseId: string }
+  | { type: "split_no"; expenseId: string }
+  | { type: "split_adjust"; page: number; expenseId: string }
+  /** Item escolhido para mudar a etapa (`page`: página da lista de etapas). */
+  | { type: "split_item"; itemId: string; page: number; expenseId: string }
+  | {
+      type: "split_stage";
+      stageId: string | null;
+      itemId: string;
+      expenseId: string;
+    }
   | { type: "project"; projectId: string }
   | { type: "project_page"; page: number };
 
@@ -66,6 +79,13 @@ export const actionId = {
     `nf:${hasInvoice ? 1 : 0}:${expenseId}`,
   move: (projectId: string, expenseId: string) =>
     `mv:${projectId}:${expenseId}`,
+  splitDo: (expenseId: string) => `sd:${expenseId}`,
+  splitNo: (expenseId: string) => `sn:${expenseId}`,
+  splitAdjust: (page: number, expenseId: string) => `sa:${page}:${expenseId}`,
+  splitItem: (itemId: string, page: number, expenseId: string) =>
+    `si:${itemId}:${page}:${expenseId}`,
+  splitStage: (stageId: string | null, itemId: string, expenseId: string) =>
+    `ss:${stageId ?? "none"}:${itemId}:${expenseId}`,
   project: (projectId: string) => `p:${projectId}`,
   projectPage: (page: number) => `pp:${page}`,
 };
@@ -123,6 +143,36 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => BotAction][] = [
   [
     new RegExp(`^mv:(${UUID}):(${UUID})$`),
     (m) => ({ type: "move", projectId: m[1]!, expenseId: m[2]! }),
+  ],
+  [
+    new RegExp(`^sd:(${UUID})$`),
+    (m) => ({ type: "split_do", expenseId: m[1]! }),
+  ],
+  [
+    new RegExp(`^sn:(${UUID})$`),
+    (m) => ({ type: "split_no", expenseId: m[1]! }),
+  ],
+  [
+    new RegExp(`^sa:(\\d{1,2}):(${UUID})$`),
+    (m) => ({ type: "split_adjust", page: Number(m[1]), expenseId: m[2]! }),
+  ],
+  [
+    new RegExp(`^si:(${UUID}):(\\d{1,2}):(${UUID})$`),
+    (m) => ({
+      type: "split_item",
+      itemId: m[1]!,
+      page: Number(m[2]),
+      expenseId: m[3]!,
+    }),
+  ],
+  [
+    new RegExp(`^ss:(${UUID}|none):(${UUID}):(${UUID})$`),
+    (m) => ({
+      type: "split_stage",
+      stageId: m[1] === "none" ? null : m[1]!,
+      itemId: m[2]!,
+      expenseId: m[3]!,
+    }),
   ],
   [new RegExp(`^p:(${UUID})$`), (m) => ({ type: "project", projectId: m[1]! })],
   [/^pp:(\d{1,2})$/, (m) => ({ type: "project_page", page: Number(m[1]) })],

@@ -6,6 +6,8 @@ import type { ExtractedExpense } from "@/lib/ai/extract-expense";
 import type { ReceiptDetails } from "@/lib/ai/read-receipt";
 import type { Database, Json } from "@/types/database";
 
+import type { SplitItem } from "./split";
+
 type Admin = SupabaseClient<Database>;
 type ConversationRow =
   Database["public"]["Tables"]["whatsapp_conversations"]["Row"];
@@ -61,6 +63,11 @@ export type ConversationContext = {
    * "Fornecedor"): a próxima mensagem de texto vira o valor novo.
    */
   editing?: { expenseId: string; field: TextEditField };
+  /**
+   * Itens do cupom do pendente com a etapa de cada um (sugerida pela IA ou
+   * ajustada pela pessoa), para dividir a nota por etapa.
+   */
+  split?: { expenseId: string; items: SplitItem[] };
 };
 
 /** Campos do pendente editados por texto livre. */

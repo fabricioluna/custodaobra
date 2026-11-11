@@ -51,6 +51,7 @@ import {
   dateListMessage,
   editMenuMessage,
   formatSummary,
+  formatSummaryLine,
   heardPrefix,
   invoiceButtonsMessage,
   moveListMessage,
@@ -58,6 +59,9 @@ import {
   PAYMENT_NAMES,
   paymentListMessage,
   projectListMessage,
+  splitItemsListMessage,
+  splitProposalMessage,
+  splitStageListMessage,
   stageListMessage,
   summaryMessage,
 } from "../messages";
@@ -67,7 +71,14 @@ import {
   listBotProjects,
   listLaunchableProjects,
 } from "../projects";
-import { saveReceipt } from "../receipts";
+import { copyReceipts, saveReceipt } from "../receipts";
+import {
+  distinctStages,
+  groupDescription,
+  type SplitItem,
+  splitGroups,
+  splitProposalLines,
+} from "../split";
 import { sendProjectPage, sendProjectSummary } from "./commands";
 import { answerQuestion } from "./question";
 
@@ -642,6 +653,7 @@ export async function handleAction(
         session.send(
           editMenuMessage(pending.id, {
             canMove: (pending.moveTargets?.length ?? 0) > 0,
+            canSplit: (pending.split?.length ?? 0) >= 2,
           }),
         ),
       ]);
@@ -722,6 +734,64 @@ export async function handleAction(
       );
     case "move":
       return moveToProject(session, pending, action.projectId);
+    case "split_no":
+      return presentPending(session, pending, "new", "", { skipSplit: true });
+    case "split_adjust":
+      if (!pending.split?.length) {
+        return session.send({
+          type: "text",
+          body: botMessages.splitNeedsItems,
+        });
+      }
+      return session.send(
+        splitItemsListMessage({
+          expenseId: pending.id,
+          items: pending.split.map((item) => ({
+            id: item.id,
+            description: item.description,
+            stageName: stageNameOf(pending, item.stageId),
+          })),
+          page: action.page,
+        }),
+      );
+    case "split_item": {
+      const item = pending.split?.find((i) => i.id === action.itemId);
+      if (!item) {
+        return session.send({ type: "text", body: botMessages.alreadyHandled });
+      }
+      return session.send(
+        splitStageListMessage({
+          expenseId: pending.id,
+          itemId: item.id,
+          itemDescription: item.description,
+          stages: pending.stages,
+          page: action.page,
+        }),
+      );
+    }
+    case "split_stage": {
+      if (
+        !pending.split?.some((i) => i.id === action.itemId) ||
+        (action.stageId && !pending.stages.some((s) => s.id === action.stageId))
+      ) {
+        return session.send({ type: "text", body: botMessages.alreadyHandled });
+      }
+      const updated = {
+        ...pending,
+        split: pending.split.map((item) =>
+          item.id === action.itemId
+            ? { ...item, stageId: action.stageId }
+            : item,
+        ),
+      };
+      await Promise.all([
+        setState(session, "awaiting_confirmation", updated),
+        session.send(splitProposal(updated)),
+      ]);
+      return;
+    }
+    case "split_do":
+      return executeSplit(session, pending);
     case "date": {
       if (!isIsoDate(action.date) || action.date > addDays(pending.today, 1)) {
         return session.send({ type: "text", body: botMessages.alreadyHandled });
@@ -774,6 +844,8 @@ function editFieldMessage(
       return invoiceButtonsMessage(pending.id);
     case "project":
       return moveListMessage(pending.moveTargets ?? [], pending.id);
+    case "split":
+      return splitProposal(pending);
     case "amount":
       return { type: "text", body: botMessages.askAmount(pending.description) };
     case "stage":
@@ -932,6 +1004,8 @@ type PendingExpense = {
   stages: { id: string; name: string }[];
   /** Outras obras da mesma conta em que a pessoa lança (Editar > Obra). */
   moveTargets?: { id: string; name: string }[];
+  /** Itens do cupom com a etapa de cada um (para dividir por etapa). */
+  split?: SplitItem[];
 };
 
 function summaryOf(pending: PendingExpense): string {
@@ -1009,6 +1083,10 @@ async function loadPending(
     moveTargets: projects
       .filter((p) => p.orgId === data.org_id && p.id !== data.project_id)
       .map(({ id, name }) => ({ id, name })),
+    split:
+      session.conversation.context.split?.expenseId === data.id
+        ? session.conversation.context.split.items
+        : undefined,
   };
 }
 
@@ -1065,8 +1143,22 @@ async function presentPending(
   mode: "new" | "updated",
   /** Texto antes do resumo (o que o bot ouviu de um áudio). */
   prefix = "",
+  options: { skipSplit?: boolean } = {},
 ): Promise<void> {
   const summary = prefix + summaryOf(pending);
+  // Cupom com itens de etapas diferentes: propõe lançar um gasto por etapa.
+  if (
+    mode === "new" &&
+    !options.skipSplit &&
+    pending.split &&
+    distinctStages(pending.split) >= 2
+  ) {
+    await Promise.all([
+      setState(session, "awaiting_confirmation", pending),
+      session.send(splitProposal(pending, summary)),
+    ]);
+    return;
+  }
   const askStage =
     mode === "new" && !pending.stageId && pending.stages.length > 0;
   await Promise.all([
@@ -1108,6 +1200,9 @@ function setState(
               document: pending.supplierDocument,
             },
           }
+        : {}),
+      ...(pending.split?.length
+        ? { split: { expenseId: pending.id, items: pending.split } }
         : {}),
       ...extra,
     },
@@ -1250,6 +1345,7 @@ async function insertPending(
   // cadastro só nasce se a pessoa confirmar.
   const categoryId = await categoryIdOf(admin, expense.categoryCode);
 
+  let itemIds: string[] = [];
   const { data, error } = await admin
     .from("expenses")
     .insert({
@@ -1310,11 +1406,14 @@ async function insertPending(
           userId,
           file: receipt.file,
           items: receipt.details.items,
-        }).then((ok) => {
+        }).then(({ ok, itemIds }) => {
           if (!ok) session.noteError?.("receipt_save_failed");
+          return itemIds;
         })
-      : Promise.resolve(),
-  ]);
+      : Promise.resolve([] as string[]),
+  ]).then(([, , ids]) => {
+    itemIds = ids;
+  });
 
   return {
     id: data.id,
@@ -1334,5 +1433,183 @@ async function insertPending(
     hasInvoice: expense.hasInvoice,
     itemCount: receipt?.details.items.length ?? 0,
     stages,
+    // Itens gravados (2 ou mais): podem ser divididos por etapa. Item sem
+    // etapa sugerida fica com a etapa do cupom.
+    ...(receipt && itemIds.length >= 2
+      ? {
+          split: receipt.details.items.map((item, index) => ({
+            id: itemIds[index]!,
+            description: item.description,
+            totalCents: item.totalCents,
+            stageId: item.stageId ?? expense.stageId,
+          })),
+        }
+      : {}),
   };
+}
+
+// Dividir a nota por etapa ------------------------------------------------------------
+
+function stageNameOf(pending: PendingExpense, stageId: string | null): string {
+  return pending.stages.find((s) => s.id === stageId)?.name ?? "Sem etapa";
+}
+
+/** Proposta de divisão (com o resumo antes, na primeira apresentação). */
+function splitProposal(pending: PendingExpense, summary?: string) {
+  const groups = splitGroups(pending.split ?? [], pending.amountCents);
+  return splitProposalMessage({
+    expenseId: pending.id,
+    totalCents: pending.amountCents,
+    lines: splitProposalLines(groups, (id) => stageNameOf(pending, id)),
+    groupCount: groups.length,
+    ...(summary ? { summary } : {}),
+  });
+}
+
+/**
+ * Lança um gasto por etapa: o pendente fica com a primeira etapa e as outras
+ * viram gastos novos, cada um com os seus itens e uma cópia da foto. Os novos
+ * nascem pendentes e todos são confirmados juntos no fim; se algo falhar no
+ * caminho, os novos são cancelados, os itens voltam e nada é lançado.
+ */
+async function executeSplit(
+  session: BotSession,
+  pending: PendingExpense,
+): Promise<void> {
+  const { admin, userId } = session;
+  const groups = splitGroups(pending.split ?? [], pending.amountCents);
+  if (groups.length < 2) return session.send(splitProposal(pending));
+  const [first, ...rest] = groups as [
+    (typeof groups)[number],
+    ...typeof groups,
+  ];
+
+  const { data: original, error: readError } = await admin
+    .from("expenses")
+    .select(
+      "project_id, category_id, spent_on, payment_method, has_invoice, invoice_number, nfe_access_key, source, raw_input, ai_confidence",
+    )
+    .eq("id", pending.id)
+    .eq("org_id", pending.orgId)
+    .eq("created_by", userId)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!original) {
+    await resetConversation(admin, userId);
+    return session.send({ type: "text", body: botMessages.alreadyHandled });
+  }
+
+  const newIds = rest.map(() => crypto.randomUUID());
+  const moved: { id: string; itemIds: string[] }[] = [];
+  try {
+    const { error: insertError } = await admin.from("expenses").insert(
+      rest.map((group, index) => ({
+        ...original,
+        id: newIds[index],
+        org_id: pending.orgId,
+        created_by: userId,
+        status: "pending" as const,
+        stage_id: group.stageId,
+        description: groupDescription(group.descriptions),
+        amount_cents: group.amountCents,
+      })),
+    );
+    if (insertError) throw insertError;
+
+    for (const [index, group] of rest.entries()) {
+      const { error } = await admin
+        .from("expense_items")
+        .update({ expense_id: newIds[index] })
+        .eq("org_id", pending.orgId)
+        .eq("expense_id", pending.id)
+        .in("id", group.itemIds);
+      if (error) throw error;
+      moved.push({ id: newIds[index]!, itemIds: group.itemIds });
+    }
+
+    const firstOk = await updatePending(session, pending, {
+      amount_cents: first.amountCents,
+      stage_id: first.stageId,
+      description: groupDescription(first.descriptions),
+      quantity: null,
+      unit: null,
+    });
+    if (!firstOk)
+      throw new Error("O pendente original já não estava pendente.");
+  } catch (error) {
+    console.error("[whatsapp] falha ao dividir a nota", error);
+    session.noteError?.("split_failed");
+    // Desfaz: itens voltam para o pendente e os gastos novos são cancelados.
+    await Promise.all(
+      moved.map(({ itemIds }) =>
+        admin
+          .from("expense_items")
+          .update({ expense_id: pending.id })
+          .eq("org_id", pending.orgId)
+          .in("id", itemIds),
+      ),
+    );
+    await admin
+      .from("expenses")
+      .update({ status: "cancelled" })
+      .eq("org_id", pending.orgId)
+      .eq("created_by", userId)
+      .in("id", newIds);
+    return session.send({ type: "text", body: botMessages.splitFailed });
+  }
+
+  // A foto vai para cada gasto novo (falha só fica no log).
+  const [copied, supplierId] = await Promise.all([
+    copyReceipts(admin, {
+      orgId: pending.orgId,
+      fromExpenseId: pending.id,
+      toExpenseIds: newIds,
+      userId,
+    }),
+    pending.supplierName
+      ? resolveSupplier(
+          admin,
+          pending.orgId,
+          pending.supplierName,
+          pending.supplierDocument,
+        ).catch((error: unknown) => {
+          console.error("[whatsapp] falha ao ligar o fornecedor", error);
+          session.noteError?.("supplier_failed");
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
+  if (!copied) session.noteError?.("receipt_copy_failed");
+
+  const allIds = [pending.id, ...newIds];
+  const { data: confirmed, error: confirmError } = await admin
+    .from("expenses")
+    .update({ status: "confirmed", supplier_id: supplierId })
+    .eq("org_id", pending.orgId)
+    .eq("created_by", userId)
+    .eq("status", "pending")
+    .in("id", allIds)
+    .select("id");
+  if (confirmError) throw confirmError;
+
+  const lines = groups
+    .map((group) =>
+      formatSummaryLine({
+        amountCents: group.amountCents,
+        stageName: stageNameOf(pending, group.stageId),
+        description: groupDescription(group.descriptions),
+      }),
+    )
+    .join("\n");
+  await Promise.all([
+    session.send({
+      type: "text",
+      body: `${botMessages.splitDone(confirmed.length, lines)}\nObra: ${pending.projectName}`,
+    }),
+    recordUsage(admin, pending.orgId, pending.today, {
+      whatsappEntries: confirmed.length,
+    }),
+    resetConversation(admin, userId),
+  ]);
 }

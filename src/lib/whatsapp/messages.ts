@@ -114,6 +114,21 @@ export const botMessages = {
   dateQuestion: "Em que dia foi o gasto?",
   dateButton: "Escolher dia",
   paymentQuestion: "Como foi pago?",
+  splitProposal: (total: string, parts: number) =>
+    `Os itens desta nota são de etapas diferentes. Dá para lançar os ${total} em ${parts} gastos, um por etapa:`,
+  splitHint:
+    "Cada gasto leva os seus itens e a foto da nota. O desconto do cupom é repartido entre eles.",
+  splitSameStage:
+    "Todos os itens estão na mesma etapa. Para dividir, mude a etapa de algum item:",
+  splitWhichItem: "Qual item muda de etapa?",
+  splitItemButton: "Escolher item",
+  splitItemStage: (item: string) => `Em qual etapa vai _${item}_?`,
+  splitNeedsItems:
+    "Esta nota não tem itens lidos para dividir. Dá para dividir no app.",
+  splitDone: (count: number, lines: string) =>
+    `✅ Lançados ${count} gastos:\n${lines}`,
+  splitFailed:
+    "Não consegui dividir a nota agora. Nada foi lançado: tente de novo ou use Não dividir.",
   paymentButton: "Escolher",
   invoiceQuestion:
     "Tem nota fiscal ou cupom fiscal? (Recibo, orçamento e comprovante de pix contam como sem nota.)",
@@ -192,6 +207,15 @@ export function formatSummary(expense: ExpenseSummary, today: string): string {
     expense.hasInvoice ? "com nota" : "sem nota",
   ].filter(Boolean);
   return `${parts.join(" · ")}\nObra: ${expense.projectName}`;
+}
+
+/** Linha de um gasto da divisão: "• *R$ 78,00* · Alvenaria · Cimento e Areia". */
+export function formatSummaryLine(input: {
+  amountCents: number;
+  stageName: string;
+  description: string;
+}): string {
+  return `• *${formatCents(input.amountCents)}* · ${input.stageName} · ${input.description}`;
 }
 
 /** Tamanho máximo do trecho ouvido repetido na resposta. */
@@ -281,7 +305,7 @@ export function stageListMessage(input: {
 /** Menu do "Editar". "Obra" só aparece se há outra obra da conta. */
 export function editMenuMessage(
   expenseId: string,
-  options: { canMove?: boolean } = {},
+  options: { canMove?: boolean; canSplit?: boolean } = {},
 ): OutgoingMessage {
   const row = (field: EditField, title: string): ListRow => ({
     id: actionId.editField(field, expenseId),
@@ -301,7 +325,129 @@ export function editMenuMessage(
       row("payment", "Forma de pagamento"),
       row("invoice", "Nota fiscal"),
       ...(options.canMove ? [row("project", "Obra")] : []),
+      ...(options.canSplit ? [row("split", "Dividir por etapa")] : []),
     ],
+  };
+}
+
+/**
+ * Proposta de dividir a nota por etapa, com a lista de partes. Com uma etapa
+ * só, não dá para dividir: oferece ajustar a etapa dos itens.
+ */
+export function splitProposalMessage(input: {
+  expenseId: string;
+  totalCents: number;
+  lines: string[];
+  groupCount: number;
+  /** Resumo do lançamento antes da proposta (primeira apresentação). */
+  summary?: string;
+}): OutgoingMessage {
+  const head = input.summary ? `${input.summary}\n\n` : "";
+  if (input.groupCount < 2) {
+    return {
+      type: "buttons",
+      body: `${head}${botMessages.splitSameStage}\n${input.lines.join("\n")}`,
+      buttons: [
+        {
+          id: actionId.splitAdjust(0, input.expenseId),
+          title: "Ajustar divisão",
+        },
+        { id: actionId.splitNo(input.expenseId), title: "Não dividir" },
+      ],
+    };
+  }
+  return {
+    type: "buttons",
+    body: `${head}${botMessages.splitProposal(formatCents(input.totalCents), input.groupCount)}\n${input.lines.join("\n")}\n\n${botMessages.splitHint}`,
+    buttons: [
+      { id: actionId.splitDo(input.expenseId), title: "Dividir e lançar" },
+      {
+        id: actionId.splitAdjust(0, input.expenseId),
+        title: "Ajustar divisão",
+      },
+      { id: actionId.splitNo(input.expenseId), title: "Não dividir" },
+    ],
+  };
+}
+
+/** Itens do cupom para escolher qual muda de etapa (páginas de 8). */
+const SPLIT_ITEMS_PER_PAGE = 8;
+
+export function splitItemsListMessage(input: {
+  expenseId: string;
+  items: { id: string; description: string; stageName: string }[];
+  page: number;
+}): OutgoingMessage {
+  const pages = Math.max(
+    1,
+    Math.ceil(input.items.length / SPLIT_ITEMS_PER_PAGE),
+  );
+  const page = Math.min(Math.max(input.page, 0), pages - 1);
+  const slice = input.items.slice(
+    page * SPLIT_ITEMS_PER_PAGE,
+    (page + 1) * SPLIT_ITEMS_PER_PAGE,
+  );
+  const rows: ListRow[] = slice.map((item) => ({
+    id: actionId.splitItem(item.id, 0, input.expenseId),
+    title: item.description,
+    description: item.stageName,
+  }));
+  if (pages > 1) {
+    const next = (page + 1) % pages;
+    rows.push({
+      id: actionId.splitAdjust(next, input.expenseId),
+      title: next === 0 ? "Voltar ao início" : "Mais itens",
+      description: `Página ${next + 1} de ${pages}`,
+    });
+  }
+  rows.push({ id: actionId.splitNo(input.expenseId), title: "Não dividir" });
+  return {
+    type: "list",
+    body: botMessages.splitWhichItem,
+    buttonLabel: botMessages.splitItemButton,
+    rows,
+  };
+}
+
+/** Etapas para um item do cupom (páginas de 8, com "Sem etapa"). */
+const SPLIT_STAGES_PER_PAGE = 8;
+
+export function splitStageListMessage(input: {
+  expenseId: string;
+  itemId: string;
+  itemDescription: string;
+  stages: { id: string; name: string }[];
+  page: number;
+}): OutgoingMessage {
+  const { stages, itemId, expenseId } = input;
+  const paged = stages.length > SPLIT_STAGES_PER_PAGE + 1;
+  const perPage = paged ? SPLIT_STAGES_PER_PAGE : stages.length;
+  const pages = paged ? Math.ceil(stages.length / perPage) : 1;
+  const page = Math.min(Math.max(input.page, 0), pages - 1);
+  const rows: ListRow[] = stages
+    .slice(page * perPage, (page + 1) * perPage)
+    .map((stage) => ({
+      id: actionId.splitStage(stage.id, itemId, expenseId),
+      title: stage.name,
+      ...(stage.name.length > 24 ? { description: stage.name } : {}),
+    }));
+  if (paged) {
+    const next = (page + 1) % pages;
+    rows.push({
+      id: actionId.splitItem(itemId, next, expenseId),
+      title: next === 0 ? "Voltar ao início" : "Mais etapas",
+      description: `Página ${next + 1} de ${pages}`,
+    });
+  }
+  rows.push({
+    id: actionId.splitStage(null, itemId, expenseId),
+    title: "Sem etapa",
+  });
+  return {
+    type: "list",
+    body: botMessages.splitItemStage(input.itemDescription),
+    buttonLabel: botMessages.stageButton,
+    rows,
   };
 }
 
