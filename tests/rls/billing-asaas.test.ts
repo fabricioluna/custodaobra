@@ -19,6 +19,8 @@ const { asaasEventSchema } = await import("@/lib/billing/asaas-events");
 describe("cobrança pelo Asaas", () => {
   const admin = adminClient();
   const plan = `teste_pago_${Date.now()}`;
+  // Plano grátis próprio do teste: não depende dos preços reais.
+  const freePlan = `teste_gratis_${Date.now()}`;
   const subscriptionId = `sub_teste_${Date.now()}`;
   const eventIds: string[] = [];
   let ana: TestUser;
@@ -29,15 +31,16 @@ describe("cobrança pelo Asaas", () => {
     ana = await createTestUser("asaas-ana");
     bruno = await createTestUser("asaas-bruno");
     carla = await createTestUser("asaas-carla");
-    const inserted = await admin.from("plans").insert({
-      code: plan,
-      name: "Teste pago",
+    const limits = {
       max_projects: 5,
       max_members: 5,
       max_whatsapp_entries_month: 100,
       max_ai_calls_month: 100,
-      price_cents_month: 1990,
-    });
+    };
+    const inserted = await admin.from("plans").insert([
+      { code: plan, name: "Teste pago", price_cents_month: 1990, ...limits },
+      { code: freePlan, name: "Teste grátis", price_cents_month: 0, ...limits },
+    ]);
     if (inserted.error) throw inserted.error;
     // Bruno é membro comum da conta da Ana.
     const member = await admin
@@ -49,7 +52,7 @@ describe("cobrança pelo Asaas", () => {
   afterAll(async () => {
     await admin.from("billing_events").delete().in("id", eventIds);
     await deleteTestUsers([ana, bruno, carla]);
-    await admin.from("plans").delete().eq("code", plan);
+    await admin.from("plans").delete().in("code", [plan, freePlan]);
   });
 
   it("membro comum e outra conta não mexem na cobrança", async () => {
@@ -92,7 +95,7 @@ describe("cobrança pelo Asaas", () => {
     const free = await ana.client.rpc("billing_set_subscription", {
       p_org_id: ana.orgId,
       p_subscription_id: subscriptionId,
-      p_plan_code: "pessoal",
+      p_plan_code: freePlan,
     });
     expect(free.error?.code).toBe("22023");
 

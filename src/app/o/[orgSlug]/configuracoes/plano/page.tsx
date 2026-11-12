@@ -86,6 +86,11 @@ export default async function PlanPage({
               <span className="font-semibold">{copy.page.free}</span>
             )}
           </p>
+          {!BILLING_LIVE && plan.price_cents_month > 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {copy.page.notChargedYet}
+            </p>
+          ) : null}
           {showPhase ? (
             <p
               className={cn(

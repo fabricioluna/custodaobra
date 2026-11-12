@@ -25,6 +25,6 @@ export const APP_CONTACT_EMAIL = `contato@${APP_DOMAIN}`;
  * razão social e o CNPJ quando houver empresa.
  */
 export const LEGAL_ENTITY = {
-  name: "Fabrício Luna",
+  name: "Fabrício de Meneses Luna",
   document: "CPF 067.116.784-78",
 } as const;
