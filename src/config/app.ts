@@ -21,9 +21,10 @@ export const APP_CONTACT_EMAIL = `contato@${APP_DOMAIN}`;
 
 /**
  * Quem responde pelo serviço nos Termos e na Política de Privacidade
- * (controlador dos dados, LGPD). Preencher antes do lançamento comercial.
+ * (controlador dos dados, LGPD). Pessoa física por enquanto; trocar pela
+ * razão social e o CNPJ quando houver empresa.
  */
 export const LEGAL_ENTITY = {
-  name: "[nome ou razão social do responsável]",
-  document: "[CPF ou CNPJ]",
+  name: "Fabrício Luna",
+  document: "CPF 067.116.784-78",
 } as const;
