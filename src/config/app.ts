@@ -12,3 +12,19 @@ export const APP_URL =
 
 export const APP_LOCALE = "pt-BR";
 export const DEFAULT_TIMEZONE = "America/Recife";
+
+/**
+ * E-mail de contato e do encarregado de dados (LGPD), no rodapé e nas páginas
+ * legais. A caixa precisa existir no domínio antes do lançamento.
+ */
+export const APP_CONTACT_EMAIL = `contato@${APP_DOMAIN}`;
+
+/**
+ * Quem responde pelo serviço nos Termos e na Política de Privacidade
+ * (controlador dos dados, LGPD). Pessoa física por enquanto; trocar pela
+ * razão social e o CNPJ quando houver empresa.
+ */
+export const LEGAL_ENTITY = {
+  name: "Fabrício Luna",
+  document: "CPF 067.116.784-78",
+} as const;

@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { checkMemberCount, checkProjectCount, isSubscriptionUsable } =
-  await import("@/lib/billing/limits");
+const {
+  checkMemberCount,
+  checkProjectCount,
+  isSubscriptionUsable,
+  subscriptionState,
+} = await import("@/lib/billing/limits");
 
 describe("checkProjectCount", () => {
   it("deixa criar enquanto está abaixo do limite", () => {
@@ -20,30 +24,57 @@ describe("checkProjectCount", () => {
   });
 });
 
-describe("isSubscriptionUsable", () => {
+describe("subscriptionState", () => {
   const now = new Date("2026-11-08T12:00:00Z");
+  const sub = (
+    status: "active" | "trialing" | "past_due" | "cancelled",
+    trial: string | null,
+    period: string | null = null,
+  ) => ({ status, trial_ends_at: trial, current_period_end: period });
+  const live = (s: ReturnType<typeof sub>) => subscriptionState(s, now, true);
 
-  it("ativa e em teste podem usar", () => {
-    expect(
-      isSubscriptionUsable({ status: "active", trial_ends_at: null }, now),
-    ).toBe(true);
-    expect(
-      isSubscriptionUsable(
-        { status: "trialing", trial_ends_at: "2026-11-20T00:00:00Z" },
-        now,
-      ),
-    ).toBe(true);
+  it("em teste: pode usar e conta os dias que faltam", () => {
+    expect(live(sub("trialing", "2026-11-11T12:00:00Z"))).toEqual({
+      phase: "trial",
+      usable: true,
+      daysLeft: 3,
+    });
   });
 
-  it("cancelada sem teste em vigor não pode", () => {
+  it("teste vencido bloqueia só com a cobrança no ar", () => {
+    const over = sub("trialing", "2026-11-08T11:00:00Z");
+    expect(live(over)).toEqual({
+      phase: "trial_over",
+      usable: false,
+      daysLeft: 0,
+    });
+    expect(subscriptionState(over, now, false).usable).toBe(true);
+    expect(isSubscriptionUsable(over, now, false)).toBe(true);
+  });
+
+  it("ativa pode usar", () => {
+    expect(live(sub("active", null, "2026-12-08T12:00:00Z")).usable).toBe(true);
+  });
+
+  it("atrasada tem 7 dias de tolerância depois do vencimento", () => {
+    expect(live(sub("past_due", null, "2026-11-02T12:00:00Z"))).toMatchObject({
+      phase: "past_due",
+      usable: true,
+    });
+    expect(live(sub("past_due", null, "2026-10-31T12:00:00Z"))).toMatchObject({
+      phase: "past_due_over",
+      usable: false,
+    });
+  });
+
+  it("cancelada vale até o fim do período pago, mesmo sem cobrança no ar", () => {
+    expect(live(sub("cancelled", null, "2026-11-20T00:00:00Z")).usable).toBe(
+      true,
+    );
+    expect(live(sub("cancelled", null)).usable).toBe(false);
     expect(
-      isSubscriptionUsable({ status: "cancelled", trial_ends_at: null }, now),
-    ).toBe(false);
-    expect(
-      isSubscriptionUsable(
-        { status: "cancelled", trial_ends_at: "2026-11-01T00:00:00Z" },
-        now,
-      ),
+      subscriptionState(sub("cancelled", "2026-11-01T00:00:00Z"), now, false)
+        .usable,
     ).toBe(false);
   });
 });

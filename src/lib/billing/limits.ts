@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/types/database";
 
+import { BILLING_LIVE, PAST_DUE_GRACE_DAYS } from "./plans";
+
 /**
  * ÚNICO lugar onde os limites do plano são checados (CLAUDE.md, seção 3).
  * Server actions e webhook chamam estas funções; a interface nunca decide
@@ -26,31 +28,96 @@ export type LimitReason =
   | "max_template_messages";
 
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
+type SubscriptionStatus = Database["public"]["Enums"]["subscription_status"];
 
-/** Regra pura: a assinatura permite usar o app agora? */
-export function isSubscriptionUsable(
-  subscription: {
-    status: Database["public"]["Enums"]["subscription_status"];
-    trial_ends_at: string | null;
-  },
+type SubscriptionDates = {
+  status: SubscriptionStatus;
+  trial_ends_at: string | null;
+  current_period_end: string | null;
+};
+
+/**
+ * Em que pé está a assinatura:
+ * - `trial`: em teste; `trial_over`: o teste acabou sem plano pago;
+ * - `active`: em dia; `past_due`: mensalidade atrasada, ainda na tolerância;
+ *   `past_due_over`: atrasada além da tolerância;
+ * - `cancelled`: cancelada (vale até o fim do que já foi pago).
+ */
+export type SubscriptionPhase =
+  | "trial"
+  | "trial_over"
+  | "active"
+  | "past_due"
+  | "past_due_over"
+  | "cancelled";
+
+export type SubscriptionState = {
+  phase: SubscriptionPhase;
+  /** Pode criar coisas novas (gastos, obras, contas, convites)? */
+  usable: boolean;
+  /** Dias inteiros até o fim do teste ou do período pago (nulo se não há). */
+  daysLeft: number | null;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysUntil(iso: string | null, now: Date): number | null {
+  if (!iso) return null;
+  return Math.ceil((new Date(iso).getTime() - now.getTime()) / DAY_MS);
+}
+
+/**
+ * Regra pura da situação da assinatura. Com a cobrança desligada
+ * (`billingLive = false`), teste vencido e atraso não bloqueiam: os planos
+ * ainda são provisórios e não haveria onde pagar.
+ */
+export function subscriptionState(
+  subscription: SubscriptionDates,
   now: Date = new Date(),
-): boolean {
+  billingLive: boolean = BILLING_LIVE,
+): SubscriptionState {
+  const trialLeft = daysUntil(subscription.trial_ends_at, now);
+  const periodLeft = daysUntil(subscription.current_period_end, now);
+  const state = (
+    phase: SubscriptionPhase,
+    usable: boolean,
+    daysLeft: number | null,
+  ): SubscriptionState => ({
+    phase,
+    // Sem cobrança no ar, só a cancelada bloqueia (como antes da Fase 5).
+    usable: usable || (!billingLive && phase !== "cancelled"),
+    daysLeft,
+  });
+
   switch (subscription.status) {
     case "active":
-      return true;
+      return state("active", true, periodLeft);
     case "trialing":
-      // TODO(Fase 5): bloqueio suave ao fim do teste, quando houver cobrança.
-      // Até lá, os planos são provisórios e o teste vencido não bloqueia.
-      return true;
-    case "past_due":
-      // Alguns dias de tolerância ficam para a Fase 5; por ora, não bloqueia.
-      return true;
-    case "cancelled":
-      return (
-        subscription.trial_ends_at !== null &&
-        new Date(subscription.trial_ends_at) > now
-      );
+      return trialLeft !== null && trialLeft <= 0
+        ? state("trial_over", false, 0)
+        : state("trial", true, trialLeft);
+    case "past_due": {
+      // Tolerância contada do vencimento (fim do período pago).
+      const overdueDays = periodLeft === null ? 0 : -periodLeft;
+      return overdueDays > PAST_DUE_GRACE_DAYS
+        ? state("past_due_over", false, periodLeft)
+        : state("past_due", true, periodLeft);
+    }
+    case "cancelled": {
+      // Vale até o fim do período pago ou do teste, o que vier depois.
+      const left = Math.max(periodLeft ?? 0, trialLeft ?? 0);
+      return state("cancelled", left > 0, left > 0 ? left : 0);
+    }
   }
+}
+
+/** Regra pura: a assinatura permite criar coisas novas agora? */
+export function isSubscriptionUsable(
+  subscription: SubscriptionDates,
+  now: Date = new Date(),
+  billingLive: boolean = BILLING_LIVE,
+): boolean {
+  return subscriptionState(subscription, now, billingLive).usable;
 }
 
 /** Regra pura: dá para criar mais uma obra? */
@@ -139,7 +206,7 @@ export function monthOf(isoDate: string): string {
 async function getOrgPlan(supabase: Client, orgId: string) {
   const { data } = await supabase
     .from("subscriptions")
-    .select("status, trial_ends_at, plans(*)")
+    .select("status, trial_ends_at, current_period_end, plans(*)")
     .eq("org_id", orgId)
     .maybeSingle();
   return data;
@@ -156,6 +223,17 @@ export async function canCreateProject(
     return { ok: false, reason: "subscription_inactive" };
   }
 
+  return checkProjectCount(
+    subscription.plans,
+    await countActiveProjects(supabase, orgId),
+  );
+}
+
+/** Obras ativas (arquivadas não contam). */
+async function countActiveProjects(
+  supabase: Client,
+  orgId: string,
+): Promise<number> {
   const { count, error } = await supabase
     .from("projects")
     .select("id", { count: "exact", head: true })
@@ -164,21 +242,14 @@ export async function canCreateProject(
   if (error || count === null) {
     throw new Error("Não foi possível contar as obras da organização.");
   }
-
-  return checkProjectCount(subscription.plans, count);
+  return count;
 }
 
-/** Pode convidar mais uma pessoa para esta organização? */
-export async function canInviteMember(
+/** Pessoas da organização e convites ainda pendentes. */
+async function countMembers(
   supabase: Client,
   orgId: string,
-): Promise<LimitResult> {
-  const subscription = await getOrgPlan(supabase, orgId);
-  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
-
+): Promise<{ members: number; pending: number }> {
   const [members, invitations] = await Promise.all([
     supabase
       .from("organization_members")
@@ -200,8 +271,22 @@ export async function canInviteMember(
   ) {
     throw new Error("Não foi possível contar as pessoas da organização.");
   }
+  return { members: members.count, pending: invitations.count };
+}
 
-  return checkMemberCount(subscription.plans, members.count, invitations.count);
+/** Pode convidar mais uma pessoa para esta organização? */
+export async function canInviteMember(
+  supabase: Client,
+  orgId: string,
+): Promise<LimitResult> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+
+  const { members, pending } = await countMembers(supabase, orgId);
+  return checkMemberCount(subscription.plans, members, pending);
 }
 
 async function getUsage(supabase: Client, orgId: string, month: string) {
@@ -298,4 +383,93 @@ export async function canSendTemplates(
     usage.template_messages,
     count,
   );
+}
+
+/**
+ * Pode criar dados novos nesta conta pelo app (gasto, conta a pagar, pagar
+ * uma conta)? Bloqueio suave: com o teste vencido ou a mensalidade atrasada
+ * além da tolerância, a pessoa continua vendo, editando e exportando tudo,
+ * só não cria nada novo.
+ */
+export async function canWrite(
+  supabase: Client,
+  orgId: string,
+): Promise<LimitResult> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
+  if (!isSubscriptionUsable(subscription)) {
+    return { ok: false, reason: "subscription_inactive" };
+  }
+  return { ok: true };
+}
+
+export type UsageMeter = { used: number; limit: number };
+
+export type PlanOverview = {
+  plan: Pick<Plan, "code" | "name" | "price_cents_month" | "whatsapp_enabled">;
+  state: SubscriptionState;
+  trialEndsAt: string | null;
+  periodEndsAt: string | null;
+  usage: {
+    projects: UsageMeter;
+    members: UsageMeter;
+    whatsappEntries: UsageMeter;
+    aiCalls: UsageMeter;
+    templateMessages: UsageMeter;
+  };
+};
+
+/**
+ * Plano, situação e uso do mês, para a tela "Plano e uso" (dono e admin: o
+ * RLS de usage_counters só mostra a eles). `today` no fuso da conta.
+ */
+export async function getPlanOverview(
+  supabase: Client,
+  orgId: string,
+  today: string,
+): Promise<PlanOverview | null> {
+  const [subscription, usage, projects, people] = await Promise.all([
+    getOrgPlan(supabase, orgId),
+    getUsage(supabase, orgId, monthOf(today)),
+    countActiveProjects(supabase, orgId),
+    countMembers(supabase, orgId),
+  ]);
+  if (!subscription?.plans) return null;
+  const plan = subscription.plans;
+  return {
+    plan: {
+      code: plan.code,
+      name: plan.name,
+      price_cents_month: plan.price_cents_month,
+      whatsapp_enabled: plan.whatsapp_enabled,
+    },
+    state: subscriptionState(subscription),
+    trialEndsAt: subscription.trial_ends_at,
+    periodEndsAt: subscription.current_period_end,
+    usage: {
+      projects: { used: projects, limit: plan.max_projects },
+      members: {
+        used: people.members + people.pending,
+        limit: plan.max_members,
+      },
+      whatsappEntries: {
+        used: usage.whatsapp_entries,
+        limit: plan.max_whatsapp_entries_month,
+      },
+      aiCalls: { used: usage.ai_calls, limit: plan.max_ai_calls_month },
+      templateMessages: {
+        used: usage.template_messages,
+        limit: plan.max_template_messages_month,
+      },
+    },
+  };
+}
+
+/** Situação da assinatura da conta (para o aviso no topo do app). */
+export async function getSubscriptionState(
+  supabase: Client,
+  orgId: string,
+): Promise<SubscriptionState | null> {
+  const subscription = await getOrgPlan(supabase, orgId);
+  return subscription ? subscriptionState(subscription) : null;
 }

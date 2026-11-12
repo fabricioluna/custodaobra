@@ -3,10 +3,12 @@
 import { redirect } from "next/navigation";
 
 import { orgPath } from "@/components/layout/nav";
+import { billingCopy } from "@/features/billing/copy";
 import { requireOrg } from "@/features/organizations/queries";
 import { getProjectAccess } from "@/features/projects/queries";
 import { resolveSupplier } from "@/features/suppliers/resolve";
 import { requireUserId } from "@/lib/auth/session";
+import { canWrite } from "@/lib/billing/limits";
 import { addDays, todayIn } from "@/lib/dates";
 import { fieldErrorsFrom, type FormState, textField } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +71,9 @@ export async function createPayable(
   const data = parsed.data;
 
   const supabase = await createClient();
+  if (!(await canWrite(supabase, org.id)).ok) {
+    return { status: "error", message: billingCopy.inactive };
+  }
   const supplierId = await resolveSupplier(supabase, org.id, data.supplierName);
   const parts = splitInstallments(
     data.amountCents,
@@ -122,6 +127,7 @@ export async function updatePayable(
   }
   const data = parsed.data;
 
+  // Editar continua liberado no bloqueio suave (só criar é bloqueado).
   const supabase = await createClient();
   const supplierId = await resolveSupplier(supabase, org.id, data.supplierName);
   const { data: updated, error } = await supabase
@@ -175,6 +181,10 @@ export async function payPayable(
   }
 
   const supabase = await createClient();
+  // Pagar cria um gasto: segue o mesmo bloqueio suave.
+  if (!(await canWrite(supabase, org.id)).ok) {
+    return { status: "error", message: billingCopy.inactive };
+  }
   const { data: expenseId, error } = await supabase.rpc("pay_payable", {
     p_payable_id: payableId,
     p_paid_on: data.paidOn,

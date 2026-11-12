@@ -33,6 +33,14 @@
   --color-status-warn-soft: #fef3c7;
   --color-status-danger: #b91c1c;
   --color-status-danger-soft: #fee2e2;
+
+  /* Conversa de exemplo da página inicial (chat genérico, sempre claro). */
+  --color-chat-wall: #ece5dd;
+  --color-chat-in: #ffffff;
+  --color-chat-out: #d9fdd3;
+  --color-chat-text: #111b21;
+  --color-chat-meta: #667781;
+  --color-chat-button: #027eb5;
 }
 
 @theme inline {
