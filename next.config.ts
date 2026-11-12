@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -52,4 +53,23 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry: sem SENTRY_AUTH_TOKEN (dev, CI) o build não sobe source maps e
+// segue normal. Na Vercel, o token deixa os erros com o código original.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
+  silent: !process.env.CI,
+  telemetry: false,
+  // Sem Session Replay (ver instrumentation-client.ts): tira o código dele.
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+    excludeReplayWorker: true,
+  },
+});
