@@ -81,6 +81,11 @@ begin
   if not private.has_org_role(p_org_id, array['owner', 'admin']::public.org_role[]) then
     raise exception 'sem permissão' using errcode = '42501';
   end if;
+  -- Plano novo pede assinatura nova no Asaas (com o preço dele); trocar só o
+  -- plano guardado não vale. O webhook ainda confere o valor pago.
+  if p_subscription_id is not distinct from p_previous_subscription_id then
+    raise exception 'assinatura nova é obrigatória' using errcode = '22023';
+  end if;
   if not exists (
     select 1 from public.plans
     where code = p_plan_code and active and price_cents_month > 0

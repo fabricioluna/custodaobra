@@ -90,7 +90,18 @@ export async function processAsaasEvent(
     return finish(affectsAccount(event) ? "unknown_subscription" : "ignored");
   }
 
-  const patch = subscriptionPatch(event, row, now);
+  let nextPlanPriceCents: number | null = null;
+  if (row.provider_plan_code) {
+    const { data: plan, error: planError } = await admin
+      .from("plans")
+      .select("price_cents_month")
+      .eq("code", row.provider_plan_code)
+      .maybeSingle();
+    if (planError) throw planError;
+    nextPlanPriceCents = plan?.price_cents_month ?? null;
+  }
+
+  const patch = subscriptionPatch(event, row, now, nextPlanPriceCents);
   if (!patch) return finish("ignored", row.org_id);
 
   const { error: updateError } = await admin

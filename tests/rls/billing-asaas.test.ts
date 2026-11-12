@@ -132,6 +132,16 @@ describe("cobrança pelo Asaas", () => {
     expect(data?.provider_subscription_id).toBe(subscriptionId);
   });
 
+  it("trocar só o plano guardado, sem assinatura nova, é recusado", async () => {
+    const sameId = await ana.client.rpc("billing_set_subscription", {
+      p_org_id: ana.orgId,
+      p_subscription_id: subscriptionId,
+      p_previous_subscription_id: subscriptionId,
+      p_plan_code: plan,
+    });
+    expect(sameId.error?.code).toBe("22023");
+  });
+
   it("a mesma assinatura do Asaas não serve para outra conta", async () => {
     await carla.client.rpc("billing_set_customer", {
       p_org_id: carla.orgId,
@@ -163,6 +173,7 @@ describe("cobrança pelo Asaas", () => {
         subscription: subscriptionId,
         dueDate: "2026-11-20",
         status: "RECEIVED",
+        value: 19.9,
       },
     };
     const event = asaasEventSchema.parse(payload);

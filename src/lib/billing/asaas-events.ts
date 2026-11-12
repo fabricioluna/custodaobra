@@ -18,6 +18,7 @@ export const asaasEventSchema = z.object({
       subscription: z.string().nullish(),
       dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       status: z.string().optional(),
+      value: z.number().optional(),
     })
     .optional(),
   subscription: z.object({ id: z.string() }).optional(),
@@ -68,10 +69,16 @@ export function affectsAccount(event: AsaasEvent): boolean {
   );
 }
 
+/**
+ * `nextPlanPriceCents`: preço do plano guardado em `provider_plan_code`. O
+ * plano só passa a valer se a cobrança paga cobre esse preço: o plano
+ * guardado vem do app, e a conta não pode pagar o barato e levar o caro.
+ */
 export function subscriptionPatch(
   event: AsaasEvent,
   row: SubscriptionRow,
   now: Date = new Date(),
+  nextPlanPriceCents: number | null = null,
 ): SubscriptionPatch | null {
   const subscriptionId = eventSubscriptionId(event);
   if (!subscriptionId || subscriptionId !== row.provider_subscription_id) {
@@ -102,9 +109,15 @@ export function subscriptionPatch(
   if (PAID.has(event.event)) {
     // Pago: um mês a partir do vencimento da cobrança, no plano escolhido.
     if (currentEnd !== null && time(paidUntil) <= currentEnd) return null;
+    const paidCents =
+      payment.value === undefined ? 0 : Math.round(payment.value * 100);
+    const coversNextPlan =
+      row.provider_plan_code !== null &&
+      nextPlanPriceCents !== null &&
+      paidCents >= nextPlanPriceCents;
     return {
       status: "active",
-      plan_code: row.provider_plan_code ?? row.plan_code,
+      plan_code: coversNextPlan ? row.provider_plan_code! : row.plan_code,
       current_period_end: paidUntil,
     };
   }

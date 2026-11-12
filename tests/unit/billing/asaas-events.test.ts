@@ -22,13 +22,17 @@ const paymentEvent = (event: string, subscription = "sub_1") =>
       subscription,
       dueDate: "2026-12-01",
       status: "RECEIVED",
+      value: 49.9,
     },
   });
+const PRICE = 4990;
 
 describe("subscriptionPatch (webhook do Asaas)", () => {
   it("pagamento confirmado: em dia, no plano escolhido, por um mês", () => {
     for (const event of ["PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"]) {
-      expect(subscriptionPatch(paymentEvent(event), row)).toEqual({
+      expect(
+        subscriptionPatch(paymentEvent(event), row, undefined, PRICE),
+      ).toEqual({
         status: "active",
         plan_code: "profissional",
         current_period_end: "2027-01-01T23:59:59-03:00",
@@ -126,5 +130,15 @@ describe("subscriptionPatch (webhook do Asaas)", () => {
     expect(
       subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), overdue)?.status,
     ).toBe("active");
+  });
+
+  it("pagamento menor que o preço do plano guardado não troca o plano", () => {
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), row, undefined, 9990),
+    ).toMatchObject({ status: "active", plan_code: "pessoal" });
+    // Preço desconhecido: não troca.
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), row)?.plan_code,
+    ).toBe("pessoal");
   });
 });
