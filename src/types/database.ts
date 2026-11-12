@@ -1513,7 +1513,12 @@ export type Database = {
         Returns: undefined;
       };
       billing_set_subscription: {
-        Args: { p_org_id: string; p_plan_code: string; p_subscription_id: string };
+        Args: {
+          p_org_id: string;
+          p_plan_code: string;
+          p_previous_subscription_id?: string;
+          p_subscription_id: string;
+        };
         Returns: undefined;
       };
       delete_my_account: { Args: never; Returns: undefined };

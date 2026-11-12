@@ -54,7 +54,7 @@ describe("cliente do Asaas", () => {
     });
   });
 
-  it("faturas em aberto: só pendentes e atrasadas, a mais antiga primeiro", async () => {
+  it("faturas em aberto: atrasadas e pendentes, a mais antiga primeiro", async () => {
     const payment = (id: string, status: string, dueDate: string) => ({
       id,
       status,
@@ -62,16 +62,19 @@ describe("cliente do Asaas", () => {
       value: 19.9,
       invoiceUrl: `https://sandbox.asaas.com/i/${id}`,
     });
-    fetchMock.mockResolvedValue(
+    // O filtro de status vai para o Asaas: uma chamada por status.
+    fetchMock.mockImplementation(async (url: string) =>
       json(200, {
-        data: [
-          payment("p3", "PENDING", "2026-12-20"),
-          payment("p1", "RECEIVED", "2026-10-20"),
-          payment("p2", "OVERDUE", "2026-11-20"),
-        ],
+        data: url.endsWith("status=OVERDUE")
+          ? [payment("p2", "OVERDUE", "2026-11-20")]
+          : [payment("p3", "PENDING", "2026-12-20")],
       }),
     );
     const open = await listOpenPayments("sub_1");
     expect(open.map((p) => p.id)).toEqual(["p2", "p3"]);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://api-sandbox.asaas.com/v3/subscriptions/sub_1/payments?status=OVERDUE",
+      "https://api-sandbox.asaas.com/v3/subscriptions/sub_1/payments?status=PENDING",
+    ]);
   });
 });

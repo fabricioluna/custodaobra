@@ -63,11 +63,14 @@ end;
 $$;
 
 -- Guarda a assinatura do Asaas e o plano escolhido. O plano só passa a valer
--- quando o webhook confirmar o pagamento.
+-- quando o webhook confirmar o pagamento. Comparar e trocar: só grava se a
+-- assinatura guardada ainda é `p_previous_subscription_id` (nulo na primeira
+-- vez); assim, duas abas assinando juntas não deixam uma assinatura solta.
 create or replace function public.billing_set_subscription(
   p_org_id uuid,
   p_subscription_id text,
-  p_plan_code text
+  p_plan_code text,
+  p_previous_subscription_id text default null
 )
 returns void
 language plpgsql
@@ -88,9 +91,12 @@ begin
   set provider = 'asaas',
       provider_subscription_id = p_subscription_id,
       provider_plan_code = p_plan_code
-  where org_id = p_org_id and provider_customer_id is not null;
+  where org_id = p_org_id
+    and provider_customer_id is not null
+    and provider_subscription_id is not distinct from p_previous_subscription_id;
   if not found then
-    raise exception 'conta sem cliente no Asaas' using errcode = 'P0001';
+    raise exception 'assinatura mudou ou conta sem cliente no Asaas'
+      using errcode = 'P0001';
   end if;
 end;
 $$;
@@ -116,8 +122,8 @@ end;
 $$;
 
 revoke all on function public.billing_set_customer(uuid, text) from public, anon;
-revoke all on function public.billing_set_subscription(uuid, text, text) from public, anon;
+revoke all on function public.billing_set_subscription(uuid, text, text, text) from public, anon;
 revoke all on function public.billing_mark_cancelled(uuid) from public, anon;
 grant execute on function public.billing_set_customer(uuid, text) to authenticated;
-grant execute on function public.billing_set_subscription(uuid, text, text) to authenticated;
+grant execute on function public.billing_set_subscription(uuid, text, text, text) to authenticated;
 grant execute on function public.billing_mark_cancelled(uuid) to authenticated;

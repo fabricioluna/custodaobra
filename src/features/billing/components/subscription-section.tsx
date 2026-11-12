@@ -23,11 +23,11 @@ import { CancelSubscriptionForm } from "./cancel-subscription-form";
 export async function SubscriptionSection({
   orgId,
   orgSlug,
-  justCreated,
+  notice,
 }: {
   orgId: string;
   orgSlug: string;
-  justCreated: boolean;
+  notice: "criada" | "alterada" | null;
 }) {
   const [plans, subscription] = isAsaasConfigured()
     ? await Promise.all([getPaidPlans(), getBillingSubscription(orgId)])
@@ -77,7 +77,11 @@ export async function SubscriptionSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {justCreated && !open ? (
+      {notice === "alterada" ? (
+        <p role="status" className="text-muted-foreground">
+          {copy.subscription.changed}
+        </p>
+      ) : notice === "criada" && !open ? (
         <p role="status" className="text-muted-foreground">
           {copy.subscription.created}
         </p>

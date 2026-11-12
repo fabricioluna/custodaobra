@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { BackLink } from "@/components/layout/back-link";
 import { orgPath } from "@/components/layout/nav";
@@ -99,11 +100,18 @@ export default async function PlanPage({
             </p>
           ) : null}
           <div className="mt-4 flex flex-col">
-            <SubscriptionSection
-              orgId={org.id}
-              orgSlug={org.slug}
-              justCreated={assinatura === "criada"}
-            />
+            {/* Fala com o Asaas: a página não espera por ele. */}
+            <Suspense fallback={null}>
+              <SubscriptionSection
+                orgId={org.id}
+                orgSlug={org.slug}
+                notice={
+                  assinatura === "criada" || assinatura === "alterada"
+                    ? assinatura
+                    : null
+                }
+              />
+            </Suspense>
           </div>
         </section>
 

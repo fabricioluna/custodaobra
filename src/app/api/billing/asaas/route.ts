@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 import { asaasEventSchema } from "@/lib/billing/asaas-events";
 import {
   isAsaasWebhookAuthorized,
+  type JsonObject,
   processAsaasEvent,
 } from "@/lib/billing/asaas-webhook";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Json } from "@/types/database";
 
 /**
  * Webhook do Asaas (cobranças e assinaturas). Autenticado pelo token
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const outcome = await processAsaasEvent(
       createAdminClient(),
       parsed.data,
-      payload as Json,
+      payload as JsonObject,
     );
     if (outcome === "unknown_subscription") {
       console.error(

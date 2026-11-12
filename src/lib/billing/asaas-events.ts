@@ -26,7 +26,11 @@ export type AsaasEvent = z.infer<typeof asaasEventSchema>;
 
 type SubscriptionRow = Pick<
   Database["public"]["Tables"]["subscriptions"]["Row"],
-  "status" | "plan_code" | "provider_plan_code" | "provider_subscription_id"
+  | "status"
+  | "plan_code"
+  | "current_period_end"
+  | "provider_plan_code"
+  | "provider_subscription_id"
 >;
 export type SubscriptionPatch = Partial<
   Pick<
@@ -51,6 +55,19 @@ const PAID = new Set(["PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"]);
 const REVERSED = new Set(["PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED"]);
 const ENDED = new Set(["SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED"]);
 
+/**
+ * Eventos que mudam a situação da conta. Os demais (cobrança criada,
+ * removida, assinatura removida depois de cancelada no app...) chegam para
+ * assinaturas que a conta já não tem e não são problema.
+ */
+export function affectsAccount(event: AsaasEvent): boolean {
+  return (
+    PAID.has(event.event) ||
+    REVERSED.has(event.event) ||
+    event.event === "PAYMENT_OVERDUE"
+  );
+}
+
 export function subscriptionPatch(
   event: AsaasEvent,
   row: SubscriptionRow,
@@ -73,27 +90,39 @@ export function subscriptionPatch(
   const payment = event.payment;
   if (!payment) return null;
 
+  // Eventos chegam fora de ordem (no cartão, o "recebido" vem semanas depois
+  // do "confirmado"): uma cobrança só mexe na conta se não for mais antiga
+  // que o período que ela já tem.
+  const time = (iso: string) => new Date(iso).getTime();
+  const currentEnd = row.current_period_end
+    ? time(row.current_period_end)
+    : null;
+  const paidUntil = endOfDay(addMonths(payment.dueDate, 1));
+
   if (PAID.has(event.event)) {
     // Pago: um mês a partir do vencimento da cobrança, no plano escolhido.
+    if (currentEnd !== null && time(paidUntil) <= currentEnd) return null;
     return {
       status: "active",
       plan_code: row.provider_plan_code ?? row.plan_code,
-      current_period_end: endOfDay(addMonths(payment.dueDate, 1)),
+      current_period_end: paidUntil,
     };
   }
 
   if (row.status === "cancelled") return null;
 
   if (event.event === "PAYMENT_OVERDUE") {
-    // A tolerância de atraso conta a partir do vencimento.
-    return {
-      status: "past_due",
-      current_period_end: endOfDay(payment.dueDate),
-    };
+    // A tolerância de atraso conta a partir do vencimento; atraso de uma
+    // cobrança cujo período já está pago não conta.
+    const due = endOfDay(payment.dueDate);
+    if (currentEnd !== null && time(due) < currentEnd) return null;
+    return { status: "past_due", current_period_end: due };
   }
 
   if (REVERSED.has(event.event)) {
-    // Estorno ou contestação: o período pago deixa de valer agora.
+    // Estorno ou contestação da cobrança que pagou o período atual: ele
+    // deixa de valer agora. Estorno de um mês antigo não mexe.
+    if (currentEnd !== null && time(paidUntil) < currentEnd) return null;
     return { status: "past_due", current_period_end: now.toISOString() };
   }
 

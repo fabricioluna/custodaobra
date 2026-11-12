@@ -91,7 +91,11 @@ export function subscriptionState(
 
   switch (subscription.status) {
     case "active":
-      return state("active", true, periodLeft);
+      // Rede de segurança: se o aviso de atraso do Asaas se perder, o
+      // período vencido além da tolerância bloqueia do mesmo jeito.
+      return periodLeft !== null && -periodLeft > PAST_DUE_GRACE_DAYS
+        ? state("past_due_over", false, periodLeft)
+        : state("active", true, periodLeft);
     case "trialing":
       return trialLeft !== null && trialLeft <= 0
         ? state("trial_over", false, 0)

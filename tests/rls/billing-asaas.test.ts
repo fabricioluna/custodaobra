@@ -117,6 +117,21 @@ describe("cobrança pelo Asaas", () => {
     });
   });
 
+  it("gravar com a assinatura anterior errada é recusado (duas abas)", async () => {
+    const stale = await ana.client.rpc("billing_set_subscription", {
+      p_org_id: ana.orgId,
+      p_subscription_id: `${subscriptionId}_outra_aba`,
+      p_plan_code: plan,
+    });
+    expect(stale.error).not.toBeNull();
+    const { data } = await admin
+      .from("subscriptions")
+      .select("provider_subscription_id")
+      .eq("org_id", ana.orgId)
+      .single();
+    expect(data?.provider_subscription_id).toBe(subscriptionId);
+  });
+
   it("a mesma assinatura do Asaas não serve para outra conta", async () => {
     await carla.client.rpc("billing_set_customer", {
       p_org_id: carla.orgId,

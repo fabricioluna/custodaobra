@@ -7,12 +7,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/types/database";
 
 import {
+  affectsAccount,
   type AsaasEvent,
   eventSubscriptionId,
   subscriptionPatch,
 } from "./asaas-events";
 
 type Admin = SupabaseClient<Database>;
+/** O corpo do evento, como chegou (sempre um objeto JSON). */
+export type JsonObject = { [key: string]: Json | undefined };
 
 /** Confere o cabeçalho `asaas-access-token` com `ASAAS_WEBHOOK_TOKEN`. */
 export function isAsaasWebhookAuthorized(
@@ -37,7 +40,7 @@ export type WebhookOutcome =
 export async function processAsaasEvent(
   admin: Admin,
   event: AsaasEvent,
-  payload: Json,
+  payload: JsonObject,
   now: Date = new Date(),
 ): Promise<WebhookOutcome> {
   const { error: insertError } = await admin
@@ -77,13 +80,15 @@ export async function processAsaasEvent(
   const { data: row, error: rowError } = await admin
     .from("subscriptions")
     .select(
-      "org_id, status, plan_code, provider_plan_code, provider_subscription_id",
+      "org_id, status, plan_code, current_period_end, provider_plan_code, provider_subscription_id",
     )
     .eq("provider", "asaas")
     .eq("provider_subscription_id", subscriptionId)
     .maybeSingle();
   if (rowError) throw rowError;
-  if (!row) return finish("unknown_subscription");
+  if (!row) {
+    return finish(affectsAccount(event) ? "unknown_subscription" : "ignored");
+  }
 
   const patch = subscriptionPatch(event, row, now);
   if (!patch) return finish("ignored", row.org_id);

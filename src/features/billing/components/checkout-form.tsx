@@ -43,12 +43,16 @@ export function CheckoutForm({
   );
   const fieldErrors = state.status === "error" ? state.fieldErrors : undefined;
   const message = state.status === "error" ? state.message : undefined;
+  // O plano atual, se for um dos pagos; senão, o primeiro.
+  const selected = plans.some((p) => p.code === currentPlan)
+    ? currentPlan
+    : plans[0]?.code;
 
   return (
     <form action={action} className="flex flex-col gap-6">
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-3 font-medium">{copy.plan}</legend>
-        {plans.map((plan, index) => (
+        {plans.map((plan) => (
           <label
             key={plan.code}
             className={cn(
@@ -60,9 +64,8 @@ export function CheckoutForm({
               type="radio"
               name="planCode"
               value={plan.code}
-              defaultChecked={
-                currentPlan ? plan.code === currentPlan : index === 0
-              }
+              defaultChecked={plan.code === selected}
+              required
               className="mt-1 size-5 accent-brand-navy"
             />
             <span className="flex flex-col">

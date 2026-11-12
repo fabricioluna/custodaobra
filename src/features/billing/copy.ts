@@ -61,6 +61,8 @@ export const billingCopy = {
       `Pagar fatura de ${value} (vence ${due})`,
     created:
       "Assinatura criada. A fatura aparece aqui em instantes; o Asaas também manda por e-mail.",
+    changed:
+      "Plano alterado. Ele passa a valer quando o próximo pagamento for confirmado.",
     cancelTitle: "Cancelar assinatura",
     cancelDescription:
       "As próximas cobranças deixam de ser geradas. A conta continua valendo até o fim do período já pago; depois, você só vê e baixa os dados.",

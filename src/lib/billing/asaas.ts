@@ -65,6 +65,18 @@ async function request<T>(
 
 const idSchema = z.object({ id: z.string().min(1) });
 
+/** Cliente já criado para a conta (uma tentativa anterior que não chegou a ser guardada). */
+export async function findCustomerByReference(
+  externalReference: string,
+): Promise<string | null> {
+  const list = await request(
+    "GET",
+    `/v3/customers?externalReference=${encodeURIComponent(externalReference)}&limit=1`,
+    z.object({ data: z.array(idSchema) }),
+  );
+  return list.data[0]?.id ?? null;
+}
+
 export async function createCustomer(input: {
   name: string;
   cpfCnpj: string;
@@ -91,19 +103,6 @@ export async function createSubscription(input: {
   return subscription.id;
 }
 
-/** Troca de plano: novo valor, também nas cobranças ainda em aberto. */
-export async function updateSubscription(
-  id: string,
-  input: { value: number; description: string },
-): Promise<void> {
-  await request(
-    "POST",
-    `/v3/subscriptions/${encodeURIComponent(id)}`,
-    idSchema,
-    { ...input, updatePendingPayments: true },
-  );
-}
-
 export async function deleteSubscription(id: string): Promise<void> {
   await request(
     "DELETE",
@@ -121,18 +120,21 @@ const paymentSchema = z.object({
 });
 export type AsaasPayment = z.infer<typeof paymentSchema>;
 
-const OPEN_STATUSES = new Set(["PENDING", "OVERDUE"]);
-
-/** Cobranças da assinatura ainda por pagar, a mais antiga primeiro. */
+/**
+ * Cobranças da assinatura ainda por pagar (atrasadas e pendentes), a mais
+ * antiga primeiro. O filtro vai para o Asaas: a lista dele é paginada.
+ */
 export async function listOpenPayments(
   subscriptionId: string,
 ): Promise<AsaasPayment[]> {
-  const list = await request(
-    "GET",
-    `/v3/subscriptions/${encodeURIComponent(subscriptionId)}/payments`,
-    z.object({ data: z.array(paymentSchema.passthrough()) }),
+  const path = (status: string) =>
+    `/v3/subscriptions/${encodeURIComponent(subscriptionId)}/payments?status=${status}`;
+  const schema = z.object({ data: z.array(paymentSchema.passthrough()) });
+  const [overdue, pending] = await Promise.all([
+    request("GET", path("OVERDUE"), schema),
+    request("GET", path("PENDING"), schema),
+  ]);
+  return [...overdue.data, ...pending.data].sort((a, b) =>
+    a.dueDate.localeCompare(b.dueDate),
   );
-  return list.data
-    .filter((p) => OPEN_STATUSES.has(p.status))
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 }

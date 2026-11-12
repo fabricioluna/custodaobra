@@ -8,6 +8,7 @@ import {
 const row = {
   status: "trialing" as const,
   plan_code: "pessoal",
+  current_period_end: null as string | null,
   provider_plan_code: "profissional",
   provider_subscription_id: "sub_1",
 };
@@ -82,5 +83,48 @@ describe("subscriptionPatch (webhook do Asaas)", () => {
         provider_plan_code: null,
       })?.plan_code,
     ).toBe("pessoal");
+  });
+
+  it("evento antigo fora de ordem não mexe na conta", () => {
+    // Pago até 21/01 (cobrança de 20/12); chega o "recebido" de 01/12.
+    const paidAhead = {
+      ...row,
+      status: "active" as const,
+      plan_code: "profissional",
+      current_period_end: "2027-01-21T02:59:59+00:00",
+    };
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), paidAhead),
+    ).toBeNull();
+    // Atraso e estorno de uma cobrança cujo período já foi superado.
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_OVERDUE"), paidAhead),
+    ).toBeNull();
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_REFUNDED"), paidAhead),
+    ).toBeNull();
+  });
+
+  it("o mesmo pagamento confirmado e depois recebido aplica uma vez", () => {
+    const first = subscriptionPatch(paymentEvent("PAYMENT_CONFIRMED"), row);
+    const after = {
+      ...row,
+      status: "active" as const,
+      current_period_end: first!.current_period_end!,
+    };
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), after),
+    ).toBeNull();
+  });
+
+  it("pagar a cobrança atrasada volta a conta para em dia", () => {
+    const overdue = {
+      ...row,
+      status: "past_due" as const,
+      current_period_end: "2026-12-01T23:59:59-03:00",
+    };
+    expect(
+      subscriptionPatch(paymentEvent("PAYMENT_RECEIVED"), overdue)?.status,
+    ).toBe("active");
   });
 });
