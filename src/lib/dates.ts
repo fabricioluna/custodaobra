@@ -55,6 +55,44 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
+/**
+ * Instante em que o dia "AAAA-MM-DD" começa no fuso informado (meia-noite
+ * local), como ISO em UTC. Ex.: "2026-12-01" em America/Recife (UTC-3) →
+ * "2026-12-01T03:00:00.000Z".
+ */
+export function startOfDayIn(
+  isoDate: string,
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
+  const date = parseIsoDate(isoDate);
+  if (!date) throw new Error(`Data inválida: ${isoDate}`);
+  const guess = date.getTime();
+  // Quanto o relógio local está à frente do UTC nesse instante.
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(new Date(guess))
+      .map((part) => [part.type, part.value]),
+  );
+  const local = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return new Date(guess - (local - guess)).toISOString();
+}
+
 /** "AAAA-MM-DD" válido (inclusive dia que existe no calendário). */
 export function isIsoDate(value: string): boolean {
   return parseIsoDate(value) !== null;

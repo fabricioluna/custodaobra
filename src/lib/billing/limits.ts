@@ -30,10 +30,16 @@ export type LimitReason =
 type Plan = Database["public"]["Tables"]["plans"]["Row"];
 type SubscriptionStatus = Database["public"]["Enums"]["subscription_status"];
 
+type AccessOverride = Database["public"]["Enums"]["access_override"];
+
 type SubscriptionDates = {
   status: SubscriptionStatus;
   trial_ends_at: string | null;
   current_period_end: string | null;
+  /** Decisão da equipe no painel interno, por cima da regra do plano. */
+  access_override?: AccessOverride | null;
+  /** Fim da liberação ou começo do bloqueio; nulo = sem prazo / na hora. */
+  access_override_at?: string | null;
 };
 
 /**
@@ -41,9 +47,13 @@ type SubscriptionDates = {
  * - `trial`: em teste; `trial_over`: o teste acabou sem plano pago;
  * - `active`: em dia; `past_due`: mensalidade atrasada, ainda na tolerância;
  *   `past_due_over`: atrasada além da tolerância;
- * - `cancelled`: cancelada (vale até o fim do que já foi pago).
+ * - `cancelled`: cancelada (vale até o fim do que já foi pago);
+ * - `granted`: liberada pela equipe (até uma data ou sem prazo);
+ * - `suspended`: bloqueada pela equipe.
  */
 export type SubscriptionPhase =
+  | "granted"
+  | "suspended"
   | "trial"
   | "trial_over"
   | "active"
@@ -67,7 +77,9 @@ function daysUntil(iso: string | null, now: Date): number | null {
 }
 
 /**
- * Regra pura da situação da assinatura. Com a cobrança desligada
+ * Regra pura da situação da assinatura. A decisão da equipe no painel
+ * interno (liberar ou bloquear) vale antes da regra do plano; liberação
+ * vencida e bloqueio ainda por vir não mudam nada. Com a cobrança desligada
  * (`billingLive = false`), teste vencido e atraso não bloqueiam: os planos
  * ainda são provisórios e não haveria onde pagar.
  */
@@ -88,6 +100,25 @@ export function subscriptionState(
     usable: usable || (!billingLive && phase !== "cancelled"),
     daysLeft,
   });
+
+  // Decisão da equipe vale antes de tudo, com ou sem cobrança no ar.
+  const overrideAt = subscription.access_override_at ?? null;
+  const overrideStarted =
+    overrideAt === null || new Date(overrideAt).getTime() <= now.getTime();
+  if (subscription.access_override === "blocked" && overrideStarted) {
+    return { phase: "suspended", usable: false, daysLeft: null };
+  }
+  // Liberação: sem prazo (nulo) ou até a data, que ainda não chegou.
+  if (
+    subscription.access_override === "free" &&
+    (overrideAt === null || !overrideStarted)
+  ) {
+    return {
+      phase: "granted",
+      usable: true,
+      daysLeft: daysUntil(overrideAt, now),
+    };
+  }
 
   switch (subscription.status) {
     case "active":
@@ -211,7 +242,7 @@ async function getOrgPlan(supabase: Client, orgId: string) {
   const { data } = await supabase
     .from("subscriptions")
     .select(
-      "status, trial_ends_at, current_period_end, plans!subscriptions_plan_code_fkey(*)",
+      "status, trial_ends_at, current_period_end, access_override, access_override_at, plans!subscriptions_plan_code_fkey(*)",
     )
     .eq("org_id", orgId)
     .maybeSingle();

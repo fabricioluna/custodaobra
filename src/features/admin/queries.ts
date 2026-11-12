@@ -20,3 +20,22 @@ export async function listAdminOrgs(month: string) {
 export type AdminOrg = NonNullable<
   Awaited<ReturnType<typeof listAdminOrgs>>
 >[number];
+
+/** Uma conta do painel (com o uso do mês atual), ou null se não houver. */
+export async function getAdminOrg(orgId: string, month: string) {
+  const orgs = await listAdminOrgs(month);
+  if (!orgs) return null;
+  return orgs.find((org) => org.org_id === orgId) ?? null;
+}
+
+/** Planos que a equipe pode dar a uma conta. */
+export async function listActivePlans() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("plans")
+    .select("code, name")
+    .eq("active", true)
+    .order("price_cents_month");
+  if (error) throw error;
+  return data;
+}

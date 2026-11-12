@@ -34,6 +34,10 @@ function phaseLabel(state: SubscriptionState): string {
       return copy.phases.pastDueOver;
     case "cancelled":
       return copy.phases.cancelled;
+    case "granted":
+      return copy.phases.granted(state.daysLeft);
+    case "suspended":
+      return copy.phases.suspended;
   }
 }
 
@@ -58,7 +62,11 @@ export default async function PlanPage({
   if (!overview) notFound();
   const { plan, state, usage } = overview;
   // Sem cobrança no ar, prazo de teste não vale nada: não mostra.
-  const showPhase = BILLING_LIVE || state.phase === "cancelled";
+  const showPhase =
+    BILLING_LIVE ||
+    state.phase === "cancelled" ||
+    state.phase === "granted" ||
+    state.phase === "suspended";
 
   return (
     <>

@@ -1,7 +1,9 @@
+import { APP_CONTACT_EMAIL } from "@/config/app";
+
 export const billingCopy = {
   /** Quando a conta não pode criar nada novo (bloqueio suave). */
   inactive:
-    "O período de teste ou o plano desta conta acabou. Você continua vendo e baixando tudo, mas para lançar coisas novas o dono da conta precisa escolher um plano.",
+    "O período de teste ou o plano desta conta acabou, ou a conta foi suspensa. Você continua vendo e baixando tudo, mas para lançar coisas novas o dono da conta precisa escolher um plano.",
   settingsRow: {
     title: "Plano e uso",
     description: "O que o plano permite e o uso deste mês.",
@@ -32,6 +34,13 @@ export const billingCopy = {
     pastDue: "Pagamento atrasado",
     pastDueOver: "Pagamento atrasado · lançamentos bloqueados",
     cancelled: "Cancelado",
+    granted: (days: number | null) =>
+      days === null
+        ? "Acesso liberado pela equipe"
+        : days <= 1
+          ? "Acesso liberado pela equipe · acaba em menos de 24 horas"
+          : `Acesso liberado pela equipe · faltam ${days} dias`,
+    suspended: "Conta suspensa · lançamentos bloqueados",
   },
   subscribe: {
     title: "Assinar um plano",
@@ -107,6 +116,7 @@ export const billingCopy = {
     pastDue: "A mensalidade está atrasada. Confira o pagamento.",
     pastDueOver:
       "A mensalidade está atrasada. Você ainda vê tudo, mas não lança gastos novos.",
+    suspended: `Esta conta está suspensa. Você ainda vê e baixa tudo, mas não lança coisas novas. Fale com a gente: ${APP_CONTACT_EMAIL}.`,
     action: "Ver plano",
   },
 } as const;
