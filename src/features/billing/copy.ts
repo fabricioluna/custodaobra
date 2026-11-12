@@ -13,6 +13,8 @@ export const billingCopy = {
     usage: "Uso",
     monthNote: "Os contadores do WhatsApp voltam a zero no dia 1º de cada mês.",
     free: "Grátis no lançamento",
+    notChargedYet:
+      "A cobrança ainda não começou: por enquanto, o uso é grátis. Avisaremos antes de cobrar.",
     perMonth: "/mês",
     changePlan: "Mudar de plano",
     changePlanSoon:
