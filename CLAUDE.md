@@ -291,7 +291,7 @@ tests/
 
 ## 10. Segurança e LGPD
 
-- Segredos só em variáveis de ambiente. Nada com prefixo `NEXT_PUBLIC_` além da URL e da chave anônima do Supabase.
+- Segredos só em variáveis de ambiente. Nada com prefixo `NEXT_PUBLIC_` além da URL e da chave anônima do Supabase, do número do bot e do DSN do Sentry (público por natureza: só permite enviar eventos).
 - Bucket de comprovantes **privado**, caminho `org_id/expense_id/arquivo`, acesso por URL assinada de curta duração. Aceitar só imagem e PDF, até 10 MB.
 - Rate limit no webhook, no login e nos convites.
 - Testes de RLS obrigatórios: um usuário de uma organização nunca lê nem altera dados de outra. Esses testes rodam no CI.
@@ -326,6 +326,11 @@ WHATSAPP_LINK_CODE_SECRET=
 NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=
 
 CRON_SECRET=
+
+NEXT_PUBLIC_SENTRY_DSN=
+SENTRY_ORG=
+SENTRY_PROJECT=
+SENTRY_AUTH_TOKEN=
 ```
 
 ---
