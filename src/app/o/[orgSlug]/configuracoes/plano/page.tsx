@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { BackLink } from "@/components/layout/back-link";
 import { orgPath } from "@/components/layout/nav";
 import { PageHeader } from "@/components/layout/page-header";
-import { APP_CONTACT_EMAIL } from "@/config/app";
+import { SubscriptionSection } from "@/features/billing/components/subscription-section";
 import { UsageMeter } from "@/features/billing/components/usage-meter";
 import { billingCopy as copy } from "@/features/billing/copy";
 import { requireOrg } from "@/features/organizations/queries";
@@ -39,8 +40,12 @@ function phaseLabel(state: SubscriptionState): string {
 /** Plano, situação e uso do mês. Só dono e admin. */
 export default async function PlanPage({
   params,
+  searchParams,
 }: PageProps<"/o/[orgSlug]/configuracoes/plano">) {
-  const { orgSlug } = await params;
+  const [{ orgSlug }, { assinatura }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const org = await requireOrg(orgSlug);
   if (!(await canManageOrg(org.id))) notFound();
 
@@ -94,15 +99,20 @@ export default async function PlanPage({
                 : null}
             </p>
           ) : null}
-          <p className="mt-4 text-sm text-muted-foreground">
-            {copy.page.changePlanSoon}{" "}
-            <a
-              href={`mailto:${APP_CONTACT_EMAIL}`}
-              className="font-medium text-foreground underline underline-offset-2"
-            >
-              {APP_CONTACT_EMAIL}
-            </a>
-          </p>
+          <div className="mt-4 flex flex-col">
+            {/* Fala com o Asaas: a página não espera por ele. */}
+            <Suspense fallback={null}>
+              <SubscriptionSection
+                orgId={org.id}
+                orgSlug={org.slug}
+                notice={
+                  assinatura === "criada" || assinatura === "alterada"
+                    ? assinatura
+                    : null
+                }
+              />
+            </Suspense>
+          </div>
         </section>
 
         <section className="flex flex-col gap-6">

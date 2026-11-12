@@ -54,6 +54,15 @@ describe("subscriptionState", () => {
 
   it("ativa pode usar", () => {
     expect(live(sub("active", null, "2026-12-08T12:00:00Z")).usable).toBe(true);
+    expect(live(sub("active", null)).usable).toBe(true);
+  });
+
+  it("ativa com o período vencido além da tolerância bloqueia (aviso perdido)", () => {
+    expect(live(sub("active", null, "2026-11-02T12:00:00Z")).usable).toBe(true);
+    expect(live(sub("active", null, "2026-10-31T12:00:00Z"))).toMatchObject({
+      phase: "past_due_over",
+      usable: false,
+    });
   });
 
   it("atrasada tem 7 dias de tolerância depois do vencimento", () => {
