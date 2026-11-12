@@ -467,7 +467,7 @@ describe("perguntas pelo WhatsApp", () => {
   it("com os lançamentos do mês esgotados, perguntas continuam", async () => {
     const { data: plan } = await admin
       .from("subscriptions")
-      .select("plans(max_whatsapp_entries_month)")
+      .select("plans!subscriptions_plan_code_fkey(max_whatsapp_entries_month)")
       .eq("org_id", ana.orgId)
       .single();
     const month = `${today().slice(0, 7)}-01`;

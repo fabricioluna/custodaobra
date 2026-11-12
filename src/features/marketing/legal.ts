@@ -57,7 +57,7 @@ export const privacyPolicy: LegalDocument = {
       title: "4. Com quem compartilhamos",
       paragraphs: [
         "Com as pessoas que você convida para a sua conta ou para uma obra, conforme o acesso que você der a cada uma.",
-        "Com os fornecedores que operam o serviço para nós: Supabase (banco de dados, login e armazenamento de arquivos), Vercel (hospedagem), Meta (WhatsApp Cloud API), Anthropic (inteligência artificial), Groq (transcrição de áudio), Resend (envio do e-mail de acesso), Sentry (registro de erros técnicos, sem gravar a sua tela) e Google (login com Google, quando você escolhe essa opção).",
+        "Com os fornecedores que operam o serviço para nós: Supabase (banco de dados, login e armazenamento de arquivos), Vercel (hospedagem), Meta (WhatsApp Cloud API), Anthropic (inteligência artificial), Groq (transcrição de áudio), Resend (envio do e-mail de acesso), Asaas (cobrança da assinatura: nome, CPF ou CNPJ e e-mail de quem paga), Sentry (registro de erros técnicos, sem gravar a sua tela) e Google (login com Google, quando você escolhe essa opção).",
         "Com autoridades, quando a lei ou uma ordem judicial exigir.",
       ],
     },

@@ -2,12 +2,17 @@
 
 import { redirect } from "next/navigation";
 
+import { cancelOwnedSubscriptions } from "@/features/billing/cancel-owned";
 import { ACCOUNT_DELETED_PATH } from "@/lib/auth/paths";
 import { requireUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 import { accountCopy } from "./copy";
-import { AccountDeletionAfterFilesError, deleteOwnAccount } from "./delete";
+import {
+  AccountDeletionAfterFilesError,
+  deleteOwnAccount,
+  ownedOrgIds,
+} from "./delete";
 import { deleteAccountSchema } from "./schemas";
 
 export type DeleteAccountState = { error: string | null };
@@ -25,6 +30,11 @@ export async function deleteAccount(
   const userId = await requireUserId();
   const supabase = await createClient();
   try {
+    // A cobrança para antes de qualquer coisa ser apagada.
+    await cancelOwnedSubscriptions(
+      supabase,
+      await ownedOrgIds(supabase, userId),
+    );
     await deleteOwnAccount(supabase, userId);
   } catch (error) {
     console.error("[conta] falha ao excluir", error);

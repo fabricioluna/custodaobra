@@ -98,6 +98,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      billing_events: {
+        Row: {
+          created_at: string;
+          error: string | null;
+          event: string;
+          id: string;
+          org_id: string | null;
+          payload: Json;
+          processed_at: string | null;
+          provider: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          error?: string | null;
+          event: string;
+          id: string;
+          org_id?: string | null;
+          payload: Json;
+          processed_at?: string | null;
+          provider: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          error?: string | null;
+          event?: string;
+          id?: string;
+          org_id?: string | null;
+          payload?: Json;
+          processed_at?: string | null;
+          provider?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       budget_alerts: {
         Row: {
           created_at: string;
@@ -999,6 +1043,7 @@ export type Database = {
           plan_code: string;
           provider: string | null;
           provider_customer_id: string | null;
+          provider_plan_code: string | null;
           provider_subscription_id: string | null;
           status: Database["public"]["Enums"]["subscription_status"];
           trial_ends_at: string | null;
@@ -1012,6 +1057,7 @@ export type Database = {
           plan_code: string;
           provider?: string | null;
           provider_customer_id?: string | null;
+          provider_plan_code?: string | null;
           provider_subscription_id?: string | null;
           status?: Database["public"]["Enums"]["subscription_status"];
           trial_ends_at?: string | null;
@@ -1025,6 +1071,7 @@ export type Database = {
           plan_code?: string;
           provider?: string | null;
           provider_customer_id?: string | null;
+          provider_plan_code?: string | null;
           provider_subscription_id?: string | null;
           status?: Database["public"]["Enums"]["subscription_status"];
           trial_ends_at?: string | null;
@@ -1037,6 +1084,13 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscriptions_provider_plan_code_fkey";
+            columns: ["provider_plan_code"];
+            isOneToOne: false;
+            referencedRelation: "plans";
+            referencedColumns: ["code"];
           },
           {
             foreignKeyName: "subscriptions_plan_code_fkey";
@@ -1449,6 +1503,23 @@ export type Database = {
           trial_ends_at: string;
           whatsapp_entries: number;
         }[];
+      };
+      billing_mark_cancelled: {
+        Args: { p_org_id: string };
+        Returns: undefined;
+      };
+      billing_set_customer: {
+        Args: { p_customer_id: string; p_org_id: string };
+        Returns: undefined;
+      };
+      billing_set_subscription: {
+        Args: {
+          p_org_id: string;
+          p_plan_code: string;
+          p_previous_subscription_id?: string;
+          p_subscription_id: string;
+        };
+        Returns: undefined;
       };
       delete_my_account: { Args: never; Returns: undefined };
       expire_pending_expenses: {
