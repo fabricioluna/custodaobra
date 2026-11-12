@@ -1086,15 +1086,15 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "subscriptions_provider_plan_code_fkey";
-            columns: ["provider_plan_code"];
+            foreignKeyName: "subscriptions_plan_code_fkey";
+            columns: ["plan_code"];
             isOneToOne: false;
             referencedRelation: "plans";
             referencedColumns: ["code"];
           },
           {
-            foreignKeyName: "subscriptions_plan_code_fkey";
-            columns: ["plan_code"];
+            foreignKeyName: "subscriptions_provider_plan_code_fkey";
+            columns: ["provider_plan_code"];
             isOneToOne: false;
             referencedRelation: "plans";
             referencedColumns: ["code"];
