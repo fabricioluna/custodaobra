@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Tudo, menos arquivos estáticos, imagens, ícones e as rotas sem sessão
-    // (webhook do WhatsApp e cron).
-    "/((?!api/whatsapp|api/cron|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|sw.js|offline|brand/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // (webhooks do WhatsApp e do Asaas, e cron).
+    "/((?!api/whatsapp|api/billing|api/cron|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|sw.js|offline|brand/|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

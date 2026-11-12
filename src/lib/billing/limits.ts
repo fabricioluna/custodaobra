@@ -206,7 +206,9 @@ export function monthOf(isoDate: string): string {
 async function getOrgPlan(supabase: Client, orgId: string) {
   const { data } = await supabase
     .from("subscriptions")
-    .select("status, trial_ends_at, current_period_end, plans(*)")
+    .select(
+      "status, trial_ends_at, current_period_end, plans!subscriptions_plan_code_fkey(*)",
+    )
     .eq("org_id", orgId)
     .maybeSingle();
   return data;

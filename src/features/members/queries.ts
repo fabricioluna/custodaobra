@@ -82,7 +82,7 @@ export async function getMaxMembers(orgId: string): Promise<number | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
-    .select("plans(max_members)")
+    .select("plans!subscriptions_plan_code_fkey(max_members)")
     .eq("org_id", orgId)
     .maybeSingle();
   return data?.plans?.max_members ?? null;

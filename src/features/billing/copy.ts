@@ -31,6 +31,55 @@ export const billingCopy = {
     pastDueOver: "Pagamento atrasado · lançamentos bloqueados",
     cancelled: "Cancelado",
   },
+  subscribe: {
+    title: "Assinar um plano",
+    description:
+      "Escolha o plano. Na página de pagamento você paga com Pix, boleto ou cartão.",
+    start: "Assinar um plano",
+    change: "Mudar de plano",
+    plan: "Plano",
+    name: "Nome para a cobrança",
+    nameHint: "O seu nome ou o da empresa.",
+    document: "CPF ou CNPJ",
+    documentHint: "Exigido para emitir a cobrança. Só os números.",
+    email: "E-mail para receber as faturas",
+    submit: "Ir para o pagamento",
+    pending: "Preparando o pagamento…",
+    trialNote:
+      "Se você ainda está no teste grátis, a primeira cobrança vence no fim do teste.",
+    changeNote:
+      "O novo plano passa a valer quando o próximo pagamento for confirmado.",
+    providerDescription: (planName: string, appName: string) =>
+      `${appName} · plano ${planName}`,
+    none: "Ainda não há planos pagos para assinar.",
+  },
+  subscription: {
+    title: "Sua assinatura",
+    nextPlan: (name: string) =>
+      `Muda para o plano ${name} no próximo pagamento.`,
+    openInvoice: (value: string, due: string) =>
+      `Pagar fatura de ${value} (vence ${due})`,
+    created:
+      "Assinatura criada. A fatura aparece aqui em instantes; o Asaas também manda por e-mail.",
+    cancelTitle: "Cancelar assinatura",
+    cancelDescription:
+      "As próximas cobranças deixam de ser geradas. A conta continua valendo até o fim do período já pago; depois, você só vê e baixa os dados.",
+    cancelConfirm: "Quero cancelar a assinatura",
+    cancelSubmit: "Cancelar assinatura",
+    cancelPending: "Cancelando…",
+  },
+  errors: {
+    noPermission: "Só o dono ou um administrador da conta mexe no plano.",
+    unavailable: "A assinatura pelo app ainda não está disponível.",
+    plan: "Escolha um dos planos.",
+    name: "Informe o nome para a cobrança.",
+    document: "CPF ou CNPJ inválido. Confira os números.",
+    email: "Informe um e-mail válido.",
+    confirm: "Marque a caixa para confirmar o cancelamento.",
+    rejected: (reason: string) => `O sistema de pagamento recusou: ${reason}`,
+    failed:
+      "Não deu para falar com o sistema de pagamento agora. Tente de novo em instantes.",
+  },
   meters: {
     projects: "Obras ativas",
     members: "Pessoas com acesso (e convites pendentes)",
