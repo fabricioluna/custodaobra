@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { after, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -61,23 +62,37 @@ export async function POST(request: NextRequest) {
   const failures = extractFailedDeliveries(body, phoneNumberId);
   if (messages.length || failures.length) {
     after(async () => {
-      const admin = createAdminClient();
-      // Uma por vez, na ordem em que chegaram.
-      for (const message of messages) {
-        // Erros viram resposta à pessoa e ficam no log lá dentro.
-        await handleIncomingMessage(admin, message);
-      }
-      // Resposta do bot que não chegou: fica anotada no log.
-      for (const failure of failures) {
-        console.error("[whatsapp]", failure.waMessageId, failure.error);
-        await admin
-          .from("whatsapp_messages")
-          .update({ error: failure.error })
-          .eq("wa_message_id", failure.waMessageId)
-          .eq("direction", "out");
+      try {
+        await processWebhook(messages, failures);
+      } finally {
+        // O after() roda depois da resposta: sem esperar o envio, a função
+        // pode congelar antes de o Sentry mandar os erros anotados aqui.
+        await Sentry.flush(2000);
       }
     });
   }
 
   return new Response("OK", { status: 200 });
+}
+
+async function processWebhook(
+  messages: ReturnType<typeof extractMessages>,
+  failures: ReturnType<typeof extractFailedDeliveries>,
+) {
+  const admin = createAdminClient();
+  // Uma por vez, na ordem em que chegaram.
+  for (const message of messages) {
+    // Erros viram resposta à pessoa e ficam no log lá dentro.
+    await handleIncomingMessage(admin, message);
+  }
+  // Resposta do bot que não chegou: fica anotada no log. O id da mensagem
+  // não vai para o Sentry (o `wamid` carrega o número da pessoa).
+  for (const failure of failures) {
+    console.error("[whatsapp] resposta não entregue", failure.error);
+    await admin
+      .from("whatsapp_messages")
+      .update({ error: failure.error })
+      .eq("wa_message_id", failure.waMessageId)
+      .eq("direction", "out");
+  }
 }

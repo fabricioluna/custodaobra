@@ -1,19 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo } from "next/font/google";
 
 import { APP_LOCALE, APP_NAME, APP_TAGLINE, APP_URL } from "@/config/app";
 import { ServiceWorker } from "@/components/service-worker";
 import { BRAND_COLORS } from "@/config/brand";
 
-import "./globals.css";
+import { archivo } from "./fonts";
 
-// Archivo: grotesca de largura variável. Corpo na largura normal; títulos na
-// versão larga e pesada (utilitário `heading` em globals.css), como letra de placa.
-const archivo = Archivo({
-  variable: "--font-sans",
-  subsets: ["latin", "latin-ext"],
-  axes: ["wdth"],
-});
+import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
