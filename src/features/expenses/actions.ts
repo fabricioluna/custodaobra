@@ -120,9 +120,23 @@ async function prepare(
   formData: FormData,
   { creating }: { creating: boolean },
 ) {
-  const userId = await requireUserId();
-  const org = await requireOrg(orgSlug);
-  const access = await getProjectAccess(org.id, projectId);
+  // Leituras independentes juntas, em poucas rodadas ao banco: lançar um
+  // gasto precisa ser rápido. Nada é gravado (nem fornecedor novo) antes de
+  // conferir a permissão e o plano.
+  const parsed = parseExpenseForm(formData);
+  const [userId, org, supabase] = await Promise.all([
+    requireUserId(),
+    requireOrg(orgSlug),
+    createClient(),
+  ]);
+  const [access, allowed, categoryName] = await Promise.all([
+    getProjectAccess(org.id, projectId),
+    // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
+    creating ? canWrite(supabase, org.id) : null,
+    parsed.success && !parsed.data.description
+      ? getCategoryName(supabase, parsed.data.categoryId)
+      : null,
+  ]);
   if (!access.canEdit) {
     return {
       ok: false,
@@ -130,7 +144,6 @@ async function prepare(
     } as const;
   }
 
-  const parsed = parseExpenseForm(formData);
   if (!parsed.success) {
     return {
       ok: false,
@@ -154,27 +167,20 @@ async function prepare(
     } as const;
   }
 
-  const supabase = await createClient();
-  // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
-  // Antes do fornecedor, para não cadastrar um à toa.
-  if (creating) {
-    const allowed = await canWrite(supabase, org.id);
-    if (!allowed.ok) {
-      return {
-        ok: false,
-        state: {
-          status: "error",
-          message: billingCopy.blocked(allowed.reason),
-        },
-      } as const;
-    }
+  if (allowed && !allowed.ok) {
+    return {
+      ok: false,
+      state: {
+        status: "error",
+        message: billingCopy.blocked(allowed.reason),
+      },
+    } as const;
   }
-  const [supplierId, categoryName] = await Promise.all([
-    resolveSupplier(supabase, org.id, parsed.data.supplierName),
-    parsed.data.description
-      ? Promise.resolve(null)
-      : getCategoryName(supabase, parsed.data.categoryId),
-  ]);
+  const supplierId = await resolveSupplier(
+    supabase,
+    org.id,
+    parsed.data.supplierName,
+  );
 
   const data = parsed.data;
   const row = {

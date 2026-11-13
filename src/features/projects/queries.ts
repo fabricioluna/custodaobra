@@ -3,6 +3,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { getOrgRole, isOrgAdminRole } from "@/features/members/queries";
 import { requireOrg } from "@/features/organizations/queries";
 import { requireUserId } from "@/lib/auth/session";
 import { isUuid } from "@/lib/forms";
@@ -27,16 +28,19 @@ export async function listProjects(
     .order("created_at", { ascending: false });
   if (archived === "exclude") query = query.is("archived_at", null);
   if (archived === "only") query = query.not("archived_at", "is", null);
-  const { data: projects } = await query;
+  // Resumos da conta toda junto com as obras (uma rodada só ao banco, em vez
+  // de esperar a lista para pedir só os dela). Vêm também os das obras
+  // arquivadas, ignorados aqui; se uma conta juntar muitas arquivadas, vale
+  // pôr `archived_at` na view para filtrar.
+  const [{ data: projects }, { data: summaries }] = await Promise.all([
+    query,
+    supabase
+      .from("v_project_summary")
+      .select("project_id, construction_cents, land_cents, expense_count")
+      .eq("org_id", orgId),
+  ]);
   if (!projects?.length) return [];
 
-  const { data: summaries } = await supabase
-    .from("v_project_summary")
-    .select("project_id, construction_cents, land_cents, expense_count")
-    .in(
-      "project_id",
-      projects.map((p) => p.id),
-    );
   const byId = new Map(summaries?.map((s) => [s.project_id, s]));
 
   return projects.map((project) => ({
@@ -61,16 +65,34 @@ export async function countArchivedProjects(orgId: string): Promise<number> {
 export type ProjectListItem = Awaited<ReturnType<typeof listProjects>>[number];
 
 export const getProject = cache(async (orgId: string, projectId: string) => {
+  const project = await getProjectById(projectId);
+  return project?.org_id === orgId ? project : null;
+});
+
+/** A obra pelo id (o RLS só devolve se a pessoa pode vê-la). */
+const getProjectById = cache(async (projectId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("projects")
     .select(
       "id, org_id, name, address, city, state, built_area_m2, standard, start_date, status, archived_at",
     )
-    .eq("org_id", orgId)
     .eq("id", projectId)
     .maybeSingle();
   return data;
+});
+
+/** Papel da pessoa logada na obra (project_members), se tiver. */
+const getProjectRole = cache(async (projectId: string) => {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("project_members")
+    .select("role")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.role ?? null;
 });
 
 /**
@@ -80,28 +102,16 @@ export const getProject = cache(async (orgId: string, projectId: string) => {
  */
 export const getProjectAccess = cache(
   async (orgId: string, projectId: string) => {
-    const userId = await requireUserId();
-    const supabase = await createClient();
-    const [{ data: membership }, { data: projectMember }] = await Promise.all([
-      supabase
-        .from("organization_members")
-        .select("role")
-        .eq("org_id", orgId)
-        .eq("user_id", userId)
-        .maybeSingle(),
-      supabase
-        .from("project_members")
-        .select("role")
-        .eq("project_id", projectId)
-        .eq("user_id", userId)
-        .maybeSingle(),
+    const [userId, orgRole, projectRole] = await Promise.all([
+      requireUserId(),
+      getOrgRole(orgId),
+      getProjectRole(projectId),
     ]);
-    const isOrgAdmin =
-      membership?.role === "owner" || membership?.role === "admin";
+    const isOrgAdmin = isOrgAdminRole(orgRole);
     return {
       userId,
       isOrgAdmin,
-      canEdit: isOrgAdmin || projectMember?.role === "editor",
+      canEdit: isOrgAdmin || projectRole === "editor",
     };
   },
 );
@@ -109,25 +119,31 @@ export const getProjectAccess = cache(
 /**
  * Use no começo de TODA página de /o/[orgSlug]/obras/[projectId]/...
  * Obra inexistente ou sem acesso vira 404.
+ *
+ * Conta (com o papel), obra e papel na obra saem juntos, numa rodada só ao
+ * banco: as consultas não dependem umas das outras (a obra vem pelo id e é
+ * conferida contra a conta depois).
  */
 export async function requireProject(orgSlug: string, projectId: string) {
-  const org = await requireOrg(orgSlug);
+  // Sessão primeiro (lida do cookie, sem ir ao banco): sem login, sempre o
+  // login, nunca um 404 que dependa de qual consulta terminou antes.
+  await requireUserId();
   if (!isUuid(projectId)) notFound();
-  const project = await getProject(org.id, projectId);
-  if (!project) notFound();
+  // O papel na obra entra junto para já estar pronto quando getProjectAccess
+  // pedir (para dono e admin ele não muda nada, mas não custa espera: corre
+  // em paralelo).
+  const [org, project] = await Promise.all([
+    requireOrg(orgSlug),
+    getProjectById(projectId),
+    getProjectRole(projectId),
+  ]);
+  if (!project || project.org_id !== org.id) notFound();
   const access = await getProjectAccess(org.id, projectId);
   return { org, project, access };
 }
 
 /** Pode criar obras nesta organização (dono ou admin)? */
 export async function canManageOrg(orgId: string): Promise<boolean> {
-  const userId = await requireUserId();
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("organization_members")
-    .select("role")
-    .eq("org_id", orgId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return data?.role === "owner" || data?.role === "admin";
+  // O papel quase sempre já veio junto com a conta (getOrgContext).
+  return isOrgAdminRole(await getOrgRole(orgId));
 }

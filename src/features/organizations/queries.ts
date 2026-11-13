@@ -3,21 +3,44 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { getUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import type { OrgRole } from "@/features/members/queries";
 
 /**
- * Organização pelo endereço (slug). O RLS só devolve se o usuário for membro,
- * então `null` significa "não existe ou não é sua": as duas viram 404.
+ * Papéis já lidos nesta requisição, por organização. `getOrgContext` grava
+ * aqui e `getOrgRole` (features/members) lê antes de ir ao banco: a conta e o
+ * papel saem de uma consulta só. Fora de uma renderização (rotas de API,
+ * algumas ações) o `cache` não guarda nada: `getOrgRole` só faz a própria
+ * consulta, como antes.
  */
-export const getOrgBySlug = cache(async (slug: string) => {
+export const knownOrgRoles = cache(() => new Map<string, OrgRole>());
+
+/**
+ * Organização pelo endereço (slug) e o papel da pessoa logada nela, numa
+ * consulta só (pelo vínculo em organization_members). A organização só é
+ * visível a quem é membro (RLS), então dá no mesmo que ler `organizations`.
+ * `null` = não existe ou não é sua: as duas viram 404.
+ */
+export const getOrgContext = cache(async (slug: string) => {
+  const userId = await getUserId();
+  if (!userId) return null;
   const supabase = await createClient();
   const { data } = await supabase
-    .from("organizations")
-    .select("id, name, slug, kind, timezone")
-    .eq("slug", slug)
+    .from("organization_members")
+    .select("role, org:organizations!inner(id, name, slug, kind, timezone)")
+    .eq("user_id", userId)
+    .eq("org.slug", slug)
     .maybeSingle();
-  return data;
+  if (!data?.org) return null;
+  knownOrgRoles().set(data.org.id, data.role);
+  return { org: data.org, role: data.role };
 });
+
+/** Organização pelo endereço (slug); `null` = não existe ou não é sua. */
+export const getOrgBySlug = cache(
+  async (slug: string) => (await getOrgContext(slug))?.org ?? null,
+);
 
 /**
  * Use no começo de TODA página da área /o/[orgSlug] que busca dados.

@@ -40,13 +40,14 @@ export default async function SettingsPage({
 }: PageProps<"/o/[orgSlug]/configuracoes">) {
   const { orgSlug } = await params;
   const org = await requireOrg(orgSlug);
-  const [role, orgs, whatsapp] = await Promise.all([
-    getOrgRole(org.id),
+  // O papel já veio junto com a conta: a equipe sai na mesma rodada que o
+  // resto, em vez de esperar.
+  const canManage = isOrgAdminRole(await getOrgRole(org.id));
+  const [orgs, whatsapp, team] = await Promise.all([
     listMyOrgs(),
     getMyWhatsapp(),
+    canManage ? listTeam(org.id) : [],
   ]);
-  const canManage = isOrgAdminRole(role);
-  const team = canManage ? await listTeam(org.id) : [];
 
   return (
     <>

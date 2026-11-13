@@ -50,3 +50,6 @@ supabase/.temp
 
 # Guia do usuário: gerado por scripts/guia (fotos, HTML e PDF)
 /docs/guia/
+
+# Medições de desempenho (scripts/perf)
+/scripts/perf/out/

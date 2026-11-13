@@ -1,5 +1,6 @@
 export const layoutCopy = {
   skipToContent: "Pular para o conteúdo",
+  loading: "Carregando…",
   nav: {
     label: "Navegação principal",
     projects: "Obras",
