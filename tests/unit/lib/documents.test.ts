@@ -36,7 +36,40 @@ describe("CNPJ e CPF", () => {
   });
 });
 
+describe("CNPJ alfanumérico", () => {
+  // Exemplo da Receita Federal: 12.ABC.345/01DE-35.
+  const ALNUM = "12ABC34501DE35";
+
+  it("aceita com e sem pontuação, em maiúsculas ou minúsculas", () => {
+    expect(isValidCnpj(ALNUM)).toBe(true);
+    expect(isValidCnpj("12.ABC.345/01DE-35")).toBe(true);
+    expect(normalizeDocument("12.abc.345/01de-35")).toBe(ALNUM);
+  });
+
+  it("tira o rótulo que vem junto", () => {
+    expect(normalizeDocument("CNPJ: 12.ABC.345/01DE-35")).toBe(ALNUM);
+    expect(normalizeDocument("CNPJ 11.222.333/0001-81")).toBe(CNPJ);
+    expect(normalizeDocument("CPF: 529.982.247-25")).toBe(CPF);
+  });
+
+  it("recusa verificador errado, letra no verificador e letra no CPF", () => {
+    expect(isValidCnpj("12ABC34501DE36")).toBe(false);
+    expect(isValidCnpj("12ABC34501DF35")).toBe(false);
+    expect(isValidCnpj("12ABC34501DE3A")).toBe(false);
+    expect(normalizeDocument("5299822472A")).toBeNull();
+  });
+});
+
 describe("chave de acesso da NFC-e", () => {
+  it("aceita a chave com CNPJ alfanumérico", () => {
+    const key = "26111112ABC34501DE35650010000123451000123451";
+    expect(normalizeAccessKey(key)).toBe(key);
+    expect(normalizeAccessKey(key.toLowerCase())).toBe(key);
+    expect(normalizeAccessKey(`${key.slice(0, 43)}2`)).toBeNull();
+    // Letra fora da parte do CNPJ não vale.
+    expect(normalizeAccessKey(`A${key.slice(1)}`)).toBeNull();
+  });
+
   it("aceita a chave impressa em blocos de 4", () => {
     const printed = KEY.match(/.{1,4}/g)?.join(" ") ?? "";
     expect(normalizeAccessKey(printed)).toBe(KEY);

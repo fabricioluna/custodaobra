@@ -18,7 +18,7 @@ import {
 import {
   READ_RECEIPT_PROMPT_VERSION,
   READ_RECEIPT_SYSTEM,
-} from "./prompts/read-receipt.v2";
+} from "./prompts/read-receipt.v3";
 import {
   type AiFailureReason,
   type AiUsage,

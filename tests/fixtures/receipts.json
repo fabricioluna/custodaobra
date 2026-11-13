@@ -49,6 +49,22 @@
       }
     },
     {
+      "file": "nfce-hidraulica.png",
+      "caption": null,
+      "expect": {
+        "is_receipt": true,
+        "amount_cents": 15540,
+        "category": "material",
+        "stage": "Instalações hidrossanitárias",
+        "spent_on": "2026-11-08",
+        "payment_method": "dinheiro",
+        "has_invoice": true,
+        "supplier_document": "7KQ3RZ1X000152",
+        "access_key": "2626117KQ3RZ1X000152650010000077881000077880",
+        "items": 3
+      }
+    },
+    {
       "file": "recibo-pedreiro.png",
       "caption": null,
       "expect": {
