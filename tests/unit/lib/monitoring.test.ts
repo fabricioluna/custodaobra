@@ -6,6 +6,7 @@ import {
   redactText,
   scrubBreadcrumb,
   scrubEvent,
+  sentryEnvironment,
 } from "@/lib/monitoring/sentry";
 
 describe("redactText", () => {
@@ -99,5 +100,21 @@ describe("scrubBreadcrumb", () => {
     expect(scrubBreadcrumb({ category: "navigation" })).toEqual({
       category: "navigation",
     });
+  });
+});
+
+describe("ambiente do Sentry", () => {
+  it("usa o da Vercel quando houver", () => {
+    expect(
+      sentryEnvironment({ vercelEnv: "production", nodeEnv: "production" }),
+    ).toBe("production");
+    expect(
+      sentryEnvironment({ vercelEnv: "preview", nodeEnv: "production" }),
+    ).toBe("preview");
+  });
+
+  it("build de produção fora da Vercel vira local", () => {
+    expect(sentryEnvironment({ nodeEnv: "production" })).toBe("local");
+    expect(sentryEnvironment({ nodeEnv: "development" })).toBe("development");
   });
 });

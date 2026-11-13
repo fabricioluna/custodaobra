@@ -83,7 +83,7 @@ export type QueryAnswer =
       count: number;
     };
 
-/** O PostgREST devolve até 1000 linhas por vez: as somas leem em páginas. */
+/** O PostgREST devolve até 1000 linhas por vez: as contas leem em páginas. */
 const PAGE_SIZE = 1000;
 /** Teto de segurança (20 mil gastos numa obra). */
 const MAX_PAGES = 20;
@@ -105,31 +105,41 @@ export async function runQuery(
 ): Promise<QueryAnswer> {
   switch (call.name) {
     case "total_spent": {
-      const rows = await fetchExpenses(admin, project, call.filters);
-      const land = rows.filter((row) => row.categoryCode === "terreno");
+      const [row] = await expenseTotals(admin, project, call.filters, null);
       return {
         name: "total_spent",
         filters: call.filters,
-        totalCents: sum(rows),
-        landCents: sum(land),
-        count: rows.length,
+        totalCents: row?.cents ?? 0,
+        landCents: row?.landCents ?? 0,
+        count: row?.count ?? 0,
       };
     }
     case "spending_breakdown": {
-      const rows = await fetchExpenses(admin, project, call.filters);
+      const rows = await expenseTotals(
+        admin,
+        project,
+        call.filters,
+        call.groupBy,
+      );
       return {
         name: "spending_breakdown",
         filters: call.filters,
         groupBy: call.groupBy,
-        groups: groupRows(rows, call.groupBy),
-        totalCents: sum(rows),
-        count: rows.length,
+        groups: sortGroups(
+          rows.map(({ label, cents }) => ({ label, cents })),
+          call.groupBy,
+        ),
+        totalCents: rows.reduce((total, row) => total + row.cents, 0),
+        count: rows.reduce((total, row) => total + row.count, 0),
       };
     }
     case "recent_expenses": {
-      const items = await fetchExpenses(admin, project, call.filters, {
-        limit: call.limit,
-      });
+      const items = await recentExpenses(
+        admin,
+        project,
+        call.filters,
+        call.limit,
+      );
       return { name: "recent_expenses", filters: call.filters, items };
     }
     case "budget_status":
@@ -142,40 +152,28 @@ export async function runQuery(
 const sum = (rows: { amountCents: number }[]) =>
   rows.reduce((total, row) => total + row.amountCents, 0);
 
-/** Soma por grupo, do maior para o menor. Sem etapa/fornecedor: label nulo. */
-export function groupRows(
-  rows: ExpenseRow[],
-  groupBy: GroupBy,
-): { label: string | null; cents: number }[] {
-  const totals = new Map<string | null, number>();
-  for (const row of rows) {
-    const label =
-      groupBy === "stage"
-        ? row.stageName
-        : groupBy === "category"
-          ? row.categoryCode
-          : groupBy === "supplier"
-            ? row.supplierName
-            : row.spentOn.slice(0, 7);
-    totals.set(label, (totals.get(label) ?? 0) + row.amountCents);
-  }
-  const groups = [...totals].map(([label, cents]) => ({ label, cents }));
-  // Por mês, a ordem é a do calendário; nos outros, do maior para o menor.
+type Group = { label: string | null; cents: number };
+
+/**
+ * Ordem dos grupos: por mês, a do calendário; nos outros, do maior para o
+ * menor. Sem etapa/fornecedor: label nulo.
+ */
+export function sortGroups(groups: Group[], groupBy: GroupBy): Group[] {
   return groupBy === "month"
     ? groups.sort((a, b) => (a.label ?? "").localeCompare(b.label ?? ""))
     : groups.sort((a, b) => b.cents - a.cents);
 }
 
 /**
- * Gastos confirmados da obra com os filtros pedidos. Categoria e fornecedor
- * viram listas de ids antes (consulta simples, sem junção filtrada).
+ * Categoria e fornecedor viram listas de ids antes (consulta simples, sem
+ * junção filtrada). null = sem esse filtro; lista vazia = o filtro não acha
+ * nada (nenhum gasto, em vez de ignorar o filtro).
  */
-async function fetchExpenses(
+async function filterIds(
   admin: Admin,
   project: QueryProject,
   filters: ExpenseFilters,
-  options: { limit?: number } = {},
-): Promise<ExpenseRow[]> {
+) {
   const [categoryIds, supplierIds] = await Promise.all([
     filters.categoryCode
       ? idsOf(
@@ -197,53 +195,95 @@ async function fetchExpenses(
         )
       : null,
   ]);
-  // Filtro que não acha nada: nenhum gasto (não ignora o filtro).
-  if (categoryIds?.length === 0 || supplierIds?.length === 0) return [];
+  const empty = categoryIds?.length === 0 || supplierIds?.length === 0;
+  return { categoryIds, supplierIds, empty };
+}
 
-  const page = async (offset: number, size: number) => {
-    let query = admin
-      .from("expenses")
-      .select(EXPENSE_COLUMNS)
-      .eq("org_id", project.orgId)
-      .eq("project_id", project.id)
-      .eq("status", "confirmed")
-      .is("deleted_at", null);
-    if (filters.from) query = query.gte("spent_on", filters.from);
-    if (filters.to) query = query.lte("spent_on", filters.to);
-    if (filters.stageId) query = query.eq("stage_id", filters.stageId);
-    if (categoryIds) query = query.in("category_id", categoryIds);
-    if (supplierIds) query = query.in("supplier_id", supplierIds);
-    if (filters.paymentMethod) {
-      query = query.eq("payment_method", filters.paymentMethod);
-    }
-    if (filters.search) {
-      query = query.ilike("description", likePattern(filters.search));
-    }
-    const { data, error } = await query
-      .order("spent_on", { ascending: false })
-      .order("created_at", { ascending: false })
-      .order("id")
-      .range(offset, offset + size - 1);
-    if (error) throw error;
-    return data.map((row) => ({
-      amountCents: row.amount_cents,
-      description: row.description,
-      spentOn: row.spent_on,
-      stageName: row.stages?.name ?? null,
-      categoryCode: row.categories?.code ?? "outros",
-      supplierName: row.suppliers?.name ?? null,
-    }));
-  };
+/**
+ * Somas dos gastos confirmados da obra com os filtros pedidos, feitas no
+ * banco (expense_totals): uma linha por grupo, ou uma só sem grupo.
+ */
+async function expenseTotals(
+  admin: Admin,
+  project: QueryProject,
+  filters: ExpenseFilters,
+  groupBy: GroupBy | null,
+): Promise<
+  { label: string | null; cents: number; landCents: number; count: number }[]
+> {
+  const { categoryIds, supplierIds, empty } = await filterIds(
+    admin,
+    project,
+    filters,
+  );
+  if (empty) return [];
+  const { data, error } = await admin.rpc("expense_totals", {
+    p_org_id: project.orgId,
+    p_project_id: project.id,
+    p_group_by: groupBy ?? undefined,
+    p_from: filters.from ?? undefined,
+    p_to: filters.to ?? undefined,
+    p_stage_id: filters.stageId ?? undefined,
+    p_category_ids: categoryIds ?? undefined,
+    p_supplier_ids: supplierIds ?? undefined,
+    p_payment_method: filters.paymentMethod ?? undefined,
+    p_search: filters.search ? likePattern(filters.search) : undefined,
+  });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    // Os tipos gerados não marcam colunas de função como anuláveis.
+    label: row.label as string | null,
+    cents: Number(row.cents),
+    landCents: Number(row.land_cents),
+    count: Number(row.expense_count),
+  }));
+}
 
-  if (options.limit) return page(0, options.limit);
-
-  const rows: ExpenseRow[] = [];
-  for (let i = 0; i < MAX_PAGES; i++) {
-    const batch = await page(i * PAGE_SIZE, PAGE_SIZE);
-    rows.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
+/** Os gastos mais recentes da obra com os filtros pedidos. */
+async function recentExpenses(
+  admin: Admin,
+  project: QueryProject,
+  filters: ExpenseFilters,
+  limit: number,
+): Promise<ExpenseRow[]> {
+  const { categoryIds, supplierIds, empty } = await filterIds(
+    admin,
+    project,
+    filters,
+  );
+  if (empty) return [];
+  let query = admin
+    .from("expenses")
+    .select(EXPENSE_COLUMNS)
+    .eq("org_id", project.orgId)
+    .eq("project_id", project.id)
+    .eq("status", "confirmed")
+    .is("deleted_at", null);
+  if (filters.from) query = query.gte("spent_on", filters.from);
+  if (filters.to) query = query.lte("spent_on", filters.to);
+  if (filters.stageId) query = query.eq("stage_id", filters.stageId);
+  if (categoryIds) query = query.in("category_id", categoryIds);
+  if (supplierIds) query = query.in("supplier_id", supplierIds);
+  if (filters.paymentMethod) {
+    query = query.eq("payment_method", filters.paymentMethod);
   }
-  return rows;
+  if (filters.search) {
+    query = query.ilike("description", likePattern(filters.search));
+  }
+  const { data, error } = await query
+    .order("spent_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(limit);
+  if (error) throw error;
+  return data.map((row) => ({
+    amountCents: row.amount_cents,
+    description: row.description,
+    spentOn: row.spent_on,
+    stageName: row.stages?.name ?? null,
+    categoryCode: row.categories?.code ?? "outros",
+    supplierName: row.suppliers?.name ?? null,
+  }));
 }
 
 async function idsOf(

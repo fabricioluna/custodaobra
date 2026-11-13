@@ -90,11 +90,27 @@ export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
   return breadcrumb.category === "console" ? null : breadcrumb;
 }
 
+/**
+ * "production" ou "preview" na Vercel; "development" no next dev; "local"
+ * num build de produção fora da Vercel (next start dos testes e medições),
+ * para não se misturar com os erros da produção.
+ */
+export function sentryEnvironment(env: {
+  vercelEnv?: string;
+  nodeEnv?: string;
+}): string {
+  if (env.vercelEnv) return env.vercelEnv;
+  return env.nodeEnv === "production" ? "local" : (env.nodeEnv ?? "local");
+}
+
 export const sentryOptions = {
   dsn: SENTRY_DSN,
   enabled: Boolean(SENTRY_DSN),
-  // "production" ou "preview" na Vercel; "development" no next dev.
-  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
+  environment: sentryEnvironment({
+    // No servidor vale também o VERCEL_ENV; no navegador, só o NEXT_PUBLIC_.
+    vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.VERCEL_ENV,
+    nodeEnv: process.env.NODE_ENV,
+  }),
   // 10% das requisições com medição de tempo: suficiente para achar lentidão
   // sem gastar a cota grátis.
   tracesSampleRate: 0.1,
