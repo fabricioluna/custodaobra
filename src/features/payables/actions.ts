@@ -42,8 +42,10 @@ function parsePayableForm(formData: FormData) {
 
 /** Sessão, organização e permissão de editar a obra. */
 async function authorize(orgSlug: string, projectId: string) {
-  const userId = await requireUserId();
-  const org = await requireOrg(orgSlug);
+  const [userId, org] = await Promise.all([
+    requireUserId(),
+    requireOrg(orgSlug),
+  ]);
   const access = await getProjectAccess(org.id, projectId);
   return { userId, org, canEdit: access.canEdit };
 }

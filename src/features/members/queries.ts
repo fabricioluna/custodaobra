@@ -4,7 +4,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import type { LaunchAccess } from "@/components/layout/nav";
-import { getOrgBySlug } from "@/features/organizations/queries";
+import { getOrgBySlug, knownOrgRoles } from "@/features/organizations/queries";
 import { getUserId, requireUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -17,6 +17,9 @@ export type ProjectRole = Database["public"]["Enums"]["project_role"];
 /** Papel da pessoa logada na organização (null = não é membro). */
 export const getOrgRole = cache(
   async (orgId: string): Promise<OrgRole | null> => {
+    // Quase sempre já veio junto com a organização (getOrgContext).
+    const known = knownOrgRoles().get(orgId);
+    if (known) return known;
     const userId = await requireUserId();
     const supabase = await createClient();
     const { data } = await supabase
