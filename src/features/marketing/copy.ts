@@ -156,12 +156,6 @@ export const marketingCopy = {
       "O endereço pode estar errado, ou esta página é de uma conta à qual você não tem acesso.",
     back: "Ir para minhas obras",
   },
-  globalError: {
-    title: "Algo deu errado",
-    description:
-      "Já fomos avisados do problema. Tente de novo; se continuar, volte daqui a pouco.",
-    retry: "Tentar de novo",
-  },
   offline: {
     title: "Sem conexão",
     description:
