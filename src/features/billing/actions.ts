@@ -19,7 +19,7 @@ import { firstDueDate } from "@/lib/billing/checkout";
 import { createClient } from "@/lib/supabase/server";
 
 import { billingCopy } from "./copy";
-import { getBillingSubscription } from "./queries";
+import { getBillingSubscription, teamManagedAccess } from "./queries";
 import { parseCheckoutForm } from "./schemas";
 
 const errors = billingCopy.errors;
@@ -61,6 +61,9 @@ export async function startCheckout(
 
   const subscription = await getBillingSubscription(org.id);
   if (!subscription) return { status: "error", message: errors.failed };
+  const managed = teamManagedAccess(subscription);
+  if (managed)
+    return { status: "error", message: billingCopy.managed[managed] };
   const needsCustomer = !subscription.provider_customer_id;
   const parsed = parseCheckoutForm(formData, needsCustomer);
   if (!parsed.success) {

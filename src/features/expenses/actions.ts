@@ -157,11 +157,17 @@ async function prepare(
   const supabase = await createClient();
   // Bloqueio suave: sem plano em vigor, não lança gasto novo (editar pode).
   // Antes do fornecedor, para não cadastrar um à toa.
-  if (creating && !(await canWrite(supabase, org.id)).ok) {
-    return {
-      ok: false,
-      state: { status: "error", message: billingCopy.inactive },
-    } as const;
+  if (creating) {
+    const allowed = await canWrite(supabase, org.id);
+    if (!allowed.ok) {
+      return {
+        ok: false,
+        state: {
+          status: "error",
+          message: billingCopy.blocked(allowed.reason),
+        },
+      } as const;
+    }
   }
   const [supplierId, categoryName] = await Promise.all([
     resolveSupplier(supabase, org.id, parsed.data.supplierName),

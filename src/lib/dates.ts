@@ -66,8 +66,15 @@ export function startOfDayIn(
 ): string {
   const date = parseIsoDate(isoDate);
   if (!date) throw new Error(`Data inválida: ${isoDate}`);
-  const guess = date.getTime();
-  // Quanto o relógio local está à frente do UTC nesse instante.
+  const midnightUtc = date.getTime();
+  // O deslocamento é medido duas vezes: na meia-noite UTC e de novo no
+  // instante achado, para acertar os dias em que o horário de verão muda.
+  const first = midnightUtc - offsetAt(midnightUtc, timezone);
+  return new Date(midnightUtc - offsetAt(first, timezone)).toISOString();
+}
+
+/** Quanto o relógio local está à frente do UTC no instante dado (ms). */
+function offsetAt(instant: number, timezone: string): number {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
@@ -79,7 +86,7 @@ export function startOfDayIn(
       minute: "2-digit",
       second: "2-digit",
     })
-      .formatToParts(new Date(guess))
+      .formatToParts(new Date(instant))
       .map((part) => [part.type, part.value]),
   );
   const local = Date.UTC(
@@ -90,7 +97,7 @@ export function startOfDayIn(
     Number(parts.minute),
     Number(parts.second),
   );
-  return new Date(guess - (local - guess)).toISOString();
+  return local - instant;
 }
 
 /** "AAAA-MM-DD" válido (inclusive dia que existe no calendário). */

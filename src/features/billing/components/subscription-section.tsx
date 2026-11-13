@@ -13,7 +13,11 @@ import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { billingCopy as copy } from "../copy";
-import { getBillingSubscription, getPaidPlans } from "../queries";
+import {
+  getBillingSubscription,
+  getPaidPlans,
+  teamManagedAccess,
+} from "../queries";
 import { CancelSubscriptionForm } from "./cancel-subscription-form";
 
 /**
@@ -33,10 +37,11 @@ export async function SubscriptionSection({
     ? await Promise.all([getPaidPlans(), getBillingSubscription(orgId)])
     : [[], null];
 
-  if (!plans.length || !subscription) {
+  const managed = subscription ? teamManagedAccess(subscription) : null;
+  if (!plans.length || !subscription || managed) {
     return (
       <p className="text-sm text-muted-foreground">
-        {copy.page.changePlanSoon}{" "}
+        {managed ? copy.managed[managed] : copy.page.changePlanSoon}{" "}
         <a
           href={`mailto:${APP_CONTACT_EMAIL}`}
           className="font-medium text-foreground underline underline-offset-2"

@@ -51,8 +51,10 @@ export async function answerQuestion(
           : allowed.reason === "whatsapp_disabled"
             ? botMessages.questionWhatsappDisabled
             : allowed.reason === "subscription_inactive"
-              ? botMessages.subscriptionInactive
-              : botMessages.questionUnavailable,
+              ? botMessages.questionSubscriptionInactive
+              : allowed.reason === "account_suspended"
+                ? botMessages.questionAccountSuspended
+                : botMessages.questionUnavailable,
       );
     }
     context = loaded;

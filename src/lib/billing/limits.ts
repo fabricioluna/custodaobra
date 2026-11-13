@@ -20,6 +20,7 @@ export type LimitResult =
 export type LimitReason =
   | "no_subscription"
   | "subscription_inactive"
+  | "account_suspended"
   | "max_projects"
   | "max_members"
   | "whatsapp_disabled"
@@ -77,6 +78,31 @@ function daysUntil(iso: string | null, now: Date): number | null {
 }
 
 /**
+ * Em que pé está a decisão da equipe no painel interno:
+ * - `none`: nenhuma (vale a regra do plano);
+ * - `granted`: liberada (sem prazo ou até uma data que ainda não chegou);
+ * - `granted_expired`: a liberação venceu (vale a regra do plano);
+ * - `suspended`: bloqueada (sem data ou a data já chegou);
+ * - `suspension_scheduled`: bloqueio marcado para uma data futura.
+ * Única regra do override: o painel e a checagem do plano usam esta.
+ */
+export type OverrideStatus =
+  "none" | "granted" | "granted_expired" | "suspended" | "suspension_scheduled";
+
+export function overrideStatus(
+  override: AccessOverride | null | undefined,
+  at: string | null | undefined,
+  now: Date = new Date(),
+): OverrideStatus {
+  if (!override) return "none";
+  const started = !at || new Date(at).getTime() <= now.getTime();
+  if (override === "blocked") {
+    return started ? "suspended" : "suspension_scheduled";
+  }
+  return at && started ? "granted_expired" : "granted";
+}
+
+/**
  * Regra pura da situação da assinatura. A decisão da equipe no painel
  * interno (liberar ou bloquear) vale antes da regra do plano; liberação
  * vencida e bloqueio ainda por vir não mudam nada. Com a cobrança desligada
@@ -102,21 +128,19 @@ export function subscriptionState(
   });
 
   // Decisão da equipe vale antes de tudo, com ou sem cobrança no ar.
-  const overrideAt = subscription.access_override_at ?? null;
-  const overrideStarted =
-    overrideAt === null || new Date(overrideAt).getTime() <= now.getTime();
-  if (subscription.access_override === "blocked" && overrideStarted) {
+  const override = overrideStatus(
+    subscription.access_override,
+    subscription.access_override_at,
+    now,
+  );
+  if (override === "suspended") {
     return { phase: "suspended", usable: false, daysLeft: null };
   }
-  // Liberação: sem prazo (nulo) ou até a data, que ainda não chegou.
-  if (
-    subscription.access_override === "free" &&
-    (overrideAt === null || !overrideStarted)
-  ) {
+  if (override === "granted") {
     return {
       phase: "granted",
       usable: true,
-      daysLeft: daysUntil(overrideAt, now),
+      daysLeft: daysUntil(subscription.access_override_at ?? null, now),
     };
   }
 
@@ -153,6 +177,27 @@ export function isSubscriptionUsable(
   billingLive: boolean = BILLING_LIVE,
 ): boolean {
   return subscriptionState(subscription, now, billingLive).usable;
+}
+
+/**
+ * Regra pura: o plano em vigor deixa criar coisas novas? Se não, diz por quê
+ * (conta suspensa pela equipe ou teste/plano acabado), para a mensagem
+ * certa: pagar um plano não tira a suspensão.
+ */
+export function checkSubscription(
+  subscription: SubscriptionDates,
+  now: Date = new Date(),
+  billingLive: boolean = BILLING_LIVE,
+): LimitResult {
+  const state = subscriptionState(subscription, now, billingLive);
+  if (state.usable) return { ok: true };
+  return {
+    ok: false,
+    reason:
+      state.phase === "suspended"
+        ? "account_suspended"
+        : "subscription_inactive",
+  };
 }
 
 /** Regra pura: dá para criar mais uma obra? */
@@ -256,9 +301,8 @@ export async function canCreateProject(
 ): Promise<LimitResult> {
   const subscription = await getOrgPlan(supabase, orgId);
   if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
+  const usable = checkSubscription(subscription);
+  if (!usable.ok) return usable;
 
   return checkProjectCount(
     subscription.plans,
@@ -318,9 +362,8 @@ export async function canInviteMember(
 ): Promise<LimitResult> {
   const subscription = await getOrgPlan(supabase, orgId);
   if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
+  const usable = checkSubscription(subscription);
+  if (!usable.ok) return usable;
 
   const { members, pending } = await countMembers(supabase, orgId);
   return checkMemberCount(subscription.plans, members, pending);
@@ -358,9 +401,8 @@ export async function whatsappAllowance(
   if (!subscription?.plans) {
     return blocked({ ok: false, reason: "no_subscription" });
   }
-  if (!isSubscriptionUsable(subscription)) {
-    return blocked({ ok: false, reason: "subscription_inactive" });
-  }
+  const usable = checkSubscription(subscription);
+  if (!usable.ok) return blocked(usable);
   if (!subscription.plans.whatsapp_enabled) {
     return blocked({ ok: false, reason: "whatsapp_disabled" });
   }
@@ -412,9 +454,8 @@ export async function canSendTemplates(
     getUsage(supabase, orgId, monthOf(today)),
   ]);
   if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
+  const usable = checkSubscription(subscription);
+  if (!usable.ok) return usable;
   return checkTemplateMessages(
     subscription.plans,
     usage.template_messages,
@@ -434,10 +475,7 @@ export async function canWrite(
 ): Promise<LimitResult> {
   const subscription = await getOrgPlan(supabase, orgId);
   if (!subscription?.plans) return { ok: false, reason: "no_subscription" };
-  if (!isSubscriptionUsable(subscription)) {
-    return { ok: false, reason: "subscription_inactive" };
-  }
-  return { ok: true };
+  return checkSubscription(subscription);
 }
 
 export type UsageMeter = { used: number; limit: number };

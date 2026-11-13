@@ -3,7 +3,14 @@ import { APP_CONTACT_EMAIL } from "@/config/app";
 export const billingCopy = {
   /** Quando a conta não pode criar nada novo (bloqueio suave). */
   inactive:
-    "O período de teste ou o plano desta conta acabou, ou a conta foi suspensa. Você continua vendo e baixando tudo, mas para lançar coisas novas o dono da conta precisa escolher um plano.",
+    "O período de teste ou o plano desta conta acabou. Você continua vendo e baixando tudo, mas para lançar coisas novas o dono da conta precisa escolher um plano.",
+  /** Conta suspensa pela equipe: pagar um plano não resolve. */
+  suspended: `Esta conta está suspensa. Você continua vendo e baixando tudo, mas não pode lançar coisas novas. Para saber o motivo, fale com a gente: ${APP_CONTACT_EMAIL}.`,
+  /** Mensagem do bloqueio suave para o motivo devolvido pelos limites. */
+  blocked: (reason: string): string =>
+    reason === "account_suspended"
+      ? billingCopy.suspended
+      : billingCopy.inactive,
   settingsRow: {
     title: "Plano e uso",
     description: "O que o plano permite e o uso deste mês.",
@@ -41,6 +48,13 @@ export const billingCopy = {
           ? "Acesso liberado pela equipe · acaba em menos de 24 horas"
           : `Acesso liberado pela equipe · faltam ${days} dias`,
     suspended: "Conta suspensa · lançamentos bloqueados",
+  },
+  /** A equipe decidiu o acesso: a assinatura pelo app fica de fora. */
+  managed: {
+    granted:
+      "O acesso desta conta foi liberado pela equipe: não há nada para pagar agora. Dúvidas sobre o plano:",
+    suspended:
+      "Esta conta está suspensa: assinar um plano não a libera. Para saber o motivo, fale com a gente:",
   },
   subscribe: {
     title: "Assinar um plano",

@@ -10,6 +10,8 @@ import { canCreateProject } from "@/lib/billing/limits";
 import { fieldErrorsFrom, type FormState, textField } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
 
+import { billingCopy } from "@/features/billing/copy";
+
 import { projectsCopy } from "./copy";
 import { getProjectAccess } from "./queries";
 import { type ProjectFormField, projectFormSchema } from "./schemas";
@@ -56,7 +58,9 @@ export async function createProject(
       message:
         allowed.reason === "max_projects"
           ? limit.maxProjects(allowed.limit ?? 1)
-          : limit.inactive,
+          : allowed.reason === "account_suspended"
+            ? billingCopy.suspended
+            : limit.inactive,
     };
   }
 
@@ -152,7 +156,9 @@ export async function setProjectArchived(
         message:
           allowed.reason === "max_projects"
             ? limit.maxProjects(allowed.limit ?? 1)
-            : limit.inactive,
+            : allowed.reason === "account_suspended"
+              ? billingCopy.suspended
+              : limit.inactive,
       };
     }
   }

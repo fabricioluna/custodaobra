@@ -16,6 +16,8 @@ import {
 import { getRequestOrigin } from "@/lib/request-origin";
 import { createClient } from "@/lib/supabase/server";
 
+import { billingCopy } from "@/features/billing/copy";
+
 import { membersCopy } from "./copy";
 import { getOrgRole, isOrgAdminRole } from "./queries";
 import {
@@ -75,7 +77,9 @@ export async function createInvitation(
       message:
         allowed.reason === "max_members"
           ? errors.maxMembers(allowed.limit ?? 1)
-          : errors.inactive,
+          : allowed.reason === "account_suspended"
+            ? billingCopy.suspended
+            : errors.inactive,
     };
   }
 
