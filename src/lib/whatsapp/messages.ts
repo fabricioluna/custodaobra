@@ -102,7 +102,13 @@ export const botMessages = {
   whatsappDisabled:
     "O seu plano não inclui lançamentos pelo WhatsApp. Você pode lançar pelo app.",
   subscriptionInactive:
-    "Esta conta não pode lançar coisas novas agora: o teste ou o plano acabou, ou a conta foi suspensa. Você ainda vê tudo no app.",
+    "Esta conta não pode lançar coisas novas agora: o teste ou o plano acabou. Você ainda vê tudo no app.",
+  accountSuspended:
+    "Esta conta está suspensa e não pode lançar coisas novas. Você ainda vê tudo no app.",
+  questionSubscriptionInactive:
+    "Não consigo responder perguntas agora: o teste ou o plano desta conta acabou. Você ainda vê tudo no app.",
+  questionAccountSuspended:
+    "Não consigo responder perguntas agora: esta conta está suspensa. Você ainda vê tudo no app.",
   unavailable:
     "Não consegui lançar agora. Tente de novo em alguns minutos ou use o app.",
 

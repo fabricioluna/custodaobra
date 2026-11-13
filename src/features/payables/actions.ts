@@ -71,8 +71,9 @@ export async function createPayable(
   const data = parsed.data;
 
   const supabase = await createClient();
-  if (!(await canWrite(supabase, org.id)).ok) {
-    return { status: "error", message: billingCopy.inactive };
+  const allowed = await canWrite(supabase, org.id);
+  if (!allowed.ok) {
+    return { status: "error", message: billingCopy.blocked(allowed.reason) };
   }
   const supplierId = await resolveSupplier(supabase, org.id, data.supplierName);
   const parts = splitInstallments(
@@ -182,8 +183,9 @@ export async function payPayable(
 
   const supabase = await createClient();
   // Pagar cria um gasto: segue o mesmo bloqueio suave.
-  if (!(await canWrite(supabase, org.id)).ok) {
-    return { status: "error", message: billingCopy.inactive };
+  const allowed = await canWrite(supabase, org.id);
+  if (!allowed.ok) {
+    return { status: "error", message: billingCopy.blocked(allowed.reason) };
   }
   const { data: expenseId, error } = await supabase.rpc("pay_payable", {
     p_payable_id: payableId,

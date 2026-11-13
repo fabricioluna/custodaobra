@@ -5,7 +5,9 @@ vi.mock("server-only", () => ({}));
 const {
   checkMemberCount,
   checkProjectCount,
+  checkSubscription,
   isSubscriptionUsable,
+  overrideStatus,
   subscriptionState,
 } = await import("@/lib/billing/limits");
 
@@ -208,5 +210,40 @@ describe("limites do WhatsApp e da IA", async () => {
 
   it("mês do plano é o primeiro dia do mês", () => {
     expect(monthOf("2026-11-09")).toBe("2026-11-01");
+  });
+});
+
+describe("overrideStatus e checkSubscription", () => {
+  const now = new Date("2026-11-20T12:00:00Z");
+  const past = "2026-11-01T03:00:00.000Z";
+  const future = "2026-12-01T03:00:00.000Z";
+
+  it("situação da decisão da equipe", () => {
+    expect(overrideStatus(null, null, now)).toBe("none");
+    expect(overrideStatus("free", null, now)).toBe("granted");
+    expect(overrideStatus("free", future, now)).toBe("granted");
+    expect(overrideStatus("free", past, now)).toBe("granted_expired");
+    expect(overrideStatus("blocked", null, now)).toBe("suspended");
+    expect(overrideStatus("blocked", past, now)).toBe("suspended");
+    expect(overrideStatus("blocked", future, now)).toBe("suspension_scheduled");
+  });
+
+  it("conta suspensa tem motivo próprio (pagar não resolve)", () => {
+    const base = {
+      status: "active" as const,
+      trial_ends_at: null,
+      current_period_end: future,
+    };
+    expect(
+      checkSubscription({ ...base, access_override: "blocked" }, now, true),
+    ).toEqual({ ok: false, reason: "account_suspended" });
+    expect(
+      checkSubscription(
+        { ...base, status: "cancelled", current_period_end: past },
+        now,
+        true,
+      ),
+    ).toEqual({ ok: false, reason: "subscription_inactive" });
+    expect(checkSubscription(base, now, true)).toEqual({ ok: true });
   });
 });

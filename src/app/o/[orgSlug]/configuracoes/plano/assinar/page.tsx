@@ -9,6 +9,7 @@ import { billingCopy as copy } from "@/features/billing/copy";
 import {
   getBillingSubscription,
   getPaidPlans,
+  teamManagedAccess,
 } from "@/features/billing/queries";
 import { requireOrg } from "@/features/organizations/queries";
 import { canManageOrg } from "@/features/projects/queries";
@@ -31,7 +32,8 @@ export default async function SubscribePage({
     getBillingSubscription(org.id),
     supabase.auth.getClaims(),
   ]);
-  if (!subscription) notFound();
+  // Liberada ou suspensa pela equipe: assinar pelo app não vale.
+  if (!subscription || teamManagedAccess(subscription)) notFound();
   const email = claims.data?.claims?.email;
   const changing = Boolean(subscription.provider_subscription_id);
 

@@ -5,7 +5,7 @@ import { Suspense } from "react";
 
 import { BackLink } from "@/components/layout/back-link";
 import { DEFAULT_TIMEZONE } from "@/config/app";
-import { accessDate, accessLabel } from "@/features/admin/access";
+import { accessFormDefaults, accessLabel } from "@/features/admin/access";
 import { AccessForm } from "@/features/admin/components/access-form";
 import { AdminShell } from "@/features/admin/components/admin-shell";
 import { adminCopy } from "@/features/admin/copy";
@@ -45,15 +45,16 @@ async function AccessContent({
   if (!isUuid(orgId)) notFound();
   await connection();
   const month = `${todayIn(DEFAULT_TIMEZONE).slice(0, 7)}-01`;
-  const org = await getAdminOrg(orgId, month);
+  const [org, plans] = await Promise.all([
+    getAdminOrg(orgId, month),
+    listActivePlans(),
+  ]);
   if (!org) notFound();
-  const plans = await listActivePlans();
 
-  const mode = org.access_override ?? "normal";
-  const date =
-    org.access_override && org.access_override_at
-      ? accessDate(org.access_override, org.access_override_at)
-      : "";
+  const { mode, date } = accessFormDefaults(
+    org.access_override,
+    org.access_override_at,
+  );
   const details = [
     [copy.owner, org.owner_email ?? "—"],
     [copy.plan, org.plan_name ?? "—"],

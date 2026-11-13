@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { DEFAULT_TIMEZONE } from "@/config/app";
+import { overrideStatus } from "@/lib/billing/limits";
 import { addDays, isIsoDate, startOfDayIn, todayIn } from "@/lib/dates";
 import type { Database } from "@/types/database";
 
@@ -78,18 +79,41 @@ export function accessLabel(
   timezone: string = DEFAULT_TIMEZONE,
 ): AccessLabel {
   const copy = adminCopy.access.labels;
-  if (!mode) return { text: copy.normal, tone: "normal" };
-  const started = at === null || new Date(at).getTime() <= now.getTime();
-  if (mode === "blocked") {
-    return started
-      ? { text: copy.blocked, tone: "blocked" }
-      : {
-          text: copy.blockedFrom(accessDate(mode, at!, timezone)),
-          tone: "scheduled",
-        };
+  // A mesma regra que decide o acesso de verdade (limits.ts).
+  switch (overrideStatus(mode, at, now)) {
+    case "none":
+      return { text: copy.normal, tone: "normal" };
+    case "suspended":
+      return { text: copy.blocked, tone: "blocked" };
+    case "suspension_scheduled":
+      return {
+        text: copy.blockedFrom(accessDate("blocked", at!, timezone)),
+        tone: "scheduled",
+      };
+    case "granted_expired":
+      return { text: copy.freeExpired, tone: "normal" };
+    case "granted":
+      return at === null
+        ? { text: copy.free, tone: "free" }
+        : {
+            text: copy.freeUntil(accessDate("free", at, timezone)),
+            tone: "free",
+          };
   }
-  if (at === null) return { text: copy.free, tone: "free" };
-  return started
-    ? { text: copy.freeExpired, tone: "normal" }
-    : { text: copy.freeUntil(accessDate(mode, at, timezone)), tone: "free" };
+}
+
+/**
+ * Como o formulário abre: liberação vencida abre como regra normal (é o que
+ * vale), para salvar o plano ou o motivo sem esbarrar em "a data já passou".
+ */
+export function accessFormDefaults(
+  mode: AccessOverride | null,
+  at: string | null,
+  now: Date = new Date(),
+  timezone: string = DEFAULT_TIMEZONE,
+): { mode: AccessMode; date: string } {
+  const status = overrideStatus(mode, at, now);
+  if (!mode || status === "granted_expired")
+    return { mode: "normal", date: "" };
+  return { mode, date: at ? accessDate(mode, at, timezone) : "" };
 }

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { requireOrg } from "@/features/organizations/queries";
 import { createProject } from "@/features/projects/actions";
 import { ProjectForm } from "@/features/projects/components/project-form";
+import { billingCopy } from "@/features/billing/copy";
 import { projectsCopy } from "@/features/projects/copy";
 import { canManageOrg, listProjects } from "@/features/projects/queries";
 import { canCreateProject } from "@/lib/billing/limits";
@@ -39,7 +40,9 @@ export default async function NewProjectPage({
         <FormMessage className="mb-6 max-w-xl">
           {allowed.reason === "max_projects"
             ? projectsCopy.limit.maxProjects(allowed.limit ?? 1)
-            : projectsCopy.limit.inactive}
+            : allowed.reason === "account_suspended"
+              ? billingCopy.suspended
+              : projectsCopy.limit.inactive}
         </FormMessage>
       )}
       <ProjectForm

@@ -40,6 +40,12 @@ export async function setOrgAccess(
   const { mode, date, note, planCode } = parsed.data;
 
   const supabase = await createClient();
+  // A função do banco confere platform_admins; aqui, ao menos a sessão.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: errors.noPermission };
+
   const at = accessOverrideAt(mode, date);
   const { error } = await supabase.rpc("admin_set_access", {
     p_org_id: orgId,

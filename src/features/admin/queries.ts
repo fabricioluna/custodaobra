@@ -21,7 +21,11 @@ export type AdminOrg = NonNullable<
   Awaited<ReturnType<typeof listAdminOrgs>>
 >[number];
 
-/** Uma conta do painel (com o uso do mês atual), ou null se não houver. */
+/**
+ * Uma conta do painel (com o uso do mês atual), ou null se não houver.
+ * admin_orgs devolve todas as contas: serve enquanto são poucas; com muitas,
+ * vale um filtro por org_id na função do banco.
+ */
 export async function getAdminOrg(orgId: string, month: string) {
   const orgs = await listAdminOrgs(month);
   if (!orgs) return null;

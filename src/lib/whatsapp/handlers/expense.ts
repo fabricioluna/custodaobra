@@ -300,7 +300,9 @@ async function refuseAi(session: BotSession, reason: string): Promise<void> {
         ? botMessages.limitReached
         : reason === "subscription_inactive"
           ? botMessages.subscriptionInactive
-          : botMessages.unavailable;
+          : reason === "account_suspended"
+            ? botMessages.accountSuspended
+            : botMessages.unavailable;
   await session.send({ type: "text", body });
 }
 

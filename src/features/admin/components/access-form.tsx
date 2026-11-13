@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 
 import { FormField, fieldA11y } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,15 @@ export function AccessForm({
   const message = state.status === "error" ? state.message : undefined;
 
   return (
-    <form action={action} className="flex flex-col gap-6">
+    <form
+      // Sem `action`: o React limparia o que foi digitado quando há erro.
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(() => action(formData));
+      }}
+      className="flex flex-col gap-6"
+    >
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-3 font-medium">{copy.mode}</legend>
         {MODES.map((value) => (

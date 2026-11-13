@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import {
+vi.mock("server-only", () => ({}));
+
+const {
   accessDate,
+  accessFormDefaults,
   accessFormSchema,
   accessLabel,
   accessOverrideAt,
-} from "@/features/admin/access";
-import { startOfDayIn } from "@/lib/dates";
+} = await import("@/features/admin/access");
+const { startOfDayIn } = await import("@/lib/dates");
 
 describe("startOfDayIn", () => {
   it("meia-noite no fuso da conta, em UTC", () => {
@@ -16,6 +19,13 @@ describe("startOfDayIn", () => {
     expect(startOfDayIn("2026-12-01", "UTC")).toBe("2026-12-01T00:00:00.000Z");
     expect(startOfDayIn("2026-07-01", "America/New_York")).toBe(
       "2026-07-01T04:00:00.000Z",
+    );
+  });
+
+  it("acerta o dia em que o horário de verão muda à meia-noite local", () => {
+    // Beirute adianta o relógio às 00:00 de 29/03/2026 (22:00 UTC do dia 28).
+    expect(startOfDayIn("2026-03-29", "Asia/Beirut")).toBe(
+      "2026-03-28T22:00:00.000Z",
     );
   });
 });
@@ -77,5 +87,23 @@ describe("acesso decidido pela equipe", () => {
     expect(
       accessFormSchema.safeParse({ ...base, mode: "outro", date: "" }).success,
     ).toBe(false);
+  });
+
+  it("formulário: liberação vencida abre como regra normal", () => {
+    const now = new Date("2026-11-20T12:00:00Z");
+    expect(accessFormDefaults("free", "2026-11-01T03:00:00.000Z", now)).toEqual(
+      { mode: "normal", date: "" },
+    );
+    expect(accessFormDefaults("free", "2026-12-02T03:00:00.000Z", now)).toEqual(
+      { mode: "free", date: "2026-12-01" },
+    );
+    expect(accessFormDefaults("blocked", null, now)).toEqual({
+      mode: "blocked",
+      date: "",
+    });
+    expect(accessFormDefaults(null, null, now)).toEqual({
+      mode: "normal",
+      date: "",
+    });
   });
 });
