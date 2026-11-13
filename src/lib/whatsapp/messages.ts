@@ -101,6 +101,8 @@ export const botMessages = {
     "O limite de lançamentos pelo WhatsApp do seu plano neste mês acabou. Você ainda pode lançar pelo app.",
   whatsappDisabled:
     "O seu plano não inclui lançamentos pelo WhatsApp. Você pode lançar pelo app.",
+  subscriptionInactive:
+    "Esta conta não pode lançar coisas novas agora: o teste ou o plano acabou, ou a conta foi suspensa. Você ainda vê tudo no app.",
   unavailable:
     "Não consegui lançar agora. Tente de novo em alguns minutos ou use o app.",
 

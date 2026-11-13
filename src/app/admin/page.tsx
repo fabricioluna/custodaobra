@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { BrandMark } from "@/components/layout/brand-mark";
 import { DEFAULT_TIMEZONE } from "@/config/app";
+import { accessLabel } from "@/features/admin/access";
+import { AdminShell } from "@/features/admin/components/admin-shell";
 import { adminCopy as copy } from "@/features/admin/copy";
 import { type AdminOrg, listAdminOrgs } from "@/features/admin/queries";
 import { estimateAiCostUsd } from "@/lib/billing/costs";
@@ -39,18 +40,13 @@ function parseMonth(raw: string | string[] | undefined): string {
 
 export default function AdminPage({ searchParams }: PageProps<"/admin">) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <header className="bg-brand-navy px-4 py-4 text-brand-white sm:px-8">
-        <BrandMark />
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8">
-        <h1 className="text-2xl heading md:text-4xl">{copy.title}</h1>
-        <p className="mt-2 text-muted-foreground">{copy.description}</p>
-        <Suspense fallback={<div className="mt-8 h-96" />}>
-          <AdminContent searchParams={searchParams} />
-        </Suspense>
-      </main>
-    </div>
+    <AdminShell>
+      <h1 className="text-2xl heading md:text-4xl">{copy.title}</h1>
+      <p className="mt-2 text-muted-foreground">{copy.description}</p>
+      <Suspense fallback={<div className="mt-8 h-96" />}>
+        <AdminContent searchParams={searchParams} />
+      </Suspense>
+    </AdminShell>
   );
 }
 
@@ -124,7 +120,7 @@ async function AdminContent({
         <p className="mt-8 text-muted-foreground">{copy.empty}</p>
       ) : (
         <div className="mt-8 overflow-x-auto rounded-2xl border bg-card">
-          <table className="w-full min-w-[60rem] text-left text-sm">
+          <table className="w-full min-w-[68rem] text-left text-sm">
             <thead className="border-b bg-muted/50">
               <tr>
                 {[
@@ -138,6 +134,7 @@ async function AdminContent({
                   copy.table.whatsapp,
                   copy.table.aiCalls,
                   copy.table.aiCost,
+                  copy.table.access,
                   copy.table.createdAt,
                 ].map((header) => (
                   <th
@@ -191,6 +188,9 @@ async function AdminContent({
                   <td className="px-3 py-2 money">
                     {usd.format(estimateAiCostUsd(org))}
                   </td>
+                  <td className="px-3 py-2">
+                    <AccessCell org={org} />
+                  </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {formatDate(org.created_at.slice(0, 10))}
                   </td>
@@ -201,5 +201,32 @@ async function AdminContent({
         </div>
       )}
     </>
+  );
+}
+
+/** Etiqueta do acesso decidido pela equipe e o atalho para mudar. */
+function AccessCell({ org }: { org: AdminOrg }) {
+  const label = accessLabel(org.access_override, org.access_override_at);
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      <span
+        className={cn(
+          label.tone === "blocked" && "font-semibold text-status-danger",
+          label.tone === "scheduled" && "text-status-warn",
+          label.tone === "free" && "font-semibold text-status-ok",
+          label.tone === "normal" && "text-muted-foreground",
+        )}
+        title={org.access_note ?? undefined}
+      >
+        {label.text}
+      </span>
+      <Link
+        href={`/admin/contas/${org.org_id}`}
+        className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+      >
+        {copy.access.change}
+        <span className="sr-only"> · {org.name}</span>
+      </Link>
+    </span>
   );
 }

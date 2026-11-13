@@ -14,6 +14,38 @@ export type Database = {
   };
   public: {
     Tables: {
+      admin_org_notes: {
+        Row: {
+          created_at: string;
+          note: string | null;
+          org_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          note?: string | null;
+          org_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          note?: string | null;
+          org_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "admin_org_notes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: true;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       attachments: {
         Row: {
           created_at: string;
@@ -1036,6 +1068,8 @@ export type Database = {
       };
       subscriptions: {
         Row: {
+          access_override: Database["public"]["Enums"]["access_override"] | null;
+          access_override_at: string | null;
           created_at: string;
           current_period_end: string | null;
           id: string;
@@ -1050,6 +1084,8 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          access_override?: Database["public"]["Enums"]["access_override"] | null;
+          access_override_at?: string | null;
           created_at?: string;
           current_period_end?: string | null;
           id?: string;
@@ -1064,6 +1100,8 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          access_override?: Database["public"]["Enums"]["access_override"] | null;
+          access_override_at?: string | null;
           created_at?: string;
           current_period_end?: string | null;
           id?: string;
@@ -1483,6 +1521,9 @@ export type Database = {
       admin_orgs: {
         Args: { p_month: string };
         Returns: {
+          access_note: string;
+          access_override: Database["public"]["Enums"]["access_override"];
+          access_override_at: string;
           ai_calls: number;
           ai_input_tokens: number;
           ai_output_tokens: number;
@@ -1503,6 +1544,16 @@ export type Database = {
           trial_ends_at: string;
           whatsapp_entries: number;
         }[];
+      };
+      admin_set_access: {
+        Args: {
+          p_at?: string;
+          p_mode?: Database["public"]["Enums"]["access_override"];
+          p_note?: string;
+          p_org_id: string;
+          p_plan_code?: string;
+        };
+        Returns: undefined;
       };
       billing_mark_cancelled: {
         Args: { p_org_id: string };
@@ -1587,6 +1638,7 @@ export type Database = {
       };
     };
     Enums: {
+      access_override: "free" | "blocked";
       expense_source:
         | "app"
         | "whatsapp_text"
@@ -1744,6 +1796,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      access_override: ["free", "blocked"],
       expense_source: [
         "app",
         "whatsapp_text",

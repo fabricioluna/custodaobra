@@ -298,7 +298,9 @@ async function refuseAi(session: BotSession, reason: string): Promise<void> {
       ? botMessages.whatsappDisabled
       : reason === "max_whatsapp_entries" || reason === "max_ai_calls"
         ? botMessages.limitReached
-        : botMessages.unavailable;
+        : reason === "subscription_inactive"
+          ? botMessages.subscriptionInactive
+          : botMessages.unavailable;
   await session.send({ type: "text", body });
 }
 

@@ -88,6 +88,75 @@ describe("subscriptionState", () => {
   });
 });
 
+describe("subscriptionState com a decisão da equipe", () => {
+  const now = new Date("2026-11-08T12:00:00Z");
+  const overTrial = {
+    status: "trialing" as const,
+    trial_ends_at: "2026-11-01T00:00:00Z",
+    current_period_end: null,
+  };
+  const paid = {
+    status: "active" as const,
+    trial_ends_at: null,
+    current_period_end: "2026-12-01T00:00:00Z",
+  };
+
+  it("liberada sem prazo usa mesmo com o teste vencido", () => {
+    expect(
+      subscriptionState(
+        { ...overTrial, access_override: "free", access_override_at: null },
+        now,
+        true,
+      ),
+    ).toEqual({ phase: "granted", usable: true, daysLeft: null });
+  });
+
+  it("liberada até uma data conta os dias e, vencida, volta à regra normal", () => {
+    const until = {
+      ...overTrial,
+      access_override: "free" as const,
+      access_override_at: "2026-11-11T12:00:00Z",
+    };
+    expect(subscriptionState(until, now, true)).toEqual({
+      phase: "granted",
+      usable: true,
+      daysLeft: 3,
+    });
+    const later = new Date("2026-11-12T00:00:00Z");
+    expect(subscriptionState(until, later, true)).toMatchObject({
+      phase: "trial_over",
+      usable: false,
+    });
+  });
+
+  it("bloqueada na hora bloqueia mesmo em dia e sem cobrança no ar", () => {
+    const blocked = {
+      ...paid,
+      access_override: "blocked" as const,
+      access_override_at: null,
+    };
+    expect(subscriptionState(blocked, now, true)).toEqual({
+      phase: "suspended",
+      usable: false,
+      daysLeft: null,
+    });
+    expect(subscriptionState(blocked, now, false).usable).toBe(false);
+  });
+
+  it("bloqueio com data só vale a partir dela", () => {
+    const scheduled = {
+      ...paid,
+      access_override: "blocked" as const,
+      access_override_at: "2026-11-10T03:00:00Z",
+    };
+    expect(subscriptionState(scheduled, now, true).phase).toBe("active");
+    expect(
+      subscriptionState(scheduled, new Date("2026-11-10T03:00:00Z"), true)
+        .phase,
+    ).toBe("suspended");
+  });
+});
+
 describe("checkMemberCount", () => {
   it("conta membros e convites pendentes juntos", () => {
     expect(checkMemberCount({ max_members: 3 }, 1, 1)).toEqual({ ok: true });

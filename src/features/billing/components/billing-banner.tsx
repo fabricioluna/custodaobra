@@ -13,8 +13,9 @@ const copy = billingCopy.banner;
 
 /**
  * Aviso no topo da área logada: teste acabando ou encerrado, mensalidade
- * atrasada, plano cancelado. Sem a cobrança no ar, só a conta cancelada
- * (que bloqueia mesmo assim) recebe aviso. O atalho para o plano aparece
+ * atrasada, plano cancelado, conta suspensa pela equipe. Sem a cobrança no
+ * ar, só a conta cancelada ou suspensa (que bloqueiam mesmo assim) recebe
+ * aviso. O atalho para o plano aparece
  * para dono e admin.
  */
 export async function BillingBanner({
@@ -32,7 +33,9 @@ export async function BillingBanner({
   if (!state) return null;
 
   let message: string | null = null;
-  if (state.phase === "cancelled" && !state.usable) {
+  if (state.phase === "suspended") {
+    message = copy.suspended;
+  } else if (state.phase === "cancelled" && !state.usable) {
     message = copy.cancelled;
   } else if (!BILLING_LIVE) {
     return null;
