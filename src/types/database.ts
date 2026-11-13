@@ -1068,7 +1068,8 @@ export type Database = {
       };
       subscriptions: {
         Row: {
-          access_override: Database["public"]["Enums"]["access_override"] | null;
+          access_override:
+            Database["public"]["Enums"]["access_override"] | null;
           access_override_at: string | null;
           created_at: string;
           current_period_end: string | null;
@@ -1084,7 +1085,8 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
-          access_override?: Database["public"]["Enums"]["access_override"] | null;
+          access_override?:
+            Database["public"]["Enums"]["access_override"] | null;
           access_override_at?: string | null;
           created_at?: string;
           current_period_end?: string | null;
@@ -1100,7 +1102,8 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
-          access_override?: Database["public"]["Enums"]["access_override"] | null;
+          access_override?:
+            Database["public"]["Enums"]["access_override"] | null;
           access_override_at?: string | null;
           created_at?: string;
           current_period_end?: string | null;
@@ -1519,7 +1522,7 @@ export type Database = {
         }[];
       };
       admin_orgs: {
-        Args: { p_month: string };
+        Args: { p_month: string; p_org_id?: string };
         Returns: {
           access_note: string;
           access_override: Database["public"]["Enums"]["access_override"];
@@ -1573,6 +1576,26 @@ export type Database = {
         Returns: undefined;
       };
       delete_my_account: { Args: never; Returns: undefined };
+      expense_totals: {
+        Args: {
+          p_category_ids?: string[];
+          p_from?: string;
+          p_group_by?: string;
+          p_org_id: string;
+          p_payment_method?: Database["public"]["Enums"]["payment_method"];
+          p_project_id: string;
+          p_search?: string;
+          p_stage_id?: string;
+          p_supplier_ids?: string[];
+          p_to?: string;
+        };
+        Returns: {
+          cents: number;
+          expense_count: number;
+          label: string;
+          land_cents: number;
+        }[];
+      };
       expire_pending_expenses: {
         Args: { p_older_than?: string };
         Returns: number;

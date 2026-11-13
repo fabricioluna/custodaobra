@@ -40,6 +40,14 @@ describe("painel interno", () => {
     expect(row?.owner_email).toBe(cliente.email);
     expect(row?.plan_code).toBe("pessoal");
     expect(row?.status).toBe("trialing");
+
+    // Uma conta só, para a página de detalhe.
+    const one = await equipe.client.rpc("admin_orgs", {
+      p_month: month,
+      p_org_id: cliente.orgId,
+    });
+    expect(one.error).toBeNull();
+    expect(one.data?.map((org) => org.org_id)).toEqual([cliente.orgId]);
   });
 
   it("cliente e visitante não listam as contas", async () => {
