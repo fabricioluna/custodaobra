@@ -66,7 +66,8 @@ export const billingCopy = {
     name: "Nome para a cobrança",
     nameHint: "O seu nome ou o da empresa.",
     document: "CPF ou CNPJ",
-    documentHint: "Exigido para emitir a cobrança. Só os números.",
+    documentHint:
+      "Exigido para emitir a cobrança. Pode digitar com ou sem pontuação.",
     email: "E-mail para receber as faturas",
     submit: "Ir para o pagamento",
     pending: "Preparando o pagamento…",
@@ -100,7 +101,7 @@ export const billingCopy = {
     unavailable: "A assinatura pelo app ainda não está disponível.",
     plan: "Escolha um dos planos.",
     name: "Informe o nome para a cobrança.",
-    document: "CPF ou CNPJ inválido. Confira os números.",
+    document: "CPF ou CNPJ inválido. Confira o que foi digitado.",
     email: "Informe um e-mail válido.",
     confirm: "Marque a caixa para confirmar o cancelamento.",
     rejected: (reason: string) => `O sistema de pagamento recusou: ${reason}`,

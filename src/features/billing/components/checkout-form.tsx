@@ -114,7 +114,7 @@ export function CheckoutForm({
           >
             <Input
               name="document"
-              inputMode="numeric"
+              autoCapitalize="characters"
               autoComplete="off"
               required
               {...fieldA11y(

@@ -14,9 +14,12 @@ import { chromium } from "@playwright/test";
 
 const OUT = path.join("tests", "fixtures", "receipts");
 
+// Cada caractere vale o código ASCII menos 48 ("A" = 17): serve para o CNPJ
+// alfanumérico e, nos números, dá a conta de sempre.
+const value = (char) => char.charCodeAt(0) - 48;
 function mod11(digits, weights) {
   let sum = 0;
-  for (let i = 0; i < digits.length; i++) sum += Number(digits[i]) * weights[i];
+  for (let i = 0; i < digits.length; i++) sum += value(digits[i]) * weights[i];
   const rest = sum % 11;
   return rest < 2 ? 0 : 11 - rest;
 }
@@ -29,7 +32,7 @@ function accessKey(base43) {
   let sum = 0;
   let weight = 2;
   for (let i = base43.length - 1; i >= 0; i--) {
-    sum += Number(base43[i]) * weight;
+    sum += value(base43[i]) * weight;
     weight = weight === 9 ? 2 : weight + 1;
   }
   const rest = sum % 11;
@@ -44,9 +47,14 @@ const brl = (cents) =>
 const CNPJ_LOJA = cnpj("112223330001");
 const CNPJ_ELETRICA = cnpj("456789120001");
 const CNPJ_MADEIREIRA = cnpj("987654320001");
+// CNPJ alfanumérico (emitido desde julho de 2026).
+const CNPJ_HIDRAULICA = cnpj("7KQ3RZ1X0001");
 
 const KEY_LOJA = accessKey(`262611${CNPJ_LOJA}65001000012345100012345`);
 const KEY_ELETRICA = accessKey(`262611${CNPJ_ELETRICA}65002000045678100045678`);
+const KEY_HIDRAULICA = accessKey(
+  `262611${CNPJ_HIDRAULICA}65001000007788100007788`,
+);
 const KEY_MADEIREIRA = accessKey(
   `262610${CNPJ_MADEIREIRA}55001000003210100003210`,
 );
@@ -256,6 +264,34 @@ const danfe = {
   </div>`,
 };
 
+const hidraulica = nfce({
+  store: "Hidráulica Água Boa Ltda",
+  cnpjNum: CNPJ_HIDRAULICA,
+  address: "Rua Imaginária, 300 - Casa Amarela - Recife/PE",
+  items: [
+    {
+      code: "4401",
+      desc: "TUBO PVC SOLDAVEL 25MM 6M",
+      qty: 5,
+      un: "BR",
+      unit: 2490,
+    },
+    {
+      code: "4402",
+      desc: "JOELHO PVC SOLDAVEL 90G 25MM",
+      qty: 10,
+      un: "UN",
+      unit: 120,
+    },
+    { code: "4403", desc: "ADESIVO PVC 175G", qty: 1, un: "UN", unit: 1890 },
+  ],
+  payment: "DINHEIRO",
+  date: "08/11/2026",
+  number: "000007788",
+  serie: "001",
+  key: KEY_HIDRAULICA,
+});
+
 /** Cada comprovante: arquivo, o que a leitura deve achar e a legenda. */
 const fixtures = [
   {
@@ -289,6 +325,23 @@ const fixtures = [
       supplier_document: CNPJ_ELETRICA,
       access_key: KEY_ELETRICA,
       items: 4,
+    },
+  },
+  {
+    file: "nfce-hidraulica.png",
+    html: hidraulica.html,
+    caption: null,
+    expect: {
+      is_receipt: true,
+      amount_cents: hidraulica.total,
+      category: "material",
+      stage: "Instalações hidrossanitárias",
+      spent_on: "2026-11-08",
+      payment_method: "dinheiro",
+      has_invoice: true,
+      supplier_document: CNPJ_HIDRAULICA,
+      access_key: KEY_HIDRAULICA,
+      items: 3,
     },
   },
   {
