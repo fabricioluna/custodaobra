@@ -6,9 +6,9 @@ import {
 } from "@/config/app";
 
 /**
- * Textos dos Termos de Uso e da Política de Privacidade. Base escrita para o
- * lançamento, a ser revisada por um advogado. Ao mudar algo relevante, troque
- * `updatedAt` e avise quem usa o app.
+ * Textos dos Termos de Uso e da Política de Privacidade, revisados por
+ * advogado (2026-11-12). Ao mudar algo relevante, troque `updatedAt`, avise
+ * quem usa o app e passe de novo pela revisão jurídica.
  */
 
 export type LegalSection = { title: string; paragraphs: string[] };
