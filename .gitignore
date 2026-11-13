@@ -47,3 +47,6 @@ next-env.d.ts
 # supabase (arquivos locais da CLI)
 supabase/.branches
 supabase/.temp
+
+# Guia do usuário: gerado por scripts/guia (fotos, HTML e PDF)
+/docs/guia/

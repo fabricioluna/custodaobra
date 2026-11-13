@@ -79,10 +79,12 @@ export function StagePlanList({
               ) : null}
             </span>
             <span className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
-              <span className="money">
+              {/* `money` em cada valor, não na linha toda: com conta a pagar
+                  a linha passa da largura do celular e precisa quebrar. */}
+              <span className="min-w-0 tabular-nums">
                 {plan.budgetCents !== null ? (
                   <>
-                    <span className="font-bold">
+                    <span className="font-bold money">
                       {planCopy.spentOf(
                         formatCents(plan.spentCents),
                         formatCents(plan.budgetCents),
@@ -96,15 +98,17 @@ export function StagePlanList({
                     ) : null}
                   </>
                 ) : (
-                  <span className="font-bold">
+                  <span className="font-bold money">
                     {formatCents(plan.spentCents)}
                   </span>
                 )}
                 {plan.committedCents > 0 ? (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    {planCopy.committed(formatCents(plan.committedCents))}
-                  </span>
+                  <>
+                    {/* O espaço fica fora do `money`: é onde a linha quebra. */}{" "}
+                    <span className="money text-muted-foreground">
+                      {planCopy.committed(formatCents(plan.committedCents))}
+                    </span>
+                  </>
                 ) : null}
               </span>
               <span className="text-muted-foreground">
