@@ -15,7 +15,7 @@ export const marketingCopy = {
       "Mande o gasto da obra pelo WhatsApp, por texto, foto do cupom ou áudio, e acompanhe quanto já foi em cada etapa contra o que estava previsto. A tempo de corrigir o rumo.",
     cta: "Começar grátis",
     secondary: "Ver como funciona",
-    note: "14 dias grátis. Sem cartão de crédito.",
+    note: "7 dias grátis. Sem cartão de crédito.",
   },
   demo: {
     label: "Exemplo de conversa com o bot no WhatsApp",
@@ -93,7 +93,7 @@ export const marketingCopy = {
   pricing: {
     title: "Preços",
     description:
-      "Comece com 14 dias grátis em qualquer plano. Depois, escolha o que serve para você.",
+      "Comece com 7 dias grátis em qualquer plano. Depois, escolha o que serve para você.",
     perMonth: "/mês",
     free: "Grátis no lançamento",
     trial: (days: number) => `${days} dias grátis para testar`,

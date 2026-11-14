@@ -44,7 +44,7 @@ describe("isolamento entre organizações (RLS)", () => {
       const days =
         (new Date(data?.trial_ends_at ?? 0).getTime() - Date.now()) /
         86_400_000;
-      expect(Math.round(days)).toBe(14);
+      expect(Math.round(days)).toBe(7);
     });
   });
 
