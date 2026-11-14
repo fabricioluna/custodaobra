@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { emailSchema, otpSchema } from "@/features/auth/schemas";
+import {
+  emailSchema,
+  newPasswordSchema,
+  otpSchema,
+  passwordLoginSchema,
+  resetPasswordSchema,
+} from "@/features/auth/schemas";
 import { onboardingSchema } from "@/features/organizations/schemas";
 
 describe("emailSchema", () => {
@@ -63,5 +69,45 @@ describe("onboardingSchema", () => {
       accountName: "x".repeat(81),
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("senha", () => {
+  it("senha nova precisa de 8 a 72 caracteres", () => {
+    expect(newPasswordSchema.safeParse("1234567").success).toBe(false);
+    expect(newPasswordSchema.safeParse("12345678").success).toBe(true);
+    expect(newPasswordSchema.safeParse("a".repeat(72)).success).toBe(true);
+    expect(newPasswordSchema.safeParse("a".repeat(73)).success).toBe(false);
+  });
+
+  it("entrar só pede a senha preenchida (contas antigas podem ter senha curta)", () => {
+    const ok = passwordLoginSchema.safeParse({
+      email: " Fulano@Exemplo.com ",
+      password: "abc",
+    });
+    expect(ok.success && ok.data.email).toBe("fulano@exemplo.com");
+    expect(
+      passwordLoginSchema.safeParse({
+        email: "fulano@exemplo.com",
+        password: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("nova senha pelo código confere código e senha", () => {
+    expect(
+      resetPasswordSchema.safeParse({
+        email: "fulano@exemplo.com",
+        token: "123 456",
+        password: "senha-boa-1",
+      }).success,
+    ).toBe(true);
+    expect(
+      resetPasswordSchema.safeParse({
+        email: "fulano@exemplo.com",
+        token: "12a456",
+        password: "senha-boa-1",
+      }).success,
+    ).toBe(false);
   });
 });

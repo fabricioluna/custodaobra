@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { APP_LOCALE } from "@/config/app";
 import { globalErrorCopy as copy } from "@/features/marketing/global-error-copy";
+import { isStaleDeploymentError, reloadOnce } from "@/lib/stale-deploy";
 import { cn } from "@/lib/utils";
 
 import { archivo } from "./fonts";
@@ -26,6 +27,8 @@ export default function GlobalError({
   retry: () => void;
 }) {
   useEffect(() => {
+    // Página de antes de um deploy: recarregar resolve, não é defeito.
+    if (isStaleDeploymentError(error) && reloadOnce()) return;
     const fromServer =
       typeof error === "object" && error !== null && "digest" in error;
     if (!fromServer) Sentry.captureException(error);
