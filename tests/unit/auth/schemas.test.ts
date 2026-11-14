@@ -73,9 +73,9 @@ describe("onboardingSchema", () => {
 });
 
 describe("senha", () => {
-  it("senha nova precisa de 8 a 72 caracteres", () => {
-    expect(newPasswordSchema.safeParse("1234567").success).toBe(false);
-    expect(newPasswordSchema.safeParse("12345678").success).toBe(true);
+  it("senha nova precisa de 6 a 72 caracteres", () => {
+    expect(newPasswordSchema.safeParse("12345").success).toBe(false);
+    expect(newPasswordSchema.safeParse("123456").success).toBe(true);
     expect(newPasswordSchema.safeParse("a".repeat(72)).success).toBe(true);
     expect(newPasswordSchema.safeParse("a".repeat(73)).success).toBe(false);
   });

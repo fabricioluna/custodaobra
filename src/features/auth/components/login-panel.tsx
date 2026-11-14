@@ -271,7 +271,7 @@ function SignUp({
             id="password"
             name="password"
             autoComplete="new-password"
-            minLength={8}
+            minLength={6}
             maxLength={72}
             required
             aria-describedby="password-hint"
@@ -409,7 +409,7 @@ function ForgotPassword({
             id="password"
             name="password"
             autoComplete="new-password"
-            minLength={8}
+            minLength={6}
             maxLength={72}
             required
             aria-describedby="password-hint"

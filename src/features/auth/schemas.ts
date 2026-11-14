@@ -26,12 +26,12 @@ export const verifyCodeSchema = z.object({
 });
 
 /**
- * Senha nova: de 8 a 72 caracteres (72 é o limite do bcrypt, que o Supabase
+ * Senha nova: de 6 a 72 caracteres (72 é o limite do bcrypt, que o Supabase
  * usa). O Supabase também confere o mínimo (configurado no painel).
  */
 export const newPasswordSchema = z
   .string()
-  .min(8, { error: authCopy.errors.shortPassword })
+  .min(6, { error: authCopy.errors.shortPassword })
   .max(72, { error: authCopy.errors.longPassword });
 
 export const passwordLoginSchema = z.object({
