@@ -13,4 +13,8 @@ export const settingsCopy = {
       : `${people} pessoas com acesso.`,
   plan: "Plano",
   privacy: "Privacidade",
+  login: "Seu acesso",
+  loggedInAs: "Você entrou como",
+  loginHint:
+    "Para usar outro e-mail (outro login), saia e entre de novo com ele.",
 } as const;

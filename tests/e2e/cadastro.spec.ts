@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { adminClient } from "../rls/helpers";
 import { createE2EUser, deleteE2EUsers, type E2EUser, signIn } from "./helpers";
 
 test.describe("entrada no app", () => {
@@ -68,6 +69,37 @@ test.describe("cadastro", () => {
 
     await expect(page).toHaveURL(/\/o\/[a-z0-9-]+\/obras\/nova$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  test("Configurações mostra com qual e-mail entrou e sai da conta", async ({
+    page,
+  }) => {
+    const user = await createE2EUser("sair");
+    users.push(user);
+    await adminClient()
+      .from("profiles")
+      .update({
+        full_name: "Saída Teste",
+        onboarded_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+    await signIn(page, user);
+    await expect(page).toHaveURL(/\/o\/[a-z0-9-]+\/obras$/);
+    const settings = page.url().replace(/\/obras$/, "/configuracoes");
+
+    await page.goto(settings);
+    await expect(
+      page.getByText(`Você entrou como ${user.email}`),
+    ).toBeVisible();
+    await page
+      .getByRole("main")
+      .getByRole("button", { name: "Sair da conta" })
+      .click();
+    await expect(page).toHaveURL(/\/entrar$/);
+
+    // Sem sessão, a área logada volta para o login.
+    await page.goto(settings);
+    await expect(page).toHaveURL(/\/entrar\?next=/);
   });
 
   test("conta de outra pessoa aparece como página não encontrada", async ({

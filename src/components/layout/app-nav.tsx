@@ -1,9 +1,11 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
+import { signOut } from "@/features/auth/actions";
+import { authCopy } from "@/features/auth/copy";
 import { cn } from "@/lib/utils";
 
 import { BrandMark } from "./brand-mark";
@@ -181,6 +183,18 @@ function SideNav({ items, activeKey, launchHref }: NavViewProps) {
           })}
         </ul>
       </nav>
+      <form action={signOut} className="mt-auto">
+        <button
+          type="submit"
+          className={cn(
+            "flex h-11 w-full items-center gap-3 rounded-lg px-3 text-base font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            focusRing,
+          )}
+        >
+          <LogOut className="size-5" strokeWidth={1.75} aria-hidden />
+          {authCopy.signOut}
+        </button>
+      </form>
     </aside>
   );
 }

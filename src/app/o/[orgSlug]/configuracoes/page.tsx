@@ -27,6 +27,7 @@ import { requireOrg } from "@/features/organizations/queries";
 import { settingsCopy as copy } from "@/features/settings/copy";
 import { whatsappCopy } from "@/features/whatsapp/copy";
 import { getMyWhatsapp } from "@/features/whatsapp/queries";
+import { getUserEmail } from "@/lib/auth/session";
 import { formatPhone } from "@/lib/whatsapp/phone";
 import { cn } from "@/lib/utils";
 
@@ -43,10 +44,11 @@ export default async function SettingsPage({
   // O papel já veio junto com a conta: a equipe sai na mesma rodada que o
   // resto, em vez de esperar.
   const canManage = isOrgAdminRole(await getOrgRole(org.id));
-  const [orgs, whatsapp, team] = await Promise.all([
+  const [orgs, whatsapp, team, email] = await Promise.all([
     listMyOrgs(),
     getMyWhatsapp(),
     canManage ? listTeam(org.id) : [],
+    getUserEmail(),
   ]);
 
   return (
@@ -54,6 +56,22 @@ export default async function SettingsPage({
       <PageHeader title={copy.title} description={org.name} />
 
       <div className="flex max-w-xl flex-col gap-8">
+        <section className="rounded-2xl border bg-card p-4">
+          <h2 className="text-lg heading">{copy.login}</h2>
+          {email ? (
+            <p className="mt-1.5 break-words">
+              {copy.loggedInAs} <strong>{email}</strong>
+            </p>
+          ) : null}
+          <p className="mt-1 text-sm text-muted-foreground">{copy.loginHint}</p>
+          <form action={signOut} className="mt-4">
+            <Button type="submit" variant="outline" size="lg">
+              <LogOut aria-hidden />
+              {authCopy.signOut}
+            </Button>
+          </form>
+        </section>
+
         <section>
           <h2 className="mb-3 text-lg heading">{whatsappCopy.title}</h2>
           <Link
@@ -205,13 +223,6 @@ export default async function SettingsPage({
           </section>
         ) : null}
       </div>
-
-      <form action={signOut} className="mt-10 border-t pt-6">
-        <Button type="submit" variant="outline" size="lg">
-          <LogOut aria-hidden />
-          {authCopy.signOut}
-        </Button>
-      </form>
     </>
   );
 }
