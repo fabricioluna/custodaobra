@@ -94,3 +94,13 @@ export async function getBudgetFormData(projectId: string) {
     costPerM2Cents: project?.cost_per_m2_cents ?? null,
   };
 }
+
+/** Nomes das etapas sugeridas para uma obra nova, na ordem. */
+export async function listStageTemplateNames(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("stage_templates")
+    .select("name")
+    .order("sort_order");
+  return (data ?? []).map((row) => row.name);
+}

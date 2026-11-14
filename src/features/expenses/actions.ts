@@ -7,6 +7,7 @@ import { orgPath } from "@/components/layout/nav";
 import { billingCopy } from "@/features/billing/copy";
 import { requireOrg } from "@/features/organizations/queries";
 import { getProjectAccess } from "@/features/projects/queries";
+import { findOrCreateStage } from "@/features/stages/create";
 import { resolveSupplier } from "@/features/suppliers/resolve";
 import { requireUserId } from "@/lib/auth/session";
 import { canWrite } from "@/lib/billing/limits";
@@ -21,6 +22,7 @@ import {
   type ExpenseFormField,
   expenseFormSchema,
   MAX_RECEIPT_BYTES,
+  NEW_STAGE,
   RECEIPT_MIME_TYPES,
 } from "./schemas";
 
@@ -35,6 +37,7 @@ function parseExpenseForm(formData: FormData) {
     amountCents: textField(formData, "amountCents"),
     description: textField(formData, "description"),
     stageId: textField(formData, "stageId"),
+    newStageName: textField(formData, "newStageName"),
     categoryId: textField(formData, "categoryId"),
     spentOn: textField(formData, "spentOn"),
     supplierName: textField(formData, "supplierName"),
@@ -176,15 +179,27 @@ async function prepare(
       },
     } as const;
   }
-  const supplierId = await resolveSupplier(
-    supabase,
-    org.id,
-    parsed.data.supplierName,
-  );
-
   const data = parsed.data;
+  // "+ Nova etapa": cria (ou reaproveita, se já existe com esse nome) junto
+  // com o fornecedor, depois de conferir permissão e plano.
+  const [supplierId, newStage] = await Promise.all([
+    resolveSupplier(supabase, org.id, data.supplierName),
+    data.stageId === NEW_STAGE && data.newStageName
+      ? findOrCreateStage(supabase, org.id, projectId, data.newStageName)
+      : null,
+  ]);
+  if (data.stageId === NEW_STAGE && !newStage) {
+    return {
+      ok: false,
+      state: {
+        status: "error",
+        fieldErrors: { newStageName: errors.newStageFailed },
+      },
+    } as const;
+  }
+
   const row = {
-    stage_id: data.stageId,
+    stage_id: newStage ? newStage.id : data.stageId,
     category_id: data.categoryId,
     supplier_id: supplierId,
     description: data.description ?? categoryName ?? "Gasto",

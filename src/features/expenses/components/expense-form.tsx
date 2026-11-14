@@ -21,7 +21,7 @@ import { formatCents, multiplyCents, parseQuantity } from "@/lib/money";
 import type { ExpenseFormState } from "../actions";
 import { expensesCopy } from "../copy";
 import { guessCategoryCode } from "../guess-category";
-import { MAX_RECEIPT_BYTES, RECEIPT_MIME_TYPES } from "../schemas";
+import { MAX_RECEIPT_BYTES, NEW_STAGE, RECEIPT_MIME_TYPES } from "../schemas";
 
 const copy = expensesCopy.form;
 
@@ -78,6 +78,7 @@ export function ExpenseForm({
   const errors = state.status === "error" ? state.fieldErrors : undefined;
 
   const [amountCents, setAmountCents] = useState(defaults.amountCents);
+  const [stageChoice, setStageChoice] = useState(defaults.stageId);
   const [categoryId, setCategoryId] = useState(defaults.categoryId);
   const [categoryTouched, setCategoryTouched] = useState(false);
   const [hasInvoice, setHasInvoice] = useState(defaults.hasInvoice);
@@ -192,6 +193,7 @@ export function ExpenseForm({
           {...fieldA11y(fid("stageId"), undefined, errors?.stageId)}
           name="stageId"
           defaultValue={defaults.stageId}
+          onChange={(event) => setStageChoice(event.target.value)}
         >
           <option value="">{copy.noStage}</option>
           {options.stages.map((stage) => (
@@ -199,8 +201,26 @@ export function ExpenseForm({
               {stage.name}
             </option>
           ))}
+          <option value={NEW_STAGE}>{copy.newStage}</option>
         </NativeSelect>
       </FormField>
+
+      {stageChoice === NEW_STAGE ? (
+        <FormField
+          id={fid("newStageName")}
+          label={copy.newStageName}
+          error={errors?.newStageName}
+        >
+          <Input
+            {...fieldA11y(fid("newStageName"), undefined, errors?.newStageName)}
+            name="newStageName"
+            placeholder={copy.newStagePlaceholder}
+            autoCapitalize="sentences"
+            maxLength={80}
+            autoFocus
+          />
+        </FormField>
+      ) : null}
 
       <details
         open={detailsOpen || hasDetailErrors(errors) || undefined}

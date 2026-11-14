@@ -212,6 +212,7 @@ export function interpretAiReceipt(
     description: raw.description,
     category_code: raw.category_code,
     stage_number: raw.stage_number,
+    new_stage_name: null,
     supplier_name: raw.supplier_name,
     spent_on: raw.spent_on,
     payment_method: raw.payment_method,

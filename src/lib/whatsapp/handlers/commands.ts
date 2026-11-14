@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cleanStageName, findOrCreateStage } from "@/features/stages/create";
 import { todayIn } from "@/lib/dates";
 
 import type { BotCommand } from "../commands";
@@ -34,6 +35,7 @@ export async function handleCommand(
   session: BotSession,
   command: BotCommand,
 ): Promise<void> {
+  if (typeof command === "object") return newStage(session, command.name);
   switch (command) {
     case "help":
       return help(session);
@@ -44,6 +46,55 @@ export async function handleCommand(
     case "undo":
       return undo(session);
   }
+}
+
+/**
+ * "nova etapa Muro": cria a etapa na obra ativa (ou na única em que a pessoa
+ * lança). Se já existe com esse nome, só avisa.
+ */
+async function newStage(session: BotSession, rawName: string): Promise<void> {
+  const { admin, userId, conversation } = session;
+  if (!rawName) {
+    return session.send({
+      type: "text",
+      body: botMessages.newStageCommandHelp,
+    });
+  }
+  const name = cleanStageName(rawName);
+  if (!name) {
+    return session.send({ type: "text", body: botMessages.newStageInvalid });
+  }
+  // Só as obras em que a pessoa lança (dono, admin ou editor): a mesma
+  // regra do RLS para criar etapas, aplicada à mão (service_role).
+  const projects = await listLaunchableProjects(admin, userId);
+  if (!projects.length) {
+    const visible = await listBotProjects(admin, userId);
+    return session.send({
+      type: "text",
+      body: visible.length
+        ? botMessages.newStageViewer
+        : botMessages.noProjects,
+    });
+  }
+  const project =
+    projects.find((p) => p.id === conversation.active_project_id) ??
+    (projects.length === 1 ? projects[0] : undefined);
+  if (!project) {
+    return session.send({
+      type: "text",
+      body: botMessages.newStageChooseProject,
+    });
+  }
+  const stage = await findOrCreateStage(admin, project.orgId, project.id, name);
+  if (!stage) {
+    return session.send({ type: "text", body: botMessages.newStageFailed });
+  }
+  return session.send({
+    type: "text",
+    body: stage.created
+      ? botMessages.stageCreated(stage.name, project.name)
+      : botMessages.stageExists(stage.name, project.name),
+  });
 }
 
 /** "ajuda": quem só acompanha recebe a versão das perguntas. */

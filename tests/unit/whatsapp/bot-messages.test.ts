@@ -143,18 +143,19 @@ describe("lista de etapas", () => {
   const rowsOf = (message: ReturnType<typeof stageListMessage>) =>
     message.type === "list" ? message.rows : [];
 
-  it("na primeira pergunta, até 7 etapas numa página, com Sem etapa, Editar e Cancelar", () => {
+  it("na primeira pergunta, até 6 etapas numa página, com Nova etapa, Sem etapa, Editar e Cancelar", () => {
     const rows = rowsOf(
       stageListMessage({
         body: "x",
         mode: "confirm",
-        stages: stages(7),
+        stages: stages(6),
         page: 0,
         expenseId: EXPENSE,
       }),
     );
     expect(rows).toHaveLength(10);
-    expect(rows.slice(-3).map((r) => r.title)).toEqual([
+    expect(rows.slice(-4).map((r) => r.title)).toEqual([
+      "➕ Nova etapa",
       "Sem etapa",
       "Editar lançamento",
       "Cancelar lançamento",
@@ -165,12 +166,12 @@ describe("lista de etapas", () => {
     });
   });
 
-  it("ao editar a etapa, até 8 numa página, sem a opção Editar", () => {
+  it("ao editar a etapa, até 7 numa página, sem a opção Editar", () => {
     const rows = rowsOf(
       stageListMessage({
         body: "x",
         mode: "edit",
-        stages: stages(8),
+        stages: stages(7),
         page: 0,
         expenseId: EXPENSE,
       }),
@@ -179,7 +180,7 @@ describe("lista de etapas", () => {
     expect(rows.map((r) => r.title)).not.toContain("Editar lançamento");
   });
 
-  it("13 etapas (o padrão) em páginas de 6, sem passar de 10 opções", () => {
+  it("13 etapas (o padrão) em páginas de 5, sem passar de 10 opções", () => {
     const page = (n: number) =>
       rowsOf(
         stageListMessage({
@@ -192,13 +193,39 @@ describe("lista de etapas", () => {
       );
     const first = page(0);
     expect(first).toHaveLength(10);
-    expect(first[6]?.title).toBe("Mais etapas");
-    expect(parseAction(first[6]?.id)).toMatchObject({ page: 1 });
+    expect(first[5]?.title).toBe("Mais etapas");
+    expect(parseAction(first[5]?.id)).toMatchObject({ page: 1 });
 
     const last = page(2);
     expect(last.map((r) => r.title)).toContain("Etapa 13");
     expect(last.find((r) => r.title === "Voltar ao início")).toBeTruthy();
     for (const n of [0, 1, 2]) expect(page(n).length).toBeLessThanOrEqual(10);
+  });
+
+  it("Nova etapa e etapa sugerida pela IA voltam como ações", () => {
+    const rows = rowsOf(
+      stageListMessage({
+        body: "x",
+        mode: "confirm",
+        stages: stages(13),
+        page: 0,
+        expenseId: EXPENSE,
+        suggestedStageName: "Piscina",
+      }),
+    );
+    expect(rows).toHaveLength(10);
+    expect(rows[0]?.title).toBe("➕ Piscina");
+    expect(parseAction(rows[0]?.id)).toEqual({
+      type: "stage_suggested",
+      mode: "confirm",
+      expenseId: EXPENSE,
+    });
+    const newRow = rows.find((r) => r.title === "➕ Nova etapa");
+    expect(parseAction(newRow?.id)).toEqual({
+      type: "stage_new",
+      mode: "confirm",
+      expenseId: EXPENSE,
+    });
   });
 });
 

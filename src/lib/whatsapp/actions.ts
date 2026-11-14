@@ -39,6 +39,10 @@ export type BotAction =
       expenseId: string;
     }
   | { type: "stage_page"; mode: StageMode; page: number; expenseId: string }
+  /** "➕ Nova etapa": o bot pergunta o nome. */
+  | { type: "stage_new"; mode: StageMode; expenseId: string }
+  /** Cria a etapa sugerida pela IA (o nome fica na conversa). */
+  | { type: "stage_suggested"; mode: StageMode; expenseId: string }
   | { type: "category"; code: string; expenseId: string }
   | { type: "date"; date: string; expenseId: string }
   | { type: "payment"; method: string | null; expenseId: string }
@@ -71,6 +75,10 @@ export const actionId = {
     `st:${modeCode(mode)}:${stageId ?? "none"}:${expenseId}`,
   stagePage: (mode: StageMode, page: number, expenseId: string) =>
     `sp:${modeCode(mode)}:${page}:${expenseId}`,
+  stageNew: (mode: StageMode, expenseId: string) =>
+    `ns:${modeCode(mode)}:${expenseId}`,
+  stageSuggested: (mode: StageMode, expenseId: string) =>
+    `nsg:${modeCode(mode)}:${expenseId}`,
   category: (code: string, expenseId: string) => `ca:${code}:${expenseId}`,
   date: (date: string, expenseId: string) => `d:${date}:${expenseId}`,
   payment: (method: string | null, expenseId: string) =>
@@ -118,6 +126,22 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => BotAction][] = [
       mode: m[1] === "c" ? "confirm" : "edit",
       page: Number(m[2]),
       expenseId: m[3]!,
+    }),
+  ],
+  [
+    new RegExp(`^ns:([ce]):(${UUID})$`),
+    (m) => ({
+      type: "stage_new",
+      mode: m[1] === "c" ? "confirm" : "edit",
+      expenseId: m[2]!,
+    }),
+  ],
+  [
+    new RegExp(`^nsg:([ce]):(${UUID})$`),
+    (m) => ({
+      type: "stage_suggested",
+      mode: m[1] === "c" ? "confirm" : "edit",
+      expenseId: m[2]!,
     }),
   ],
   [

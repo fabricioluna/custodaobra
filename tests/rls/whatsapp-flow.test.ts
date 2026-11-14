@@ -85,6 +85,8 @@ describe("lançamento pelo WhatsApp", () => {
   let brunoPhone: string;
   let projectId: string;
   let stages: { id: string; name: string }[];
+  /** Números extras (o limite é de 20 mensagens por minuto por número). */
+  const extraPhones: string[] = [];
 
   const message = (
     from: string,
@@ -185,7 +187,7 @@ describe("lançamento pelo WhatsApp", () => {
     await admin
       .from("whatsapp_messages")
       .delete()
-      .in("from_phone", [anaPhone, brunoPhone]);
+      .in("from_phone", [anaPhone, brunoPhone, ...extraPhones]);
     await deleteTestUsers([bruno, ana].filter(Boolean));
   });
 
@@ -429,6 +431,82 @@ describe("lançamento pelo WhatsApp", () => {
       amount_cents: 8200,
       suppliers: { name: "Depósito Central" },
     });
+  }, 120_000);
+
+  it("nova etapa: pelo nome digitado, pela sugestão da IA e pelo comando", async () => {
+    const stageByName = async (name: string) => {
+      const { data } = await admin
+        .from("stages")
+        .select("id, org_id")
+        .eq("project_id", projectId)
+        .eq("name", name)
+        .maybeSingle();
+      return data;
+    };
+
+    // Número só deste teste: o arquivo todo passaria do limite por minuto.
+    const phone = randomPhone();
+    extraPhones.push(phone);
+    await admin
+      .from("profiles")
+      .update({ whatsapp_phone: phone })
+      .eq("id", ana.id);
+    try {
+      // "➕ Nova etapa" na lista: o bot pergunta o nome e já lança nela.
+      extractExpense.mockResolvedValueOnce(read({ description: "Muro" }));
+      await say(phone, "800 muro");
+      await tap(phone, optionId("➕ Nova etapa"), true);
+      expect(last()?.body).toContain("nome da nova etapa");
+      await say(phone, "  Muro  ");
+      const muro = await stageByName("Muro");
+      expect(muro?.org_id).toBe(ana.orgId);
+      expect(sent.at(-2)?.body).toContain("Etapa *Muro* criada");
+      expect(await latestExpense()).toMatchObject({
+        status: "confirmed",
+        stage_id: muro?.id,
+      });
+
+      // Sugestão da IA ("➕ Piscina" no alto da lista).
+      extractExpense.mockResolvedValueOnce(
+        read({
+          description: "Azulejo da piscina",
+          suggestedStageName: "Piscina",
+        }),
+      );
+      await say(phone, "2000 azulejo da piscina");
+      const list = last();
+      expect(list?.type === "list" && list.rows[0]?.title).toBe("➕ Piscina");
+      await tap(phone, optionId("➕ Piscina"), true);
+      const piscina = await stageByName("Piscina");
+      expect(await latestExpense()).toMatchObject({
+        status: "confirmed",
+        stage_id: piscina?.id,
+      });
+
+      // Comando: cria uma vez; repetido (outra grafia) só avisa.
+      await say(phone, "nova etapa Garagem");
+      expect(last()?.body).toContain(
+        "Etapa *Garagem* criada na obra *Casa nova*",
+      );
+      await say(phone, "Nova etapa: garagem.");
+      expect(last()?.body).toContain("já tem a etapa *Garagem*");
+      const { count } = await admin
+        .from("stages")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .ilike("name", "garagem");
+      expect(count).toBe(1);
+    } finally {
+      await admin
+        .from("profiles")
+        .update({ whatsapp_phone: anaPhone })
+        .eq("id", ana.id);
+    }
+
+    // Quem só acompanha não cria etapa.
+    await say(brunoPhone, "nova etapa Teste");
+    expect(last()?.body).toContain("não pode criar etapas");
+    expect(await stageByName("Teste")).toBeNull();
   }, 120_000);
 
   it("quem só acompanha a obra não lança", async () => {

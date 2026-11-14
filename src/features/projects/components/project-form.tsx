@@ -10,6 +10,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 
 import type { ProjectFormState } from "../actions";
 import { BRAZIL_STATES, projectsCopy } from "../copy";
+import { StagePicker } from "./stage-picker";
 
 const copy = projectsCopy.form;
 
@@ -43,6 +44,7 @@ export function ProjectForm({
   submittingLabel,
   showStatus = false,
   disabled = false,
+  stageTemplates,
 }: {
   action: (
     prev: ProjectFormState,
@@ -53,6 +55,8 @@ export function ProjectForm({
   submittingLabel: string;
   showStatus?: boolean;
   disabled?: boolean;
+  /** Só ao criar: etapas sugeridas, para a pessoa escolher. */
+  stageTemplates?: string[];
 }) {
   // Ids únicos: o Next.js guarda páginas visitadas escondidas no DOM, e ids
   // repetidos fariam o rótulo apontar para o campo da página escondida.
@@ -201,6 +205,10 @@ export function ProjectForm({
             maxLength={200}
           />
         </FormField>
+
+        {stageTemplates?.length ? (
+          <StagePicker templates={stageTemplates} />
+        ) : null}
       </fieldset>
 
       {state.status === "error" && state.message ? (

@@ -31,7 +31,18 @@ export const projectsCopy = {
     submit: "Criar obra",
     submitting: "Criando…",
     stagesHint:
-      "A obra já nasce com as etapas mais comuns (fundação, alvenaria, pintura…). Dá para renomear, remover e reordenar depois.",
+      "Dá para renomear, reordenar e criar etapas depois, inclusive na hora de lançar um gasto ou pelo WhatsApp.",
+  },
+  stagePicker: {
+    legend: "Etapas da obra",
+    description:
+      "Já deixamos marcadas as etapas mais comuns. Desmarque as que não fazem parte da sua obra (numa reforma, por exemplo).",
+    selectAll: "Marcar todas",
+    selectNone: "Começar sem etapas",
+    count: (n: number, total: number) =>
+      n === 0
+        ? "Nenhuma etapa: a obra começa vazia."
+        : `${n} de ${total} etapas marcadas.`,
   },
   edit: {
     title: "Dados da obra",

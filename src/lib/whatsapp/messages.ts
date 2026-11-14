@@ -23,7 +23,7 @@ export const botMessages = {
 
   howTo:
     "Para lançar um gasto, mande o valor e o que foi. Exemplos:\n• _300 pedreiro_\n• _2 sacos de cimento 78 na loja do Zé_\n• _ontem 450 de areia no pix_\n\nOu mande a foto (ou o PDF) do cupom ou da nota, ou um áudio falando o gasto.\n\nMande *ajuda* para ver os comandos.",
-  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nE respondo perguntas sobre os gastos, como _quanto gastei com cimento em outubro?_ ou _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *ajuda*: esta mensagem`,
+  help: `Eu lanço os gastos da sua obra no *${APP_NAME}*. Mande o valor e o que foi, por exemplo: _300 pedreiro_ ou _ontem 450 de areia no pix_. Também leio a foto (ou o PDF) do cupom ou da nota e entendo áudio.\n\nE respondo perguntas sobre os gastos, como _quanto gastei com cimento em outubro?_ ou _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *desfazer*: cancela o último lançamento (até 10 minutos)\n• *nova etapa Muro*: cria uma etapa na obra\n• *ajuda*: esta mensagem`,
   viewerHelp: `Você acompanha obras no *${APP_NAME}*. Pode me perguntar sobre os gastos, por exemplo:\n• _quanto gastei esse mês?_\n• _quanto já foi na alvenaria?_\n• _tem conta atrasada?_\n\nComandos:\n• *obras*: ver e trocar a obra\n• *resumo*: quanto já foi gasto na obra\n• *ajuda*: esta mensagem`,
   projectsQuestion: "Para qual obra vão os próximos gastos?",
   viewerProjectsQuestion: "Sobre qual obra são as próximas perguntas?",
@@ -148,6 +148,21 @@ export const botMessages = {
     current
       ? `Qual é o fornecedor? Hoje está: _${current}_. Mande o nome ou *sem* para tirar.`
       : "Qual é o fornecedor (loja, empresa ou pessoa)? Mande o nome ou *sem* para deixar em branco.",
+  askNewStage:
+    "Qual é o nome da nova etapa? Por exemplo: _Muro_, _Piscina_, _Garagem_.",
+  newStageInvalid:
+    "Mande só o nome da etapa, com até 80 letras. Por exemplo: _Muro_.",
+  newStageFailed:
+    "Não consegui criar a etapa agora. Tente de novo em instantes.",
+  stageCreated: (name: string, project: string) =>
+    `✅ Etapa *${name}* criada na obra *${project}*.`,
+  stageExists: (name: string, project: string) =>
+    `A obra *${project}* já tem a etapa *${name}*.`,
+  newStageCommandHelp:
+    "Para criar uma etapa, mande assim: *nova etapa Muro* (com o nome da etapa).",
+  newStageChooseProject:
+    "Em qual obra? Mande *obras* para escolher a obra e depois repita o *nova etapa*.",
+  newStageViewer: "Você só acompanha as obras, então não pode criar etapas.",
 } as const;
 
 export const CATEGORY_NAMES: Record<string, string> = {
@@ -261,9 +276,10 @@ export function summaryMessage(
 const MAX_ROWS = 10;
 
 /**
- * Lista de etapas. Ao fim vão "Sem etapa", "Editar" (só na primeira pergunta,
- * para corrigir antes de confirmar) e "Cancelar"; as etapas usam o resto das
- * 10 opções e, se não cabem, vão em páginas com "Mais etapas".
+ * Lista de etapas. No alto, a etapa nova sugerida pela IA (se houver); ao fim
+ * vão "➕ Nova etapa", "Sem etapa", "Editar" (só na primeira pergunta, para
+ * corrigir antes de confirmar) e "Cancelar". As etapas usam o resto das 10
+ * opções e, se não cabem, vão em páginas com "Mais etapas".
  */
 export function stageListMessage(input: {
   body: string;
@@ -271,16 +287,32 @@ export function stageListMessage(input: {
   stages: { id: string; name: string }[];
   page: number;
   expenseId: string;
+  /** Etapa nova sugerida pela IA: vem primeiro na lista, para criar. */
+  suggestedStageName?: string | null;
 }): OutgoingMessage {
-  const { stages, mode, expenseId } = input;
+  const { stages, mode, expenseId, suggestedStageName } = input;
+  const suggestion: ListRow[] = suggestedStageName
+    ? [
+        {
+          id: actionId.stageSuggested(mode, expenseId),
+          title: `➕ ${suggestedStageName}`,
+          description: `Criar a etapa ${suggestedStageName}`.slice(0, 72),
+        },
+      ]
+    : [];
   const extras: ListRow[] = [
+    {
+      id: actionId.stageNew(mode, expenseId),
+      title: "➕ Nova etapa",
+      description: "Criar uma etapa com outro nome",
+    },
     { id: actionId.stage(mode, null, expenseId), title: "Sem etapa" },
     ...(mode === "confirm"
       ? [{ id: actionId.edit(expenseId), title: "Editar lançamento" }]
       : []),
     { id: actionId.cancel(expenseId), title: "Cancelar lançamento" },
   ];
-  const capacity = MAX_ROWS - extras.length;
+  const capacity = MAX_ROWS - extras.length - suggestion.length;
   const paged = stages.length > capacity;
   const perPage = paged ? capacity - 1 : capacity;
   const pages = paged ? Math.ceil(stages.length / perPage) : 1;
@@ -306,7 +338,7 @@ export function stageListMessage(input: {
     type: "list",
     body: input.body,
     buttonLabel: botMessages.stageButton,
-    rows,
+    rows: [...suggestion, ...rows],
   };
 }
 

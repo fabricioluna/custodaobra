@@ -9,7 +9,7 @@ import { anthropic, extractionModel } from "./client";
 import {
   EXTRACT_EXPENSE_PROMPT_VERSION,
   EXTRACT_EXPENSE_SYSTEM,
-} from "./prompts/extract-expense.v2";
+} from "./prompts/extract-expense.v3";
 import {
   type AiFailureReason,
   type AiUsage,
@@ -63,6 +63,8 @@ export const aiExpenseSchema = z.object({
   description: z.string().nullable(),
   category_code: z.enum(CATEGORY_CODES).nullable(),
   stage_number: z.number().int().nullable(),
+  /** Etapa que não está na lista e combina com o gasto ("Piscina"). */
+  new_stage_name: z.string().nullable(),
   supplier_name: z.string().nullable(),
   spent_on: z.string().nullable(),
   payment_method: z.enum(PAYMENT_METHODS).nullable(),
@@ -85,6 +87,11 @@ export type ExtractedExpense = {
   amountCents: number | null;
   description: string;
   stageId: string | null;
+  /**
+   * Sem etapa da lista: nome de uma etapa nova sugerida pela IA, que o bot
+   * oferece criar.
+   */
+  suggestedStageName?: string | null;
   categoryCode: CategoryCode;
   supplierName: string | null;
   spentOn: string;
@@ -177,7 +184,18 @@ export function interpretAiExpense(
     raw.stage_number !== null
       ? context.stages[raw.stage_number - 1]
       : undefined;
-  const stageId = stage?.id ?? null;
+  // Etapa nova sugerida que já existe na lista (outra grafia): usa a da lista.
+  const suggested = stage ? null : clean(raw.new_stage_name, 80);
+  const sameName = suggested
+    ? context.stages.find(
+        (s) =>
+          s.name.toLocaleLowerCase("pt-BR") ===
+          suggested.toLocaleLowerCase("pt-BR"),
+      )
+    : undefined;
+  const stageId = stage?.id ?? sameName?.id ?? null;
+  const suggestedStageName =
+    stageId === null && suggested ? capitalize(suggested) : null;
 
   const spentOn =
     raw.spent_on &&
@@ -202,6 +220,7 @@ export function interpretAiExpense(
     amountCents,
     description: capitalize(description),
     stageId,
+    suggestedStageName,
     categoryCode: raw.category_code ?? "outros",
     supplierName: clean(raw.supplier_name, 120),
     spentOn,

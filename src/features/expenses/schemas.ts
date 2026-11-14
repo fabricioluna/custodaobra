@@ -20,6 +20,9 @@ const optionalText = (max: number, message: string) =>
       .transform((value) => value || null),
   );
 
+/** Valor do campo Etapa quando a pessoa escolhe "+ Nova etapa". */
+export const NEW_STAGE = "nova";
+
 /** Centavos vindos de um campo estilo maquininha (só dígitos). */
 const centsField = z.string().transform((value) => digitsToCents(value));
 
@@ -45,10 +48,11 @@ export const expenseFormSchema = z
     description: optionalText(200, errors.descriptionTooLong),
     stageId: z
       .string()
-      .refine((value) => value === "" || isUuid(value), {
+      .refine((value) => value === "" || value === NEW_STAGE || isUuid(value), {
         error: errors.stageInvalid,
       })
       .transform((value) => value || null),
+    newStageName: optionalText(80, errors.newStageTooLong),
     categoryId: z.string().refine(isUuid, { error: errors.categoryRequired }),
     spentOn: z.string().refine(isIsoDate, { error: errors.dateInvalid }),
     supplierName: optionalText(120, errors.supplierTooLong),
@@ -67,6 +71,15 @@ export const expenseFormSchema = z
     unit: optionalText(20, errors.unitTooLong),
     unitPriceCents: centsField.transform((cents) => cents || null),
   })
+  .superRefine((data, ctx) => {
+    if (data.stageId === NEW_STAGE && !data.newStageName) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["newStageName"],
+        message: errors.newStageRequired,
+      });
+    }
+  })
   .transform((data) => ({
     ...data,
     // Nota só faz sentido marcada; número sem nota é descartado.
@@ -74,6 +87,8 @@ export const expenseFormSchema = z
     // Unidade e valor unitário só valem junto com a quantidade.
     unit: data.quantity === null ? null : data.unit,
     unitPriceCents: data.quantity === null ? null : data.unitPriceCents,
+    // Nome da etapa nova só vale com "+ Nova etapa" escolhida.
+    newStageName: data.stageId === NEW_STAGE ? data.newStageName : null,
   }));
 
 export type ExpenseFormInput = z.input<typeof expenseFormSchema>;
