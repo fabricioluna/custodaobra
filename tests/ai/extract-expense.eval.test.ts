@@ -18,6 +18,8 @@ type Expect = {
   amount_cents?: number | null;
   category?: string;
   stage?: string | null;
+  /** Etapa nova sugerida (sem etapa da lista). */
+  new_stage?: string | null;
   quantity?: number;
   supplier?: string;
   payment_method?: string;
@@ -72,6 +74,8 @@ describe.skipIf(!process.env.ANTHROPIC_API_KEY)(
       if (want.has_invoice !== undefined)
         expect(got.hasInvoice).toBe(want.has_invoice);
       if (want.spent_on) expect(got.spentOn).toBe(want.spent_on);
+      if (want.new_stage !== undefined)
+        expect(got.suggestedStageName ?? null).toBe(want.new_stage);
     });
 
     afterAll(() => {

@@ -91,7 +91,36 @@ export async function createProject(
     };
   }
 
+  if (formData.get("stagesChosen") === "1") {
+    await keepChosenStages(supabase, data.id, formData.getAll("stage"));
+  }
+
   redirect(orgPath(org.slug, "obras", data.id));
+}
+
+/**
+ * A obra nasce com todas as etapas sugeridas (gatilho no banco); aqui saem
+ * as que a pessoa desmarcou. Se falhar, a obra fica com todas, e a pessoa
+ * remove depois em Etapas.
+ */
+async function keepChosenStages(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+  chosen: FormDataEntryValue[],
+) {
+  const keep = new Set(
+    chosen.filter((v): v is string => typeof v === "string"),
+  );
+  const { data: stages } = await supabase
+    .from("stages")
+    .select("id, name")
+    .eq("project_id", projectId);
+  const remove = (stages ?? [])
+    .filter((stage) => !keep.has(stage.name))
+    .map((stage) => stage.id);
+  if (!remove.length) return;
+  const { error } = await supabase.from("stages").delete().in("id", remove);
+  if (error) console.error("[obras] etapas desmarcadas não removidas", error);
 }
 
 export async function updateProject(

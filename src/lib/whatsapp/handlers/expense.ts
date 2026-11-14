@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { cleanStageName, findOrCreateStage } from "@/features/stages/create";
 import { resolveSupplier } from "@/features/suppliers/resolve";
 import { loadExtractionContext } from "@/lib/ai/context";
 import {
@@ -699,7 +700,38 @@ export async function handleAction(
           stages: pending.stages,
           page: action.page,
           expenseId: pending.id,
+          suggestedStageName: pending.suggestedStageName,
         }),
+      );
+    case "stage_new":
+      // O nome vem na próxima mensagem de texto (applyTextEdit).
+      await Promise.all([
+        setState(
+          session,
+          action.mode === "confirm"
+            ? "awaiting_stage"
+            : "awaiting_confirmation",
+          pending,
+          {
+            editing: {
+              expenseId: pending.id,
+              field: "new_stage",
+              mode: action.mode,
+            },
+          },
+        ),
+        session.send({ type: "text", body: botMessages.askNewStage }),
+      ]);
+      return;
+    case "stage_suggested":
+      if (!pending.suggestedStageName) {
+        return session.send({ type: "text", body: botMessages.alreadyHandled });
+      }
+      return applyNewStage(
+        session,
+        pending,
+        pending.suggestedStageName,
+        action.mode,
       );
     case "category": {
       if (!Object.hasOwn(CATEGORY_NAMES, action.code)) {
@@ -859,6 +891,7 @@ function editFieldMessage(
         stages: pending.stages,
         page: 0,
         expenseId: pending.id,
+        suggestedStageName: pending.suggestedStageName,
       });
     case "category":
       return categoryListMessage(pending.id);
@@ -1010,6 +1043,8 @@ type PendingExpense = {
   moveTargets?: { id: string; name: string }[];
   /** Itens do cupom com a etapa de cada um (para dividir por etapa). */
   split?: SplitItem[];
+  /** Sem etapa: etapa nova sugerida pela IA ("➕ Piscina" na lista). */
+  suggestedStageName?: string | null;
 };
 
 function summaryOf(pending: PendingExpense): string {
@@ -1091,6 +1126,11 @@ async function loadPending(
       session.conversation.context.split?.expenseId === data.id
         ? session.conversation.context.split.items
         : undefined,
+    suggestedStageName:
+      !data.stage_id &&
+      session.conversation.context.suggestedStage?.expenseId === data.id
+        ? session.conversation.context.suggestedStage.name
+        : null,
   };
 }
 
@@ -1163,8 +1203,11 @@ async function presentPending(
     ]);
     return;
   }
+  // Sem etapa: pergunta (também numa obra sem etapas, se a IA sugeriu uma).
   const askStage =
-    mode === "new" && !pending.stageId && pending.stages.length > 0;
+    mode === "new" &&
+    !pending.stageId &&
+    (pending.stages.length > 0 || Boolean(pending.suggestedStageName));
   await Promise.all([
     setState(
       session,
@@ -1179,6 +1222,7 @@ async function presentPending(
             stages: pending.stages,
             page: 0,
             expenseId: pending.id,
+            suggestedStageName: pending.suggestedStageName,
           })
         : summaryMessage(summary, pending.id),
     ),
@@ -1208,6 +1252,14 @@ function setState(
       ...(pending.split?.length
         ? { split: { expenseId: pending.id, items: pending.split } }
         : {}),
+      ...(pending.suggestedStageName && !pending.stageId
+        ? {
+            suggestedStage: {
+              expenseId: pending.id,
+              name: pending.suggestedStageName,
+            },
+          }
+        : {}),
       ...extra,
     },
   });
@@ -1226,13 +1278,24 @@ const NO_SUPPLIER = /^(sem|nenhum|nenhuma|nao|não|-)$/iu;
  */
 async function applyTextEdit(
   session: BotSession,
-  editing: { expenseId: string; field: TextEditField },
+  editing: {
+    expenseId: string;
+    field: TextEditField;
+    mode?: "confirm" | "edit";
+  },
   text: string,
 ): Promise<void> {
   const pending = await loadPending(session, editing.expenseId);
   if (!pending) {
     await resetConversation(session.admin, session.userId);
     return session.send({ type: "text", body: botMessages.alreadyHandled });
+  }
+  if (editing.field === "new_stage") {
+    const name = cleanStageName(text);
+    if (!name) {
+      return session.send({ type: "text", body: botMessages.newStageInvalid });
+    }
+    return applyNewStage(session, pending, name, editing.mode ?? "edit");
   }
   const value = text.replace(/\s+/g, " ").trim();
   if (editing.field === "description") {
@@ -1253,6 +1316,49 @@ async function applyTextEdit(
     { ...pending, supplierName, supplierDocument: null },
     "updated",
   );
+}
+
+/**
+ * Etapa nova pelo bot ("➕ Nova etapa" com o nome digitado, ou a sugerida
+ * pela IA): cria na obra do pendente (ou usa a que já tem esse nome) e põe o
+ * gasto nela. Na primeira pergunta já confirma, como escolher uma etapa da
+ * lista; no Editar, volta ao resumo. Quem chega aqui passou por loadPending,
+ * que confere se a pessoa ainda lança nesta obra (a mesma regra do RLS para
+ * criar etapas); o filtro por conta e obra é explícito em findOrCreateStage.
+ */
+async function applyNewStage(
+  session: BotSession,
+  pending: PendingExpense,
+  name: string,
+  mode: "confirm" | "edit",
+): Promise<void> {
+  const stage = await findOrCreateStage(
+    session.admin,
+    pending.orgId,
+    pending.projectId,
+    name,
+  );
+  if (!stage) {
+    return session.send({ type: "text", body: botMessages.newStageFailed });
+  }
+  if (stage.created) {
+    await session.send({
+      type: "text",
+      body: botMessages.stageCreated(stage.name, pending.projectName),
+    });
+  }
+  const patch = {
+    stageId: stage.id,
+    stageName: stage.name,
+    suggestedStageName: null,
+    stages: stage.created
+      ? [...pending.stages, { id: stage.id, name: stage.name }]
+      : pending.stages,
+  };
+  if (mode === "confirm") {
+    return confirm(session, { ...pending, ...patch }, { stage_id: stage.id });
+  }
+  return updateAndPresent(session, pending, { stage_id: stage.id }, patch);
 }
 
 /**
@@ -1437,6 +1543,9 @@ async function insertPending(
     hasInvoice: expense.hasInvoice,
     itemCount: receipt?.details.items.length ?? 0,
     stages,
+    suggestedStageName: expense.stageId
+      ? null
+      : (expense.suggestedStageName ?? null),
     // Itens gravados (2 ou mais): podem ser divididos por etapa. Item sem
     // etapa sugerida fica com a etapa do cupom.
     ...(receipt && itemIds.length >= 2

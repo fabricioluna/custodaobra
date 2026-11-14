@@ -13,6 +13,7 @@ const base = {
   amountCents: "30000",
   description: "",
   stageId: "",
+  newStageName: "",
   categoryId: CATEGORY,
   spentOn: "2026-11-08",
   supplierName: "",
@@ -25,6 +26,22 @@ const base = {
 };
 
 describe("expenseFormSchema", () => {
+  it("+ Nova etapa pede o nome; o nome só vale com a opção escolhida", () => {
+    const missing = expenseFormSchema.safeParse({ ...base, stageId: "nova" });
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues[0]?.path).toEqual(["newStageName"]);
+    expect(
+      expenseFormSchema.parse({
+        ...base,
+        stageId: "nova",
+        newStageName: "  Piscina ",
+      }),
+    ).toMatchObject({ stageId: "nova", newStageName: "Piscina" });
+    expect(
+      expenseFormSchema.parse({ ...base, stageId: STAGE, newStageName: "X" }),
+    ).toMatchObject({ stageId: STAGE, newStageName: null });
+  });
+
   it("aceita o mínimo: valor, categoria e data", () => {
     const result = expenseFormSchema.parse(base);
     expect(result).toMatchObject({

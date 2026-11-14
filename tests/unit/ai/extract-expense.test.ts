@@ -24,6 +24,7 @@ const raw = (fields: Partial<AiExpense> = {}): AiExpense => ({
   description: "pedreiro",
   category_code: "mao_de_obra",
   stage_number: null,
+  new_stage_name: null,
   supplier_name: null,
   spent_on: "2026-11-09",
   payment_method: null,
@@ -97,6 +98,32 @@ describe("interpretAiExpense", () => {
     expect(
       interpretAiExpense(raw({ stage_number: 0 }), "x", context)?.stageId,
     ).toBeNull();
+  });
+
+  it("etapa nova sugerida: só sem etapa da lista; nome da lista vira a etapa", () => {
+    const piscina = interpretAiExpense(
+      raw({ new_stage_name: " piscina " }),
+      "x",
+      context,
+    );
+    expect(piscina?.stageId).toBeNull();
+    expect(piscina?.suggestedStageName).toBe("Piscina");
+    // Com etapa da lista escolhida, a sugestão é ignorada.
+    expect(
+      interpretAiExpense(
+        raw({ stage_number: 1, new_stage_name: "Piscina" }),
+        "x",
+        context,
+      )?.suggestedStageName,
+    ).toBeNull();
+    // Sugestão que já existe (outra grafia): usa a etapa da lista.
+    const existing = interpretAiExpense(
+      raw({ new_stage_name: "alvenaria" }),
+      "x",
+      context,
+    );
+    expect(existing?.stageId).toBe("s-alvenaria");
+    expect(existing?.suggestedStageName).toBeNull();
   });
 
   it("obra sem etapas não pergunta a etapa", () => {

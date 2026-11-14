@@ -62,7 +62,14 @@ export type ConversationContext = {
    * Campo do pendente esperando um texto da pessoa ("Editar > Descrição" ou
    * "Fornecedor"): a próxima mensagem de texto vira o valor novo.
    */
-  editing?: { expenseId: string; field: TextEditField };
+  editing?: {
+    expenseId: string;
+    field: TextEditField;
+    /** Só em "new_stage": a etapa criada já confirma ou volta ao resumo. */
+    mode?: "confirm" | "edit";
+  };
+  /** Etapa nova sugerida pela IA para o pendente ("➕ Piscina" na lista). */
+  suggestedStage?: { expenseId: string; name: string };
   /**
    * Itens do cupom do pendente com a etapa de cada um (sugerida pela IA ou
    * ajustada pela pessoa), para dividir a nota por etapa.
@@ -71,7 +78,7 @@ export type ConversationContext = {
 };
 
 /** Campos do pendente editados por texto livre. */
-export type TextEditField = "description" | "supplier";
+export type TextEditField = "description" | "supplier" | "new_stage";
 
 /** Mantém o fornecedor do pendente ao trocar o resto do contexto. */
 export function keepPendingSupplier(

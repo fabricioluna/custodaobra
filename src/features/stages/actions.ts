@@ -10,6 +10,7 @@ import { type FormState, textField } from "@/lib/forms";
 import { createClient } from "@/lib/supabase/server";
 
 import { stagesCopy } from "./copy";
+import { findOrCreateStage } from "./create";
 import { parseBudgetForm, parseProgressForm } from "./schemas";
 
 export type StageFormState = FormState<"name">;
@@ -82,21 +83,16 @@ export async function addStage(
   }
 
   const supabase = await createClient();
-  const { data: last } = await supabase
-    .from("stages")
-    .select("sort_order")
-    .eq("project_id", projectId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { error } = await supabase.from("stages").insert({
-    org_id: org.id,
-    project_id: projectId,
-    name: parsed.data,
-    sort_order: (last?.sort_order ?? 0) + 1,
-  });
-  if (error) return { status: "error", message: errors.saveFailed };
+  const stage = await findOrCreateStage(
+    supabase,
+    org.id,
+    projectId,
+    parsed.data,
+  );
+  if (!stage) return { status: "error", message: errors.saveFailed };
+  if (!stage.created) {
+    return { status: "error", fieldErrors: { name: errors.nameExists } };
+  }
 
   refresh();
   return { status: "success" };

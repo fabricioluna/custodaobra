@@ -9,6 +9,7 @@ import { ProjectForm } from "@/features/projects/components/project-form";
 import { billingCopy } from "@/features/billing/copy";
 import { projectsCopy } from "@/features/projects/copy";
 import { canManageOrg, listProjects } from "@/features/projects/queries";
+import { listStageTemplateNames } from "@/features/stages/queries";
 import { canCreateProject } from "@/lib/billing/limits";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,9 +25,10 @@ export default async function NewProjectPage({
   if (!(await canManageOrg(org.id))) notFound();
 
   const supabase = await createClient();
-  const [projects, allowed] = await Promise.all([
+  const [projects, allowed, stageTemplates] = await Promise.all([
     listProjects(org.id, { archived: "include" }),
     canCreateProject(supabase, org.id),
+    listStageTemplateNames(),
   ]);
   const isFirst = projects.length === 0;
 
@@ -50,6 +52,7 @@ export default async function NewProjectPage({
         submitLabel={copy.submit}
         submittingLabel={copy.submitting}
         disabled={!allowed.ok}
+        stageTemplates={stageTemplates}
       />
       <p className="mt-6 max-w-xl text-sm text-muted-foreground">
         {copy.stagesHint}

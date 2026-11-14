@@ -96,6 +96,7 @@ export const stagesCopy = {
   errors: {
     nameRequired: "Digite o nome da etapa.",
     nameTooLong: "Use no máximo 80 letras.",
+    nameExists: "A obra já tem uma etapa com esse nome.",
     noPermission: "Você não tem permissão para mudar as etapas desta obra.",
     saveFailed: "Não deu para salvar agora. Tente de novo em instantes.",
     invalidAmount: "Valor grande demais.",
