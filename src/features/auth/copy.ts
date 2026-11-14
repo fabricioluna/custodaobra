@@ -34,7 +34,7 @@ export const authCopy = {
       description:
         "Use o e-mail que você confere. Vamos mandar um código para ele uma única vez.",
       passwordLabel: "Crie uma senha",
-      passwordHint: "Pelo menos 8 caracteres.",
+      passwordHint: "Pelo menos 6 caracteres.",
       submit: "Criar conta",
       submitting: "Criando…",
       confirmTitle: "Confirme seu e-mail",
@@ -69,7 +69,7 @@ export const authCopy = {
     wrongPassword:
       "E-mail ou senha errados. Se você sempre entrou por código ou pelo Google, toque em Esqueci minha senha para criar uma.",
     missingPassword: "Digite sua senha.",
-    shortPassword: "A senha precisa de pelo menos 8 caracteres.",
+    shortPassword: "A senha precisa de pelo menos 6 caracteres.",
     longPassword: "A senha pode ter no máximo 72 caracteres.",
     weakPassword:
       "Essa senha é fácil de adivinhar. Use uma mais longa, misturando letras e números.",
@@ -93,7 +93,7 @@ export const authCopy = {
     title: "Senha nova",
     description: "Escolha a senha que você vai usar para entrar.",
     label: "Senha nova",
-    hint: "Pelo menos 8 caracteres.",
+    hint: "Pelo menos 6 caracteres.",
     save: "Salvar senha",
     saving: "Salvando…",
     saved: "Senha salva. Da próxima vez, entre com seu e-mail e esta senha.",

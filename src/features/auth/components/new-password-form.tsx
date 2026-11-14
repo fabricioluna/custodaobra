@@ -81,7 +81,7 @@ export function NewPasswordForm({ continueTo }: { continueTo?: string }) {
           id="new-password"
           name="password"
           autoComplete="new-password"
-          minLength={8}
+          minLength={6}
           maxLength={72}
           required
           aria-describedby="new-password-hint"
