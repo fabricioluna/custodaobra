@@ -16,6 +16,9 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+// A ação do servidor importa `server-only`; no teste só o botão importa.
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
+
 const owner = { all: true, projectIds: [] };
 
 describe("AppNav", () => {
