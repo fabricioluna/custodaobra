@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { isProtectedPath, loginPathFor, safeNextPath } from "@/lib/auth/paths";
 
 describe("isProtectedPath", () => {
-  it.each(["/o/minha-casa/obras", "/o", "/inicio", "/primeiro-acesso"])(
-    "%s exige login",
-    (path) => {
-      expect(isProtectedPath(path)).toBe(true);
-    },
-  );
+  it.each([
+    "/o/minha-casa/obras",
+    "/o",
+    "/inicio",
+    "/primeiro-acesso",
+    "/nova-senha",
+  ])("%s exige login", (path) => {
+    expect(isProtectedPath(path)).toBe(true);
+  });
 
   it.each(["/", "/entrar", "/auth/callback", "/obras", "/inicio-rapido"])(
     "%s é público",

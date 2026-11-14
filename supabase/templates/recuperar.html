@@ -1,0 +1,68 @@
+<!--
+  E-mail de "Esqueci minha senha" (código + link). Modelo "Reset Password"
+  do Supabase (Authentication > Emails > Templates).
+  Assunto sugerido: Seu código para criar a senha: {{ .Token }}
+
+  O link usa {{ .RedirectTo }}, que o app monta como
+  <origem>/auth/confirm?next=/nova-senha: abre a sessão e leva à tela de
+  escolher a senha nova.
+-->
+<div
+  style="
+    font-family: Arial, Helvetica, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    color: #132a42;
+  "
+>
+  <div style="background: #132a42; padding: 24px; border-radius: 16px 16px 0 0">
+    <p style="margin: 0; color: #ffffff; font-size: 20px; font-weight: bold">
+      Valor da Obra
+    </p>
+  </div>
+  <div
+    style="
+      background: #ffffff;
+      padding: 24px;
+      border: 1px solid #d8dee6;
+      border-top: 0;
+      border-radius: 0 0 16px 16px;
+    "
+  >
+    <p style="margin: 0 0 8px; font-size: 16px">Seu código para criar a senha:</p>
+    <p
+      style="
+        margin: 0 0 24px;
+        font-size: 36px;
+        font-weight: bold;
+        letter-spacing: 8px;
+      "
+    >
+      {{ .Token }}
+    </p>
+    <p style="margin: 0 0 16px; font-size: 16px">
+      Digite o código no app junto com a senha nova, ou toque no botão:
+    </p>
+    <p style="margin: 0 0 24px">
+      <a
+        href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery"
+        style="
+          display: inline-block;
+          background: #f5ad02;
+          color: #132a42;
+          font-size: 16px;
+          font-weight: bold;
+          text-decoration: none;
+          padding: 14px 28px;
+          border-radius: 12px;
+        "
+      >
+        Criar senha nova
+      </a>
+    </p>
+    <p style="margin: 0; font-size: 14px; color: #4e5d72">
+      O código e o botão valem por 1 hora e só funcionam uma vez. Se você não
+      pediu uma senha nova, ignore este e-mail: sua senha continua a mesma.
+    </p>
+  </div>
+</div>

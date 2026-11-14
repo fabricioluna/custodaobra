@@ -1,12 +1,17 @@
 export const accountCopy = {
   settingsRow: {
     title: "Seus dados",
-    description: "Baixar tudo em planilha ou excluir a conta.",
+    description: "Senha, baixar tudo em planilha ou excluir a conta.",
   },
   page: {
     title: "Seus dados",
     description:
       "Os dados são seus: baixe quando quiser. Se não for mais usar o app, você pode excluir a conta.",
+  },
+  passwordSection: {
+    title: "Senha",
+    description:
+      "Crie ou troque a senha para entrar com seu e-mail e senha. Se você entra pelo Google ou por código, pode continuar assim.",
   },
   exportSection: {
     title: "Baixar meus dados",

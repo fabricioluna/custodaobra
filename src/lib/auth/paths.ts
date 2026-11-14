@@ -4,11 +4,19 @@ export const LOGIN_PATH = "/entrar";
 /** Decide para onde a pessoa vai depois de entrar (primeiro acesso ou obras). */
 export const AFTER_LOGIN_PATH = "/inicio";
 export const ONBOARDING_PATH = "/primeiro-acesso";
+/** Senha nova, aberta pelo link do e-mail de "Esqueci minha senha". */
+export const NEW_PASSWORD_PATH = "/nova-senha";
 /** Para onde vai quem acabou de excluir a conta (página pública). */
 export const ACCOUNT_DELETED_PATH = "/conta-excluida";
 
 /** Áreas que exigem login. */
-const PROTECTED_PREFIXES = ["/o", "/admin", AFTER_LOGIN_PATH, ONBOARDING_PATH];
+const PROTECTED_PREFIXES = [
+  "/o",
+  "/admin",
+  AFTER_LOGIN_PATH,
+  ONBOARDING_PATH,
+  NEW_PASSWORD_PATH,
+];
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(

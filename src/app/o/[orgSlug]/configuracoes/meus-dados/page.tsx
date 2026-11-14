@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { DeleteAccountForm } from "@/features/account/components/delete-account-form";
 import { accountCopy as copy } from "@/features/account/copy";
+import { NewPasswordForm } from "@/features/auth/components/new-password-form";
 import { getDeletionPreview } from "@/features/account/queries";
 import { requireOrg } from "@/features/organizations/queries";
 import { settingsCopy } from "@/features/settings/copy";
@@ -31,6 +32,14 @@ export default async function MyDataPage({
       <PageHeader title={copy.page.title} description={copy.page.description} />
 
       <div className="flex max-w-xl flex-col gap-10">
+        <section>
+          <h2 className="text-lg heading">{copy.passwordSection.title}</h2>
+          <p className="mt-1.5 mb-4 text-muted-foreground">
+            {copy.passwordSection.description}
+          </p>
+          <NewPasswordForm />
+        </section>
+
         <section>
           <h2 className="text-lg heading">{copy.exportSection.title}</h2>
           <p className="mt-1.5 mb-4 text-muted-foreground">
