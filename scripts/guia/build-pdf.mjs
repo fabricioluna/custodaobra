@@ -141,13 +141,13 @@ const html = `<!doctype html>
     <h1>Cada real da sua casa na ponta do lápis</h1>
     <p class="sub">Como usar o app do cadastro ao fim da obra: lançar gastos pelo celular ou pelo WhatsApp, acompanhar o previsto x realizado de cada etapa, contas a pagar, equipe e relatórios.</p>
   </div>
-  <div style="font-size:9.5pt;color:rgba(255,255,255,.7)">valordaobra.com.br · Versão de novembro de 2026 · Os exemplos usam uma obra fictícia (“Casa da Maria”).</div>
+  <div style="font-size:9.5pt;color:rgba(255,255,255,.7)">valordaobra.com.br · Versão de 14 de novembro de 2026 · Os exemplos usam uma obra fictícia (“Casa da Maria”).</div>
 </section>
 
 <h2 style="break-before:page">Sumário</h2>
 <ol class="toc">
   <li>O que é o Valor da Obra</li>
-  <li>Criar a conta e entrar</li>
+  <li>Criar a conta, entrar e sair</li>
   <li>Cadastrar a primeira obra</li>
   <li>Como o app é organizado</li>
   <li>Lançar um gasto pelo app</li>
@@ -162,7 +162,7 @@ const html = `<!doctype html>
   <li>Equipe e convites</li>
   <li>Dados da obra e arquivar</li>
   <li>Plano e uso</li>
-  <li>Seus dados: planilha completa e excluir conta</li>
+  <li>Seus dados: senha, planilha completa e excluir conta</li>
   <li>Instalar no celular e dúvidas frequentes</li>
 </ol>
 
@@ -183,20 +183,24 @@ const html = `<!doctype html>
 </table>
 ${note("<strong>Regra de ouro:</strong> nada que a inteligência artificial lê é gravado sem você confirmar. No WhatsApp, o gasto só vale depois do toque em <em>Confirmar</em> (ou na etapa).")}
 
-<h2><span class="n">2</span>Criar a conta e entrar</h2>
-${two(
-  "04-entrar",
-  "Tela de entrada",
-  `
-    <p>Acesse <strong>valordaobra.com.br</strong> e toque em <strong>Começar grátis</strong> ou <strong>Entrar</strong>. Não existe senha para decorar:</p>
-    <ul>
-      <li><strong>Entrar com Google</strong>: um toque, se você usa conta Google no celular.</li>
-      <li><strong>Com e-mail</strong>: digite seu e-mail, receba um <strong>código de acesso</strong> e digite-o na tela (ou toque no link do e-mail).</li>
-    </ul>
-    <p>A conta nova começa com <strong>14 dias grátis</strong>, sem cartão de crédito.</p>
-    ${tip("O primeiro acesso cria a sua conta automaticamente. Nas próximas vezes, o mesmo e-mail ou Google entra direto nas suas obras.")}
-`,
-)}
+<h2><span class="n">2</span>Criar a conta, entrar e sair</h2>
+${row(fig("04-entrar", "Entrar com e-mail e senha"), fig("04b-criar-conta", "Criar conta"))}
+<p>Acesse <strong>valordaobra.com.br</strong> e toque em <strong>Começar grátis</strong> ou <strong>Entrar</strong>.</p>
+<h3>Criar a conta</h3>
+<ol>
+  <li>Na tela de entrar, toque em <strong>Criar conta</strong> (embaixo, em “Ainda não tem conta?”).</li>
+  <li>Digite o seu e-mail e <strong>crie uma senha</strong> de pelo menos 6 caracteres. Toque no olho para conferir o que digitou.</li>
+  <li>Chega um <strong>código de 6 dígitos</strong> no seu e-mail. Digite-o na tela e toque em <strong>Confirmar e entrar</strong>. Isso só é pedido uma vez, no cadastro.</li>
+</ol>
+<p>Ou toque em <strong>Entrar com Google</strong>: um toque, sem senha, se você usa conta Google no celular. A conta nova começa com <strong>7 dias grátis</strong>, sem cartão de crédito.</p>
+<h3>Entrar nas próximas vezes</h3>
+<table>
+  <tr><th>Jeito</th><th>Como</th></tr>
+  <tr><td>E-mail e senha</td><td>O jeito padrão: digite os dois e toque em <strong>Entrar</strong>.</td></tr>
+  <tr><td>Google</td><td><strong>Entrar com Google</strong>, se criou a conta assim.</td></tr>
+  <tr><td>Código por e-mail</td><td><strong>Entrar com código por e-mail</strong>: chega um código (e um link) no e-mail, sem precisar de senha.</td></tr>
+</table>
+${tip("Esqueceu a senha, ou sempre entrou pelo Google ou por código e quer uma senha? Toque em <strong>Esqueci minha senha</strong>: chega um código no e-mail, e você digita o código e a senha nova.")}
 <h3>Primeiro acesso</h3>
 ${two(
   "05-primeiro-acesso",
@@ -208,6 +212,16 @@ ${two(
       <li><strong>Nome da conta</strong>: pode ser o seu nome (“Maria Souza”) ou o da sua empresa (“Souza Construções”). É o nome de quem “paga” o app e dono das obras.</li>
     </ul>
     <p>Depois de <strong>Continuar</strong>, o app leva direto para o cadastro da primeira obra.</p>
+`,
+)}
+<h3>Sair da conta</h3>
+${two(
+  "23-configuracoes",
+  "Mais › Configurações, com “Seu acesso” no topo",
+  `
+    <p>Em <strong>Mais</strong>, o primeiro quadro é <strong>Seu acesso</strong>: mostra com qual e-mail você entrou e tem o botão <strong>Sair da conta</strong>. No computador, “Sair da conta” também fica no pé da barra da esquerda.</p>
+    <p>Útil para quem tem dois logins (o e-mail pessoal e o da empresa, por exemplo): saia e entre de novo com o outro.</p>
+    ${tip("Não está vendo uma obra que deveria ver? Confira em Seu acesso se entrou com o e-mail certo.")}
 `,
 )}
 
@@ -223,9 +237,14 @@ ${two(
       <li><strong>Padrão de acabamento</strong>: econômico, normal ou alto.</li>
       <li><strong>Início</strong>, <strong>situação</strong> (planejamento, em andamento, pausada, concluída) e <strong>endereço</strong>.</li>
     </ul>
-    <h3>As etapas já vêm prontas</h3>
-    <p>Toda obra nasce com 13 etapas padrão, que você pode renomear, reordenar, apagar ou completar (veja o capítulo 8):</p>
-    <p style="font-size:9.5pt">Projetos e documentação · Serviços preliminares e terreno · Fundação · Estrutura · Alvenaria · Cobertura · Instalações elétricas · Instalações hidrossanitárias · Revestimentos e pisos · Esquadrias (portas e janelas) · Pintura · Louças, metais e acabamentos · Limpeza e entrega</p>
+    <h3>Escolha as etapas</h3>
+    <p>No fim do formulário, em <strong>Etapas da obra</strong>, as 13 etapas mais comuns já vêm marcadas. <strong>Desmarque</strong> as que não fazem parte da sua obra: numa reforma, por exemplo, não há fundação nem cobertura. No exemplo, “Fundação” foi desmarcada.</p>
+    <ul>
+      <li><strong>Marcar todas</strong>: volta a marcar as 13.</li>
+      <li><strong>Começar sem etapas</strong>: a obra começa vazia, e você cria as etapas que quiser.</li>
+    </ul>
+    <p>Toque em <strong>Criar obra</strong>. Dá para renomear, reordenar e criar etapas depois, inclusive na hora de lançar um gasto ou pelo WhatsApp (capítulos 5, 8 e 12).</p>
+    <p style="font-size:9.5pt">As 13 sugeridas: Projetos e documentação · Serviços preliminares e terreno · Fundação · Estrutura · Alvenaria · Cobertura · Instalações elétricas · Instalações hidrossanitárias · Revestimentos e pisos · Esquadrias (portas e janelas) · Pintura · Louças, metais e acabamentos · Limpeza e entrega</p>
 `,
 )}
 
@@ -267,6 +286,15 @@ ${two(
       <li><strong>Etapa</strong> (opcional): em qual etapa o gasto entra. Se não souber agora, deixe “Sem etapa (classificar depois)”: ele aparece no painel em <em>Para classificar</em>.</li>
       <li>Toque em <strong>Salvar gasto</strong>. Pronto, o painel já está atualizado.</li>
     </ol>
+`,
+)}
+<h3>Etapa que ainda não existe</h3>
+${two(
+  "09b-nova-etapa",
+  "“+ Nova etapa” no campo Etapa",
+  `
+    <p>O gasto é de uma etapa que a obra ainda não tem (o muro, a piscina, a garagem)? No campo <strong>Etapa</strong>, escolha <strong>+ Nova etapa</strong>, a última da lista, e digite o nome logo abaixo.</p>
+    <p>Ao salvar, o app cria a etapa no fim da lista e já lança o gasto nela. Se já existir uma etapa com esse nome, ele usa a que existe, sem duplicar.</p>
 `,
 )}
 <h3>Mais detalhes (opcional)</h3>
@@ -365,7 +393,7 @@ ${two(
 ${row(fig("15-progresso", "Progresso de cada etapa"), fig("16-organizar", "Organizar etapas"))}
 <ul>
   <li><strong>Progresso</strong>: diga quanto cada etapa está pronta (0 a 100%). É isso que permite o aviso de “gasto à frente da obra”.</li>
-  <li><strong>Organizar etapas</strong>: renomeie (“Fundação” → “Fundação e baldrame”), mude a ordem, remova o que sua obra não tem ou acrescente etapas novas (“Piscina”, “Muro”).</li>
+  <li><strong>Organizar etapas</strong>: renomeie (“Fundação” → “Fundação e baldrame”), mude a ordem, remova o que sua obra não tem ou acrescente etapas novas (“Piscina”, “Muro”). Etapas novas também podem nascer na hora de lançar um gasto, pelo app ou pelo WhatsApp.</li>
 </ul>
 
 <h2><span class="n">9</span>Contas a pagar e parcelas</h2>
@@ -441,6 +469,16 @@ ${chat([
   <li><strong>Cancelar</strong>: nada é gravado.</li>
 </ul>
 <p>Se o bot não souber a etapa, ele mostra a lista de etapas: <strong>escolher a etapa já confirma</strong> o gasto. Assim, “300 pedreiro” vira um gasto lançado em 2 toques. Se faltar o valor, ele pergunta só o valor.</p>
+<h3>Etapa nova pelo WhatsApp</h3>
+<p>Na lista de etapas há também <strong>➕ Nova etapa</strong>: o bot pergunta o nome e já lança o gasto nela. Quando o gasto claramente é de uma etapa que a obra não tem, o bot sugere essa etapa no alto da lista:</p>
+${chat([
+  ["eu", "1200 azulejo da piscina"],
+  ["bot", "R$ 1.200,00 · Material · hoje · sem nota\nEm qual etapa?"],
+  ["btn", "➕ Piscina"],
+  ["btn", "➕ Nova etapa"],
+  ["btn", "Sem etapa"],
+])}
+<p>Tocar em <strong>➕ Piscina</strong> cria a etapa e lança o gasto, num toque só.</p>
 ${note("Um gasto que fica sem confirmação por mais de 24 horas é cancelado sozinho.")}
 <h3>Por foto do cupom ou nota</h3>
 <p>Mande a <strong>foto</strong> (ou o <strong>PDF</strong>) do cupom, da nota fiscal, do recibo ou do comprovante do Pix. O bot lê o total, a loja, o CNPJ, a data, a forma de pagamento e os <strong>itens</strong>, e guarda a foto junto com o gasto.</p>
@@ -457,6 +495,7 @@ ${tip("Foto nítida, com o cupom inteiro e boa luz, é lida melhor. ")}
   <tr><td><code>obras</code></td><td>Lista suas obras e deixa trocar a <strong>obra ativa</strong> (a que recebe os gastos).</td></tr>
   <tr><td><code>resumo</code></td><td>Total gasto na construção, previsto, contas a pagar, terreno, as 5 etapas com mais gasto e os gastos sem etapa.</td></tr>
   <tr><td><code>desfazer</code></td><td>Cancela o último gasto que você confirmou pelo WhatsApp nos últimos 10 minutos.</td></tr>
+  <tr><td><code>nova etapa Muro</code></td><td>Cria a etapa “Muro” na obra ativa (vale também <code>criar etapa</code> ou <code>adicionar etapa</code>). Só para quem lança na obra.</td></tr>
 </table>
 <h3>Perguntas sobre a obra</h3>
 <p>Pergunte do seu jeito, por texto ou áudio:</p>
@@ -530,25 +569,27 @@ ${two(
     <p>Em <strong>Mais › Plano e uso</strong> (só para o dono e administradores) você vê o plano, o preço e quanto já usou no mês.</p>
     <table>
       <tr><th></th><th>Pessoal</th><th>Profissional</th></tr>
-      <tr><td>Preço</td><td>R$ 19,90/mês</td><td>R$ 79,90/mês</td></tr>
+      <tr><td>Preço</td><td>R$ 24,90/mês</td><td>R$ 79,90/mês</td></tr>
       <tr><td>Obras ativas</td><td>1</td><td>até 10</td></tr>
       <tr><td>Pessoas com acesso</td><td>até 3</td><td>até 10</td></tr>
       <tr><td>Lançamentos por WhatsApp/mês</td><td>300</td><td>3.000</td></tr>
       <tr><td>Foto, áudio e perguntas no bot</td><td>sim</td><td>sim</td></tr>
     </table>
-    <p>Toda conta começa com <strong>14 dias grátis</strong>. Para continuar, toque em <strong>Assinar um plano</strong> e pague por Pix, boleto ou cartão.</p>
+    <p>Toda conta começa com <strong>7 dias grátis</strong>. Para continuar, toque em <strong>Assinar um plano</strong> e pague por Pix, boleto ou cartão.</p>
     ${note("<strong>Chegou no limite?</strong> Você continua vendo, editando, exportando e excluindo tudo. Só não cria além do limite (uma obra a mais, por exemplo) até mudar de plano ou arquivar uma obra.")}
     <p style="font-size:9.5pt">Pessoas com acesso contam cada pessoa uma vez, mais os convites ainda não usados.</p>
 `,
 )}
 
-<h2><span class="n">17</span>Seus dados: planilha completa e excluir conta</h2>
+<h2><span class="n">17</span>Seus dados: senha, planilha completa e excluir conta</h2>
 ${two(
   "30-meus-dados",
   "Mais › Seus dados",
   `
+    <h3>Senha</h3>
+    <p>Crie ou troque a senha usada para entrar com e-mail e senha. Quem entra pelo Google ou por código pode continuar assim, sem senha.</p>
     <h3>Baixar todos os seus dados</h3>
-    <p>Gera uma planilha com tudo o que você vê em todas as contas de que participa: obras, etapas, gastos, contas, fornecedores. Bom para guardar uma cópia ou levar para o contador.</p>
+    <p>Gera uma planilha com tudo o que você vê em todas as contas de que participa: obras, etapas, gastos, contas, fornecedores. Bom para guardar uma cópia ou levar para o contador. As fotos dos comprovantes não vão na planilha; abra cada uma no gasto.</p>
     <h3>Excluir a conta</h3>
     <p>Para apagar a sua conta, digite <strong>EXCLUIR</strong> e confirme. São apagados os seus dados pessoais, as contas de que você é o único dono (com obras, gastos e fotos de comprovantes) e o histórico do WhatsApp. Não dá para desfazer.</p>
     ${tip("Antes de excluir, baixe a planilha. Se você só foi convidado para a obra de outra pessoa, a obra dela continua existindo.")}
@@ -565,11 +606,13 @@ ${two(
 <h3>Dúvidas frequentes</h3>
 <p><strong>A inteligência artificial grava gastos sozinha?</strong><br>Não. Ela só lê a mensagem, a foto ou o áudio e propõe. O gasto só vale depois que você confirma.</p>
 <p><strong>Quem consegue ver os dados da minha obra?</strong><br>Só você e quem você convidou. As fotos dos comprovantes ficam guardadas de forma privada.</p>
-<p><strong>Serve para reforma?</strong><br>Serve. Renomeie, remova ou crie etapas para a sua reforma (“Demolição”, “Cozinha”, “Banheiro”).</p>
+<p><strong>Serve para reforma?</strong><br>Serve. Ao criar a obra, desmarque as etapas que não servem; depois renomeie, remova ou crie etapas para a sua reforma (“Demolição”, “Cozinha”, “Banheiro”).</p>
 <p><strong>Os valores de orçamento são exatos?</strong><br>Não. A estimativa por m² e os percentuais por etapa são uma referência para começar. O valor certo é o que você informar.</p>
 <p><strong>Lancei errado pelo WhatsApp. E agora?</strong><br>Se foi agora, mande <code>desfazer</code> (até 10 minutos). Depois disso, abra o gasto no app e corrija ou exclua.</p>
 <p><strong>Paguei uma conta. Preciso lançar o gasto também?</strong><br>Não. Marque a conta como paga: o gasto é criado sozinho.</p>
 <p><strong>Comprei o terreno. Lanço onde?</strong><br>Na categoria <em>Terreno</em>. Ele aparece no total investido, mas fica fora do custo da construção e do custo por m².</p>
+<p><strong>Esqueci a senha. E agora?</strong><br>Na tela de entrar, toque em <em>Esqueci minha senha</em> e digite o código que chega no e-mail e a senha nova. Ou entre com <em>código por e-mail</em>, sem senha.</p>
+<p><strong>Quanto custa?</strong><br>Pessoal R$ 24,90 e Profissional R$ 79,90 por mês, com 7 dias grátis para testar, sem cartão.</p>
 <p><strong>Precisa de ajuda?</strong><br>Escreva para <strong>contato@valordaobra.com.br</strong>.</p>
 
 </body></html>`;
