@@ -23,3 +23,11 @@ export async function requireUserId(): Promise<string> {
   if (!userId) redirect(LOGIN_PATH);
   return userId;
 }
+
+/** E-mail da pessoa logada (para mostrar com qual login ela entrou). */
+export const getUserEmail = cache(async (): Promise<string | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const email = data?.claims?.email;
+  return typeof email === "string" && email ? email : null;
+});
